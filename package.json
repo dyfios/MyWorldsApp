@@ -1,0 +1,25 @@
+{
+  "name": "myworlds-client",
+  "version": "0.1.0",
+  "description": "MyWorlds TypeScript client for spatial interaction and world rendering",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean"
+  },
+  "keywords": [
+    "myworlds",
+    "spatial",
+    "rendering",
+    "3d",
+    "client"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  }
+}
