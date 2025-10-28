@@ -2,7 +2,7 @@
  * REST API module for HTTP endpoints
  */
 
-import { EntityPlacementData, Position } from '../types/config';
+import { EntityPlacementData, Position, Rotation } from '../types/config';
 import { EntityData } from '../types/entity';
 
 export class REST {
@@ -20,7 +20,7 @@ export class REST {
     await this.post('/terrain/build', { position, radius, height });
   }
 
-  async sendPositionEntityRequest(entityId: string, position: Position, rotation?: any): Promise<void> {
+  async sendPositionEntityRequest(entityId: string, position: Position, rotation?: Rotation): Promise<void> {
     await this.post('/entity/position', { entityId, position, rotation });
   }
 

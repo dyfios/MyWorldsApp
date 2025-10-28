@@ -13,6 +13,7 @@ export interface EnvironmentSettings {
 }
 
 export class EnvironmentModifier {
+  private static readonly SECONDS_PER_HOUR = 3600;
   private settings: EnvironmentSettings;
 
   constructor() {
@@ -79,7 +80,7 @@ export class EnvironmentModifier {
   update(deltaTime: number): void {
     // Update time progression, weather transitions, etc.
     // For now, just advance time slightly
-    this.settings.timeOfDay += deltaTime / 3600; // Advance time (assuming deltaTime is in seconds)
+    this.settings.timeOfDay += deltaTime / EnvironmentModifier.SECONDS_PER_HOUR; // Advance time (assuming deltaTime is in seconds)
     if (this.settings.timeOfDay >= 24) {
       this.settings.timeOfDay -= 24;
     }

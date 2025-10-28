@@ -21,8 +21,8 @@ export { EntityManager, EntityPlacement } from './modules/EntityManager';
 export { InputRouter } from './modules/InputRouter';
 export { PlayerController } from './modules/PlayerController';
 export { ScriptEngine } from './modules/ScriptEngine';
-export { SyncManager, SyncMsgHandler } from './modules/SyncManager';
-export { UIManager } from './modules/UIManager';
+export { SyncManager, SyncMsgHandler, SyncMsgHandlerDependencies } from './modules/SyncManager';
+export { UIManager, UIUpdateData } from './modules/UIManager';
 export {
   WorldRendererFactory,
   WorldRendering,

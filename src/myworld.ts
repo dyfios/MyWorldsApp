@@ -7,6 +7,7 @@ import { ClientContext } from './modules/ClientContext';
 import { ProcessQueryParams } from './utils/ProcessQueryParams';
 
 export class MyWorld {
+  private static readonly MOCK_LOGIN_DELAY_MS = 100;
   private context: ClientContext;
   private queryParams: ProcessQueryParams;
 
@@ -71,7 +72,7 @@ export class MyWorld {
       });
       
       // Auto-resolve for now (in real app, would wait for actual login)
-      setTimeout(() => resolve(), 100);
+      setTimeout(() => resolve(), MyWorld.MOCK_LOGIN_DELAY_MS);
     });
   }
 

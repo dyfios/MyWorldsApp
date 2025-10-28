@@ -2,6 +2,11 @@
  * UI Manager - Manages UI elements and edit toolbar
  */
 
+export interface UIUpdateData {
+  type: string;
+  payload?: any;
+}
+
 export class UIManager {
   private editToolbar?: HTMLElement;
   private isInitialized: boolean = false;
@@ -72,7 +77,7 @@ export class UIManager {
   /**
    * Trigger UI updates from sync
    */
-  triggerUIUpdates(data: any): void {
+  triggerUIUpdates(data: UIUpdateData): void {
     console.log('UI updates triggered:', data);
     // Update UI elements based on sync data
   }

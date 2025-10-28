@@ -2,6 +2,11 @@
  * Synchronization module - Handles real-time updates across clients
  */
 
+import { EntityManager } from './EntityManager';
+import { PlayerController } from './PlayerController';
+import { UIManager } from './UIManager';
+import { WorldRendererFactory } from './WorldRendererFactory';
+
 export interface SyncDiff {
   type: string;
   data: any;
@@ -73,13 +78,15 @@ export class SyncManager {
   }
 }
 
+export interface SyncMsgHandlerDependencies {
+  entityManager?: EntityManager;
+  playerController?: PlayerController;
+  uiManager?: UIManager;
+  worldRendererFactory?: WorldRendererFactory;
+}
+
 export class SyncMsgHandler {
-  setDependencies(_deps: {
-    entityManager?: any;
-    playerController?: any;
-    uiManager?: any;
-    worldRendererFactory?: any;
-  }): void {
+  setDependencies(_deps: SyncMsgHandlerDependencies): void {
     // Dependencies would be stored for use in handlers
   }
 
