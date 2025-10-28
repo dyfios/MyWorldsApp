@@ -5,7 +5,7 @@ A modular TypeScript client for spatial interaction, entity placement, world ren
 ## 📖 Documentation
 
 - **[Design Document](docs/design.md)** - Complete architectural overview with PlantUML diagrams
-- **[Implementation Guide](IMPLEMENTATION.md)** - TypeScript implementation details and usage
+- **[Implementation Guide](docs/IMPLEMENTATION.md)** - TypeScript implementation details and usage
 
 ## 🚀 Quick Start
 
