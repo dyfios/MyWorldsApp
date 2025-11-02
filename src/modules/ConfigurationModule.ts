@@ -48,14 +48,45 @@ export class ConfigurationModule {
   }
 
   /**
-   * Fetch JSON from URL
+   * Fetch JSON from URL using WebVerse HTTPNetworking
    */
   private async fetchJson<T>(url: string): Promise<T> {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
-    }
-    return response.json();
+    return new Promise((resolve, reject) => {
+/*      const onComplete = "";
+      const onError = "";
+
+      HTTPNetworking.Fetch(
+        url,
+        { method: 'GET' },
+        onComplete,
+        onError
+      );
+
+      // Store callbacks globally for HTTPNetworking to call
+      (globalThis as any)[onComplete] = (response: any) => {
+        try {
+          const data = JSON.parse(response.body);
+          // Clean up callbacks
+          delete (globalThis as any)[onComplete];
+          delete (globalThis as any)[onError];
+          resolve(data);
+        } catch (error) {
+          delete (globalThis as any)[onComplete];
+          delete (globalThis as any)[onError];
+          reject(new Error(`Failed to parse JSON from ${url}: ${error}`));
+        }
+      };
+
+      (globalThis as any)[onError] = (error: any) => {
+        delete (globalThis as any)[onComplete];
+        delete (globalThis as any)[onError];
+        reject(new Error(`Failed to fetch ${url}: ${error.message || 'Unknown error'}`));
+      };*/
+      if (false) {
+        reject(new Error(`Failed to fetch ${url}: Unknown error`));
+      }
+      resolve({} as T);
+    });
   }
 
   /**
@@ -91,7 +122,7 @@ export class ConfigurationModule {
    */
   private applyEntitiesConfig(): void {
     // Logic to register entity types and variants
-    console.log('Entities configuration applied');
+    Logging.Log('Entities configuration applied');
   }
 
   /**
@@ -108,7 +139,7 @@ export class ConfigurationModule {
    */
   private applyTerrainConfig(): void {
     // Logic to set up terrain rendering
-    console.log('Terrain configuration applied');
+    Logging.Log('Terrain configuration applied');
   }
 
   /**

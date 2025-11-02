@@ -5,15 +5,25 @@
 
 import { ClientContext } from './modules/ClientContext';
 import { ProcessQueryParams } from './utils/ProcessQueryParams';
+import { StaticSurfaceRenderer } from './modules/WorldRendererFactory';
 
 export class MyWorld {
-  private static readonly MOCK_LOGIN_DELAY_MS = 100;
   private context: ClientContext;
   private queryParams: ProcessQueryParams;
+  private renderIntervalId: any = null;
 
   constructor() {
-    this.context = new ClientContext();
-    this.queryParams = new ProcessQueryParams();
+    try {
+      Logging.Log('🚀 Step 0b1: Creating ClientContext...');
+      this.context = new ClientContext();
+      Logging.Log('🚀 Step 0b2: Creating ProcessQueryParams...');
+      this.queryParams = new ProcessQueryParams();
+      Logging.Log('🚀 Step 0b3: MyWorld constructor completed successfully');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ Error in MyWorld constructor: ' + errorMessage);
+      throw error;
+    }
   }
 
   /**
@@ -21,105 +31,283 @@ export class MyWorld {
    */
   async launch(): Promise<void> {
     try {
-      console.log('🌐 Launching MyWorld Client...');
+      Logging.Log('🌐 Launching MyWorld Client...');
 
       // 1. Parse query parameters
+      Logging.Log('📊 Step 1: Starting query parameter parsing...');
       const params = this.queryParams.parse();
-      console.log('✓ Query parameters processed');
+      Logging.Log('✓ Query parameters processed successfully');
 
-      // 2. Trigger login via Identity module
-      await this.startUserLogin();
-      console.log('✓ User login completed');
+      // 2. Trigger login via Identity module (non-blocking)
+      Logging.Log('🔐 Step 2: Starting user login process (async)...');
+      this.startUserLogin(); // Don't await - let it run in background
+      Logging.Log('✓ User login process initiated (will complete asynchronously)');
 
       // 3. Initialize all core modules into ClientContext
+      Logging.Log('⚙️ Step 3: Initializing core modules...');
       await this.context.initializeModules();
-      console.log('✓ Modules initialized');
+      Logging.Log('✓ Modules initialized successfully');
 
       // 4. Load world configuration
+      Logging.Log('🌍 Step 4: Loading world configuration...');
       const worldUri = params.worldUri as string | undefined;
+      Logging.Log('🌍 Step 4a: World URI = ' + (worldUri || 'default'));
       const worldConfig = await this.context.modules.config.loadWorldConfig(worldUri);
-      console.log('✓ World configuration loaded');
+      Logging.Log('✓ World configuration loaded successfully');
 
       // 5. Connect to synchronization sessions
+      Logging.Log('🔄 Step 5: Connecting to synchronizers...');
       await this.context.modules.sync.connectToSynchronizers();
-      console.log('✓ Connected to synchronizers');
+      Logging.Log('✓ Connected to synchronizers successfully');
 
       // 6. Instantiate and load world renderers
+      Logging.Log('🎨 Step 6: Creating and loading world renderers...');
       await this.context.modules.worldRendering.createAndLoadRenderers(worldConfig);
-      console.log('✓ World renderers loaded');
+      // Ensure WorldRendererFactory is available in context after renderers are loaded
+      Logging.Log('🔍 Storing WorldRendererFactory in context. Type: ' + typeof this.context.modules.worldRendering);
+      Logging.Log('🔍 Available methods: ' + Object.getOwnPropertyNames(Object.getPrototypeOf(this.context.modules.worldRendering)));
+      
+      // Store a wrapper object to preserve method bindings
+      const worldRendererFactoryWrapper = {
+        factory: this.context.modules.worldRendering,
+        getStaticSurfaceRenderer: () => this.context.modules.worldRendering.getStaticSurfaceRenderer()
+      };
+      Context.DefineContext('WorldRendererFactory', worldRendererFactoryWrapper);
+      Logging.Log('✓ World renderers loaded successfully');
 
       // 7. Activate UI editing tools
+      Logging.Log('🖼️ Step 7: Activating UI editing tools...');
       this.context.modules.ui.initializeEditToolbar();
-      console.log('✓ UI editing tools activated');
+      Logging.Log('✓ UI editing tools activated successfully');
 
-      console.log('🎉 MyWorld Client launched successfully!');
+      Logging.Log('🎉 MyWorld Client launched successfully!');
 
       // Start render loop
-      this.startRenderLoop();
+      Logging.Log('🔄 Starting render loop...');
+      await this.startRenderLoop();
+      Logging.Log('✓ Render loop started successfully');
     } catch (error) {
-      console.error('❌ Failed to launch MyWorld Client:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorDetails = error instanceof Error ? error.stack || error.message : String(error);
+      Logging.LogError('❌ Failed to launch MyWorld Client: ' + errorMessage);
+      Logging.LogError('❌ Full error details: ' + errorDetails);
       throw error;
     }
   }
 
   /**
-   * Start user login process
+   * Start user login process (async, non-blocking)
    */
-  private async startUserLogin(): Promise<void> {
-    return new Promise<void>((resolve) => {
-      this.context.modules.identity.StartLogin(() => {
-        resolve();
+  private startUserLogin(): void {
+    try {
+      Logging.Log('🔐 Step 2a: Starting WebVerse HTML panel login...');
+      
+      // Import the WebVerse Identity module
+      import('./modules/Identity').then(({ Identity }) => {
+        Logging.Log('🔐 Step 2b: Identity module imported successfully');
+        
+        // Check if user is already logged in
+        if (Identity.isLoggedIn()) {
+          Logging.Log('🔐 Step 2c: User already logged in');
+          const user = Identity.getCurrentUser();
+          if (user) {
+            Logging.Log('👤 Current user: ' + user.userID);
+          }
+          // If already logged in, trigger entity template loading immediately
+          if (typeof (globalThis as any).triggerEntityTemplatesAfterLogin === 'function') {
+            (globalThis as any).triggerEntityTemplatesAfterLogin();
+          }
+          return;
+        }
+        
+        Logging.Log('🔐 Step 2c: Starting WebVerse login process...');
+        Identity.startUserLogin();
+        Logging.Log('🔐 Step 2d: WebVerse login process initiated (will complete via global callback)');
+        
+      }).catch((error) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        Logging.LogError('❌ Failed to import Identity module: ' + errorMessage);
       });
       
-      // Auto-resolve for now (in real app, would wait for actual login)
-      setTimeout(() => resolve(), MyWorld.MOCK_LOGIN_DELAY_MS);
-    });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ Error in startUserLogin: ' + errorMessage);
+    }
+  }
+
+  /**
+   * Initialize world-type specific settings and configurations
+   */
+  private async initializeWorldTypeSettings(): Promise<void> {
+    const worldType = this.queryParams.get('worldType') as string;
+    Logging.Log('🌍 Checking world type for initialization...');
+    
+    switch (worldType) {
+      case 'mini-world':
+        Logging.Log('🏠 World Type: mini-world - Initializing for small-scale world rendering');
+        await this.setupStaticSurfaceRenderer();
+        break;
+      case 'planet':
+        Logging.Log('🌍 World Type: planet - Initializing for planetary-scale world rendering');
+        // TODO: Add planet specific initialization here
+        break;
+      case 'galaxy':
+        Logging.Log('🌌 World Type: galaxy - Initializing for galactic-scale world rendering');
+        // TODO: Add galaxy specific initialization here
+        break;
+      default:
+        if (worldType) {
+          throw new Error('❓ World Type: ' + worldType + ' - Unknown world type');
+        } else {
+          throw new Error('🌐 World Type: not specified');
+        }
+    }
+  }
+
+  /**
+   * Set up static surface renderer for mini-world type
+   */
+  private async setupStaticSurfaceRenderer(): Promise<void> {
+    try {
+      Logging.Log('🏗️ Setting up static surface renderer for mini-world...');
+      
+      // Use the imported StaticSurfaceRenderer
+      
+      // Create a basic world config for the renderer
+      Logging.Log('🏗️ Step 1: Creating world configuration...');
+      const worldConfig = {
+        name: 'Mini World',
+        type: 'mini-world',
+        scale: 'small'
+      } as any; // Use basic config structure
+      
+      // Create and initialize the static surface renderer
+      Logging.Log('🏗️ Step 2: Creating StaticSurfaceRenderer instance...');
+      const staticRenderer = new StaticSurfaceRenderer();
+      
+      Logging.Log('🏗️ Step 3: Initializing static surface renderer...');
+      await staticRenderer.initialize(worldConfig);
+      
+      // Request entity templates
+      Logging.Log('🏗️ Step 4: Requesting entity templates...');
+      staticRenderer.requestEntityTemplates();
+      
+      // Register for entity instances trigger after templates complete
+      Logging.Log('🏗️ Step 4a: Registering for entity instances trigger...');
+      this.registerForEntityInstancesTrigger(staticRenderer);
+      
+      // The renderer is now initialized and ready to use
+      Logging.Log('🏗️ Step 5: Static surface renderer ready for use');
+      Logging.Log('🏗️ Note: Renderer will be used by WorldRendererFactory.renderFrame()');
+      
+      Logging.Log('✓ Static surface renderer setup completed for mini-world');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ Failed to setup static surface renderer: ' + errorMessage);
+      throw error;
+    }
+  }
+
+  /**
+   * Register for entity instances trigger after entity templates complete
+   */
+  private registerForEntityInstancesTrigger(staticRenderer: StaticSurfaceRenderer): void {
+    try {
+      Logging.Log('� Registering for entity instances trigger after templates completion...');
+      
+      // Set the global pending request that will be triggered after templates complete
+      (globalThis as any).pendingEntityInstanceRequest = staticRenderer;
+      
+      Logging.Log('✅ Registered for entity instances trigger');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ Error registering for entity instances trigger: ' + errorMessage);
+    }
   }
 
   /**
    * Start the render loop
    */
-  private startRenderLoop(): void {
-    let lastTime = performance.now();
+  private async startRenderLoop(): Promise<void> {
+    // Initialize world type specific settings
+    await this.initializeWorldTypeSettings();
+    
+    // Set up global render function for WebVerse Time API
+    const renderFunctionName = 'myWorldRenderLoop';
+    
+    // Store reference to this instance for the global function
+    (globalThis as any).myWorldInstance = this;
+    
+    // Create global render function
+    (globalThis as any)[renderFunctionName] = () => {
+      try {
+        const deltaTime = 1/60; // Fixed 60 FPS (0.0167 seconds per frame)
+        
+        // Update modules
+        this.context.modules.script.update(deltaTime);
+        this.context.modules.environmentModifier.update(deltaTime);
 
-    const render = (currentTime: number) => {
-      const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
-      lastTime = currentTime;
-
-      // Update modules
-      this.context.modules.player.update(deltaTime);
-      this.context.modules.script.update(deltaTime);
-      this.context.modules.environmentModifier.update(deltaTime);
-
-      // Render frame
-      this.context.modules.worldRendering.renderFrame(deltaTime);
-
-      // Schedule next frame
-      requestAnimationFrame(render);
+        // Render frame
+        this.context.modules.worldRendering.renderFrame(deltaTime);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        Logging.LogError('❌ Error in render loop: ' + errorMessage);
+      }
     };
 
-    requestAnimationFrame(render);
+    // Start the interval - 60 FPS = 1/60 seconds = ~0.0167 seconds
+    const intervalSeconds = 1/60;
+    Logging.Log('🔄 Setting up render loop with interval: ' + intervalSeconds + ' seconds');
+    
+    this.renderIntervalId = Time.SetInterval(renderFunctionName, intervalSeconds);
+    
+    if (this.renderIntervalId) {
+      Logging.Log('✓ Render loop started with ID: ' + this.renderIntervalId);
+    } else {
+      Logging.LogError('❌ Failed to start render loop');
+    }
   }
 
   /**
    * Dispose of the client
    */
   dispose(): void {
+    // Stop the render loop
+    if (this.renderIntervalId) {
+      Logging.Log('🔄 Stopping render loop...');
+      Time.StopInterval(this.renderIntervalId.ToString());
+      this.renderIntervalId = null;
+    }
+    
+    // Clean up global references
+    try {
+      delete (globalThis as any).myWorldInstance;
+      delete (globalThis as any).myWorldRenderLoop;
+    } catch (error) {
+      // Ignore cleanup errors
+    }
+    
     this.context.dispose();
   }
 }
 
-// Auto-launch when in browser environment
-if (typeof window !== 'undefined') {
-  window.addEventListener('DOMContentLoaded', () => {
-    const myworld = new MyWorld();
-    myworld.launch().catch(error => {
-      console.error('Failed to launch MyWorld:', error);
-    });
-    
-    // Make available globally for debugging
-    (window as any).myworld = myworld;
-  });
-}
+    try {
+      Logging.Log('🚀 Starting MyWorld application...');
+      Logging.Log('🚀 Step 0a: Creating MyWorld instance...');
+      const myworld = new MyWorld();
+      Logging.Log('🚀 Step 0b: MyWorld instance created successfully');
+      
+      Logging.Log('🚀 Step 0c: Starting launch process...');
+      myworld.launch().catch(error => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorDetails = error instanceof Error ? error.stack || error.message : String(error);
+        Logging.LogError('❌ Failed to launch MyWorld: ' + errorMessage);
+        Logging.LogError('❌ Full launch error details: ' + errorDetails);
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ Failed to create MyWorld instance: ' + errorMessage);
+    }
+    //(window as any).myworld = myworld;
 
 export default MyWorld;

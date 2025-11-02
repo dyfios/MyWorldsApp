@@ -38,7 +38,7 @@ export class EnvironmentModifier {
    */
   setTimeOfDay(hours: number): void {
     this.settings.timeOfDay = hours % 24;
-    console.log(`Time of day set to ${this.settings.timeOfDay}`);
+    Logging.Log(`Time of day set to ${this.settings.timeOfDay}`);
   }
 
   /**
@@ -46,7 +46,7 @@ export class EnvironmentModifier {
    */
   setWeather(weatherType: EnvironmentSettings['weatherType']): void {
     this.settings.weatherType = weatherType;
-    console.log(`Weather set to ${weatherType}`);
+    Logging.Log(`Weather set to ${weatherType}`);
   }
 
   /**
@@ -55,7 +55,7 @@ export class EnvironmentModifier {
   setWind(speed: number, direction: number): void {
     this.settings.windSpeed = speed;
     this.settings.windDirection = direction;
-    console.log(`Wind set to ${speed} m/s at ${direction} degrees`);
+    Logging.Log(`Wind set to ${speed} m/s at ${direction} degrees`);
   }
 
   /**
@@ -63,7 +63,7 @@ export class EnvironmentModifier {
    */
   setTemperature(celsius: number): void {
     this.settings.temperature = celsius;
-    console.log(`Temperature set to ${celsius}°C`);
+    Logging.Log(`Temperature set to ${celsius}°C`);
   }
 
   /**
@@ -71,7 +71,7 @@ export class EnvironmentModifier {
    */
   applyEnvironmentEffects(position: Position): void {
     // Logic to apply weather effects, time-based lighting, etc.
-    console.log('Applying environment effects at position:', position);
+    Logging.Log('Applying environment effects at position: ' + JSON.stringify(position));
   }
 
   /**

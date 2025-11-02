@@ -12,84 +12,144 @@ export class REST {
     this.baseUrl = baseUrl;
   }
 
+  private generateRequestId(): string {
+    const uuid = UUID.NewUUID().ToString();
+    if (uuid === null) {
+      // Fallback using a simple counter
+      return 'fallback_' + Math.random().toString(36).substr(2, 9);
+    }
+    return uuid;
+  }
+
   async sendTerrainDigRequest(position: Position, radius: number, depth: number): Promise<void> {
-    await this.post('/terrain/dig', { position, radius, depth });
+    await this.post('/terrain/dig', { position, radius, depth }, "application/json");
   }
 
   async sendTerrainBuildRequest(position: Position, radius: number, height: number): Promise<void> {
-    await this.post('/terrain/build', { position, radius, height });
+    await this.post('/terrain/build', { position, radius, height }, "application/json");
   }
 
   async sendPositionEntityRequest(entityId: string, position: Position, rotation?: Rotation): Promise<void> {
-    await this.post('/entity/position', { entityId, position, rotation });
+    await this.post('/entity/position', { entityId, position, rotation }, "application/json");
   }
 
   async sendDeleteEntityRequest(entityId: string): Promise<void> {
     await this.delete(`/entity/${entityId}`);
   }
 
-  async sendBiomeInfoRequest(position: Position): Promise<any> {
-    return this.get('/biome/info', { position });
+  sendBiomeInfoRequest(position: Position, onComplete: string): void {
+    this.get('/biome/info', { position }, onComplete);
   }
 
-  async sendTimeRequest(): Promise<any> {
-    return this.get('/time');
+  sendTimeRequest(onComplete: string): void {
+    this.get('/time', undefined, onComplete);
   }
 
-  async sendGetEntitiesRequest(): Promise<EntityData[]> {
-    return this.get('/entities');
+  sendGetEntitiesRequest(onComplete: string): void {
+    this.get('/entities', undefined, onComplete);
   }
 
-  async sendRegionInfoRequest(regionId: string): Promise<any> {
-    return this.get(`/region/${regionId}`);
+  sendRegionInfoRequest(regionId: string, onComplete: string): void {
+    this.get(`/region/${regionId}`, undefined, onComplete);
   }
 
-  async sendGetTerrainRequest(bounds: any): Promise<any> {
-    return this.get('/terrain', { bounds });
+  sendGetTerrainRequest(bounds: any, onComplete: string): void {
+    this.get('/terrain', { bounds }, onComplete);
   }
 
-  async sendGetEntityInstancesRequest(): Promise<EntityData[]> {
-    return this.get('/entity/instances');
+  sendGetEntityInstancesRequest(worldId: string, userId: string, userToken: string, onComplete: string): void {
+    this.get('/list-entity-instances', {
+      'world-id': worldId,
+      'user-id': userId,
+      'user-token': userToken
+    }, onComplete);
   }
 
-  async sendGetEntityTemplatesRequest(): Promise<any[]> {
-    return this.get('/entity/templates');
+  sendGetEntityTemplatesRequest(worldId: string, userId: string, userToken: string, onComplete: string): void {
+    this.get('/list-entity-templates', {
+      'world-id': worldId,
+      'user-id': userId,
+      'user-token': userToken
+    }, onComplete);
   }
 
   async sendAddEntityInstanceRequest(data: EntityPlacementData): Promise<EntityData> {
-    return this.post('/entity/instance', data);
+    return this.post('/entity/instance', data, "application/json");
   }
 
-  private async get(endpoint: string, params?: any): Promise<any> {
-    const url = new URL(this.baseUrl + endpoint, window.location.origin);
+  private get(endpoint: string, params: any, onComplete: string): void {
+    let url = this.baseUrl + endpoint;
+    
     if (params) {
-      Object.keys(params).forEach(key => url.searchParams.append(key, JSON.stringify(params[key])));
+      const searchParams = new Array<string>();
+      Object.keys(params).forEach(key => {
+        searchParams.push(key + '=' + JSON.stringify(params[key]));
+      });
+      if (searchParams.length > 0) {
+        url += '?' + searchParams.join('&');
+      }
     }
-    const response = await fetch(url.toString());
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
+
+    Logging.Log('🌐 REST GET request to: ' + url);
+    
+    HTTPNetworking.Fetch(url, onComplete);
   }
 
-  private async post(endpoint: string, data: any): Promise<any> {
-    const response = await fetch(this.baseUrl + endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+  private async post(endpoint: string, data: any, dataType: string): Promise<any> {
+    const url = this.baseUrl + endpoint;
+    
+    return new Promise((resolve, reject) => {
+      const requestId = this.generateRequestId();
+      const onComplete = `onHTTPPostComplete_${requestId}`;
+      const onError = `onHTTPPostError_${requestId}`;
+
+      HTTPNetworking.Post(url, data, dataType, onComplete);
+
+      // Store callbacks globally for HTTPNetworking to call
+      (globalThis as any)[onComplete] = (response: any) => {
+        try {
+          const data = JSON.parse(response.body);
+          // Clean up callbacks
+          delete (globalThis as any)[onComplete];
+          delete (globalThis as any)[onError];
+          resolve(data);
+        } catch (error) {
+          delete (globalThis as any)[onComplete];
+          delete (globalThis as any)[onError];
+          reject(new Error('Failed to parse response JSON'));
+        }
+      };
+
+      (globalThis as any)[onError] = (error: any) => {
+        delete (globalThis as any)[onComplete];
+        delete (globalThis as any)[onError];
+        reject(new Error(`HTTP error! ${error.message || 'Unknown error'}`));
+      };
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return response.json();
   }
 
   private async delete(endpoint: string): Promise<void> {
-    const response = await fetch(this.baseUrl + endpoint, {
-      method: 'DELETE'
+    const url = this.baseUrl + endpoint;
+    
+    return new Promise((resolve, reject) => {
+      const requestId = this.generateRequestId();
+      const onComplete = `onHTTPDeleteComplete_${requestId}`;
+      const onError = `onHTTPDeleteError_${requestId}`;
+
+      HTTPNetworking.Fetch(url, onComplete);
+
+      // Store callbacks globally for HTTPNetworking to call
+      (globalThis as any)[onComplete] = (_response: any) => {
+        delete (globalThis as any)[onComplete];
+        delete (globalThis as any)[onError];
+        resolve();
+      };
+
+      (globalThis as any)[onError] = (error: any) => {
+        delete (globalThis as any)[onComplete];
+        delete (globalThis as any)[onError];
+        reject(new Error(`HTTP error! ${error.message || 'Unknown error'}`));
+      };
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
   }
 }

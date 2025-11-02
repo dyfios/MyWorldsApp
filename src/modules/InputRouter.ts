@@ -18,7 +18,7 @@ export class InputRouter {
    */
   initialize(): void {
     this.setupEventListeners();
-    console.log('InputRouter initialized');
+    Logging.Log('InputRouter initialized');
   }
 
   /**
@@ -47,18 +47,18 @@ export class InputRouter {
   /**
    * Dispatch an input event
    */
-  private dispatch(event: InputEvent): void {
+  /*private dispatch(event: InputEvent): void {
     const handlers = this.handlers.get(event.type);
     if (handlers) {
       handlers.forEach(handler => handler(event));
     }
-  }
+  }*/
 
   /**
    * Set up DOM event listeners
    */
   private setupEventListeners(): void {
-    document.addEventListener('keydown', (e) => {
+    /*document.addEventListener('keydown', (e) => {
       this.dispatch({
         type: 'keydown',
         data: { key: e.key, code: e.code },
@@ -104,7 +104,7 @@ export class InputRouter {
         data: { deltaX: e.deltaX, deltaY: e.deltaY, deltaZ: e.deltaZ },
         timestamp: Date.now()
       });
-    });
+    });*/
   }
 
   /**

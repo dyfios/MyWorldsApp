@@ -3,6 +3,8 @@
  * Main entry point and public API
  */
 
+/// <reference path="./types/worldapi.d.ts" />
+
 // Main client
 export { MyWorld, default } from './myworld';
 
@@ -21,8 +23,10 @@ export { EntityManager, EntityPlacement } from './modules/EntityManager';
 export { InputRouter } from './modules/InputRouter';
 export { PlayerController } from './modules/PlayerController';
 export { ScriptEngine } from './modules/ScriptEngine';
-export { SyncManager, SyncMsgHandler, SyncMsgHandlerDependencies } from './modules/SyncManager';
-export { UIManager, UIUpdateData } from './modules/UIManager';
+export { SyncManager, SyncMsgHandler } from './modules/SyncManager';
+export type { SyncMsgHandlerDependencies } from './modules/SyncManager';
+export { UIManager } from './modules/UIManager';
+export type { UIUpdateData } from './modules/UIManager';
 export {
   WorldRendererFactory,
   WorldRendering,
@@ -39,3 +43,6 @@ export { EnvironmentModifier } from './modules/EnvironmentModifier';
 
 // Utils
 export { ProcessQueryParams } from './utils/ProcessQueryParams';
+
+// Auto-initialize for browser usage - import the main file to trigger launch
+import './myworld';

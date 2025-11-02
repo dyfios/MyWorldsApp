@@ -31,26 +31,53 @@ export class Modules {
   environmentModifier: EnvironmentModifier;
 
   constructor() {
-    this.api = new REST();
-    this.config = new ConfigurationModule();
-    this.identity = new Identity();
-    this.entity = new EntityManager();
-    this.input = new InputRouter();
-    this.player = new PlayerController();
-    this.script = new ScriptEngine();
-    this.sync = new SyncManager();
-    this.ui = new UIManager();
-    this.worldRendering = new WorldRendererFactory();
-    this.environmentModifier = new EnvironmentModifier();
+    try {
+      Logging.Log('⚙️ Step 3a: Creating REST API module...');
+      this.api = new REST();
+      Logging.Log('⚙️ Step 3b: Creating Configuration module...');
+      this.config = new ConfigurationModule();
+      Logging.Log('⚙️ Step 3c: Creating Identity module...');
+      this.identity = new Identity();
+      Logging.Log('⚙️ Step 3d: Creating Entity Manager module...');
+      this.entity = new EntityManager();
+      Logging.Log('⚙️ Step 3e: Creating Input Router module...');
+      this.input = new InputRouter();
+      Logging.Log('⚙️ Step 3f: Creating Player Controller module...');
+      this.player = new PlayerController(Vector3.zero, "UNSET", undefined);
+      Logging.Log('⚙️ Step 3g: Creating Script Engine module...');
+      this.script = new ScriptEngine();
+      Logging.Log('⚙️ Step 3h: Creating Sync Manager module...');
+      this.sync = new SyncManager();
+      Logging.Log('⚙️ Step 3i: Creating UI Manager module...');
+      this.ui = new UIManager();
+      Logging.Log('⚙️ Step 3j: Creating World Renderer Factory module...');
+      this.worldRendering = new WorldRendererFactory();
+      // Store WorldRendererFactory in global context for entity instantiation callbacks
+      Context.DefineContext('WorldRendererFactory', this.worldRendering);
+      Logging.Log('⚙️ Step 3k: Creating Environment Modifier module...');
+      this.environmentModifier = new EnvironmentModifier();
+      Logging.Log('⚙️ All modules created successfully');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ Error creating modules: ' + errorMessage);
+      throw error;
+    }
   }
 
   /**
    * Initialize all modules
    */
   async initialize(): Promise<void> {
-    console.log('Initializing modules...');
-    this.input.initialize();
-    console.log('All modules initialized');
+    try {
+      Logging.Log('⚙️ Step 3l: Starting module initialization...');
+      Logging.Log('⚙️ Step 3m: Initializing input router...');
+      this.input.initialize();
+      Logging.Log('⚙️ All modules initialized successfully');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ Error initializing modules: ' + errorMessage);
+      throw error;
+    }
   }
 
   /**

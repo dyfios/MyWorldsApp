@@ -1,0 +1,201 @@
+
+<veml>
+  <metadata>
+    <title>MyWorld Client v1.0-dev0</title>
+	<script>dist/myworlds-client.umd.js</script>
+	<inputevent input="move" event="MW_Input_Desktop_Move(?);"></inputevent>
+    <inputevent input="endmove" event="MW_Input_Desktop_EndMove();"></inputevent>
+	<inputevent input="look" event="MW_Input_Desktop_Look(?);"></inputevent>
+	<inputevent input="endlook" event="MW_Input_Desktop_EndLook();"></inputevent>
+	<inputevent input="left" event="MW_Input_Desktop_OnLeftPress();"></inputevent>
+	<inputevent input="right" event="MW_Input_Desktop_OnRightPress();"></inputevent>
+	<inputevent input="key" event="MW_Input_Desktop_OnKey(?);"></inputevent>
+	<inputevent input="endkey" event="MW_Input_Desktop_OnKeyRelease(?);"></inputevent>
+	<inputevent input="lefttouchpadvaluechange" event="MW_Input_VR_OnLeftTouchpadValueChange(?);"></inputevent>
+    <inputevent input="righttouchpadvaluechange" event="MW_Input_VR_OnRightTouchpadValueChange(?);"></inputevent>
+	<inputevent input="leftstickvaluechange" event="MW_Input_VR_OnLeftStickValueChange(?);"></inputevent>
+    <inputevent input="rightstickvaluechange" event="MW_Input_VR_OnRightStickValueChange(?);"></inputevent>
+	<inputevent input="leftprimarypress" event="MW_Input_VR_OnLeftPrimaryPress();"></inputevent>
+	<inputevent input="rightprimarypress" event="MW_Input_VR_OnRightPrimaryPress();"></inputevent>
+	<inputevent input="endleftprimarypress" event="MW_Input_VR_OnLeftPrimaryRelease();"></inputevent>
+	<inputevent input="endrightprimarypress" event="MW_Input_VR_OnRightPrimaryRelease();"></inputevent>
+	<inputevent input="leftsecondarypress" event="MW_Input_VR_OnLeftSecondaryPress();"></inputevent>
+	<inputevent input="rightsecondarypress" event="MW_Input_VR_OnRightSecondaryPress();"></inputevent>
+	<inputevent input="lefttouchpadpress" event="MW_Input_VR_OnLeftTouchpadPress();"></inputevent>
+	<inputevent input="righttouchpadpress" event="MW_Input_VR_OnRightTouchpadPress();"></inputevent>
+	<inputevent input="lefttriggerpress" event="MW_Input_VR_OnLeftTriggerPress();"></inputevent>
+	<inputevent input="righttriggerpress" event="MW_Input_VR_OnRightTriggerPress();"></inputevent>
+	<inputevent input="endlefttriggerpress" event="MW_Input_VR_OnLeftTriggerRelease();"></inputevent>
+	<inputevent input="endrighttriggerpress" event="MW_Input_VR_OnRightTriggerRelease();"></inputevent>
+	<inputevent input="leftgrippress" event="MW_Input_VR_OnLeftGripPress();"></inputevent>
+	<inputevent input="rightgrippress" event="MW_Input_VR_OnRightGripPress();"></inputevent>
+    <controlflags>
+      <left-vr-pointer>teleport</left-vr-pointer>
+      <right-vr-pointer>ui</right-vr-pointer>
+      <left-vr-poker>false</left-vr-poker>
+      <right-vr-poker>false</right-vr-poker>
+      <left-hand-interaction>false</left-hand-interaction>
+      <right-hand-interaction>false</right-hand-interaction>
+      <turn-locomotion>snap</turn-locomotion>
+      <joystick-motion>true</joystick-motion>
+      <left-grab-move>true</left-grab-move>
+      <right-grab-move>false</right-grab-move>
+      <two-handed-grab-move>false</two-handed-grab-move>
+    </controlflags>
+  </metadata>
+  <environment>
+    <background>
+      <color>gray</color>
+    </background>
+    <!--<entity xsi:type="canvas" tag="WASDControls">
+        <transform xsi:type="scaletransform">
+          <position x="0" y="0" z="0"></position>
+          <rotation x="1" y="1" z="0" w="1"></rotation>
+          <scale x="1" y="1" z="1"></scale>
+        </transform>
+        <entity xsi:type="button" tag="Up" on-click-event="MW_Player_ThirdPerson_MoveCharacterOneStep(1, 0);">
+          <transform xsi:type="canvastransform">
+	        <position-percent x="0.17" y="0.64"></position-percent>
+		    <size-percent x="0.1" y="0.1"></size-percent>
+          </transform>
+		  <entity xsi:type="image" tag="UpImage">
+			<image-file>myworld/modules/ui/view_menu/Images/arrow_up.png</image-file>
+			<transform xsi:type="canvastransform">
+				<position-percent x="0.5" y="0.5"></position-percent>
+				<size-percent x="1" y="1"></size-percent>
+			</transform>
+		  </entity>
+		</entity>
+		<entity xsi:type="button" tag="Down" on-click-event="MW_Player_ThirdPerson_MoveCharacterOneStep(-1, 0);">
+          <transform xsi:type="canvastransform">
+	        <position-percent x="0.17" y="0.88"></position-percent>
+		    <size-percent x="0.1" y="0.1"></size-percent>
+          </transform>
+		  <entity xsi:type="image" tag="DownImage">
+			<image-file>myworld/modules/ui/view_menu/Images/arrow_down.png</image-file>
+			<transform xsi:type="canvastransform">
+				<position-percent x="0.5" y="0.5"></position-percent>
+				<size-percent x="1" y="1"></size-percent>
+			</transform>
+		  </entity>
+		</entity>
+		<entity xsi:type="button" tag="Left" on-click-event="MW_Player_ThirdPerson_MoveCharacterOneStep(0, 1);">
+          <transform xsi:type="canvastransform">
+	        <position-percent x="0.07" y="0.76"></position-percent>
+		    <size-percent x="0.1" y="0.1"></size-percent>
+          </transform>
+		  <entity xsi:type="image" tag="LeftImage">
+			<image-file>myworld/modules/ui/view_menu/Images/arrow_left.png</image-file>
+			<transform xsi:type="canvastransform">
+				<position-percent x="0.5" y="0.5"></position-percent>
+				<size-percent x="1" y="1"></size-percent>
+			</transform>
+		  </entity>
+		</entity>
+		<entity xsi:type="button" tag="Right" on-click-event="MW_Player_ThirdPerson_MoveCharacterOneStep(0, -1);">
+          <transform xsi:type="canvastransform">
+	        <position-percent x="0.27" y="0.76"></position-percent>
+		    <size-percent x="0.1" y="0.1"></size-percent>
+          </transform>
+		  <entity xsi:type="image" tag="RightImage">
+			<image-file>myworld/modules/ui/view_menu/Images/arrow_right.png</image-file>
+			<transform xsi:type="canvastransform">
+				<position-percent x="0.5" y="0.5"></position-percent>
+				<size-percent x="1" y="1"></size-percent>
+			</transform>
+		  </entity>
+		</entity>
+		<entity xsi:type="button" tag="Jump" on-click-event="MW_Player_ThirdPerson_LiftCharacterOneStep();">
+          <transform xsi:type="canvastransform">
+	        <position-percent x="0.92" y="0.76"></position-percent>
+		    <size-percent x="0.1" y="0.1"></size-percent>
+          </transform>
+		  <entity xsi:type="text" tag="JumpText" font-size="14" text="Jump">
+              <transform xsi:type="canvastransform">
+	            <position-percent x="0.5" y="0.5"></position-percent>
+		        <size-percent x="1" y="1"></size-percent>
+              </transform>
+		    </entity>
+		</entity>
+		<entity xsi:type="button" tag="Drop" on-click-event="MW_Player_ThirdPerson_DropCharacterOneStep();">
+          <transform xsi:type="canvastransform">
+	        <position-percent x="0.92" y="0.88"></position-percent>
+		    <size-percent x="0.1" y="0.1"></size-percent>
+          </transform>
+		  <entity xsi:type="text" tag="DropText" font-size="14" text="Drop">
+              <transform xsi:type="canvastransform">
+	            <position-percent x="0.5" y="0.5"></position-percent>
+		        <size-percent x="1" y="1"></size-percent>
+              </transform>
+		    </entity>
+		</entity>
+    </entity>
+    <entity xsi:type="canvas" tag="ViewMenu">
+        <transform xsi:type="scaletransform">
+          <position x="0" y="0" z="0"></position>
+          <rotation x="1" y="1" z="0" w="1"></rotation>
+          <scale x="1" y="1" z="1"></scale>
+        </transform>
+		<entity xsi:type="button" tag="View" on-click-event="MW_UI_ViewMenu_ToggleView();">
+          <transform xsi:type="canvastransform">
+	        <position-percent x="0.92" y="0.25"></position-percent>
+		    <size-percent x="0.1" y="0.07"></size-percent>
+          </transform>
+		  <entity xsi:type="text" tag="ViewText" font-size="14" text="View: unset">
+              <transform xsi:type="canvastransform">
+	            <position-percent x="0.5" y="0.5"></position-percent>
+		        <size-percent x="1" y="1"></size-percent>
+              </transform>
+		    </entity>
+		</entity>
+		<entity xsi:type="button" tag="Camera" on-click-event="MW_UI_ViewMenu_ToggleCameraMode();">
+          <transform xsi:type="canvastransform">
+	        <position-percent x="0.92" y="0.35"></position-percent>
+		    <size-percent x="0.1" y="0.07"></size-percent>
+          </transform>
+		  <entity xsi:type="text" tag="CameraText" font-size="14" text="Camera: Third Person">
+              <transform xsi:type="canvastransform">
+	            <position-percent x="0.5" y="0.5"></position-percent>
+		        <size-percent x="1" y="1"></size-percent>
+              </transform>
+		    </entity>
+		</entity>
+		<entity xsi:type="text" tag="SpeedLabel" font-size="18" text="Speed:">
+			<transform xsi:type="canvastransform">
+			<position-percent x="0.84" y="0.455"></position-percent>
+			<size-percent x="0.1" y="0.07"></size-percent>
+		  </transform>
+		</entity>
+		<entity xsi:type="button" tag="DecreaseSpeed" on-click-event="MW_UI_ViewMenu_DecreaseSpeed();">
+          <transform xsi:type="canvastransform">
+	        <position-percent x="0.88" y="0.45"></position-percent>
+		    <size-percent x="0.025" y="0.05"></size-percent>
+          </transform>
+		  <entity xsi:type="text" tag="DecreaseSpeedText" font-size="25" text="-">
+			<transform xsi:type="canvastransform">
+			<position-percent x="0.5" y="0.5"></position-percent>
+			<size-percent x="1" y="1"></size-percent>
+			</transform>
+		  </entity>
+		</entity>
+		<entity xsi:type="text" tag="SpeedText" font-size="20" text="1">
+			<transform xsi:type="canvastransform">
+			<position-percent x="0.93" y="0.45"></position-percent>
+			<size-percent x="0.05" y="0.05"></size-percent>
+		  </transform>
+		</entity>
+		<entity xsi:type="button" tag="IncreaseSpeed" on-click-event="MW_UI_ViewMenu_IncreaseSpeed();">
+          <transform xsi:type="canvastransform">
+	        <position-percent x="0.955" y="0.45"></position-percent>
+		    <size-percent x="0.025" y="0.05"></size-percent>
+          </transform>
+		  <entity xsi:type="text" tag="IncreaseSpeedText" font-size="25" text="+">
+			<transform xsi:type="canvastransform">
+			<position-percent x="0.5" y="0.5"></position-percent>
+			<size-percent x="1" y="1"></size-percent>
+			</transform>
+		  </entity>
+		</entity>
+    </entity>-->
+  </environment>
+</veml>

@@ -21,11 +21,11 @@ export class SyncManager {
    * Connect to synchronization service
    */
   async connectToSynchronizers(): Promise<void> {
-    console.log('Connecting to synchronizers...');
+    Logging.Log('Connecting to synchronizers...');
     // Simulation of connection
-    await new Promise(resolve => setTimeout(resolve, 100));
+    //await new Promise(resolve => setTimeout(resolve, 100));
     this.connected = true;
-    console.log('Connected to synchronizers');
+    Logging.Log('Connected to synchronizers');
   }
 
   /**
@@ -50,12 +50,12 @@ export class SyncManager {
    */
   publish(diff: SyncDiff): void {
     if (!this.connected) {
-      console.warn('Cannot publish: not connected to synchronizers');
+      Logging.LogWarning('Cannot publish: not connected to synchronizers');
       return;
     }
     
     // In a real implementation, this would send to server
-    console.log('Publishing sync diff:', diff);
+    Logging.Log('Publishing sync diff: ' + JSON.stringify(diff));
     
     // For simulation, notify local listeners
     this.handleSyncMessage(diff);
@@ -74,7 +74,7 @@ export class SyncManager {
   disconnect(): void {
     this.connected = false;
     this.listeners = [];
-    console.log('Disconnected from synchronizers');
+    Logging.Log('Disconnected from synchronizers');
   }
 }
 
@@ -105,22 +105,22 @@ export class SyncMsgHandler {
         this.triggerUIUpdates(diff.data);
         break;
       default:
-        console.warn('Unknown sync diff type:', diff.type);
+        Logging.LogWarning('Unknown sync diff type:' + diff.type);
     }
   }
 
   private applyEntityUpdates(data: any): void {
-    console.log('Applying entity updates:', data);
+    Logging.Log('Applying entity updates: ' + JSON.stringify(data));
     // Would integrate with EntityManager
   }
 
   private applyPlayerState(data: any): void {
-    console.log('Applying player state:', data);
+    Logging.Log('Applying player state: ' + JSON.stringify(data));
     // Would integrate with PlayerController
   }
 
   private triggerUIUpdates(data: any): void {
-    console.log('Triggering UI updates:', data);
+    Logging.Log('Triggering UI updates: ' + JSON.stringify(data));
     // Would integrate with UIManager
     this.scheduleFrameUpdate();
   }
@@ -128,7 +128,7 @@ export class SyncMsgHandler {
   private scheduleFrameUpdate(): void {
     // Schedule next frame update
     requestAnimationFrame(() => {
-      console.log('Frame update scheduled');
+      Logging.Log('Frame update scheduled');
     });
   }
 }

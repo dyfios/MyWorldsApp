@@ -17,6 +17,7 @@ export interface BaseEntity {
 export interface MeshEntityData extends BaseEntity {
   type: 'mesh';
   meshUrl: string;
+  webVerseEntity?: any; // Reference to the actual WebVerse MeshEntity
 }
 
 export interface AutomobileEntityData extends BaseEntity {

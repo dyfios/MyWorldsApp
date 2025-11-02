@@ -12,64 +12,58 @@ export interface PlayerState {
 }
 
 export class PlayerController {
-  private state: PlayerState;
+  private internalCharacterEntity: CharacterEntity;
+  // private cameraMode: 'firstPerson' | 'thirdPerson' = 'thirdPerson'; // Reserved for future camera mode switching
 
-  constructor() {
-    this.state = {
-      position: { x: 0, y: 0, z: 0 },
-      rotation: { x: 0, y: 0, z: 0 },
-      velocity: { x: 0, y: 0, z: 0 },
-      isGrounded: true
+  constructor(initialPosition: Vector3, characterName: string, characterId: string | undefined) {
+    this.setupGlobalCallbacks();
+    this.internalCharacterEntity = CharacterEntity.Create(null, initialPosition,
+      Quaternion.identity, Vector3.one, false, characterName, characterId,
+      "onPlayerCharacterEntityLoaded");
+    this.setMotionModeFree();
+  }
+
+   /**
+   * Setup global callback functions for WebVerse entity loading
+   */
+  private setupGlobalCallbacks(): void {
+    // Define global callback for character entity loading completion
+    (globalThis as any).onPlayerCharacterEntityLoaded = (entity: any) => {
+      this.onPlayerCharacterEntityLoaded(entity);
     };
   }
 
   /**
-   * Get current player state
+   * Callback when player character entity is loaded
    */
-  getState(): PlayerState {
-    return { ...this.state };
+  onPlayerCharacterEntityLoaded(entity: any): void {
+    Logging.Log(`✓ Player character entity loaded successfully: ${entity.id}`);
+    entity.SetInteractionState(InteractionState.Physical);
+    entity.SetVisibility(true);
   }
 
   /**
-   * Update player position
+   * Set motion mode to free
    */
-  setPosition(position: Position): void {
-    this.state.position = { ...position };
+  setMotionModeFree(): void {
+    const props = new EntityPhysicalProperties(null, null, null, false, null);
+    this.internalCharacterEntity.SetPhysicalProperties(props);
   }
 
   /**
-   * Update player rotation
+   * Set motion mode to physical
    */
-  setRotation(rotation: Rotation): void {
-    this.state.rotation = { ...rotation };
+  setMotionModePhysical(): void {
+    const props = new EntityPhysicalProperties(null, null, null, true, null);
+    this.internalCharacterEntity.SetPhysicalProperties(props);
   }
 
-  /**
-   * Update player velocity
-   */
-  setVelocity(velocity: Position): void {
-    this.state.velocity = { ...velocity };
+  enterVRMode(): void {
+    
+
   }
 
-  /**
-   * Update player state from sync
-   */
-  applyPlayerState(newState: Partial<PlayerState>): void {
-    Object.assign(this.state, newState);
-  }
-
-  /**
-   * Update player physics
-   */
-  update(deltaTime: number): void {
-    // Apply velocity to position
-    this.state.position.x += this.state.velocity.x * deltaTime;
-    this.state.position.y += this.state.velocity.y * deltaTime;
-    this.state.position.z += this.state.velocity.z * deltaTime;
-
-    // Apply gravity if not grounded
-    if (!this.state.isGrounded) {
-      this.state.velocity.y -= 9.8 * deltaTime;
-    }
+  enterNonVRMode(): void {
+    this.internalCharacterEntity.PlaceCameraOn();
   }
 }

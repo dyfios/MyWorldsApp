@@ -46,7 +46,7 @@ export class ScriptEngine {
       try {
         entity.onCreate();
       } catch (error) {
-        console.error(`Error running onCreate script for ${entity.entityId}:`, error);
+        Logging.LogError(`Error running onCreate script for ${entity.entityId}:` + error);
       }
     }
   }
@@ -59,7 +59,7 @@ export class ScriptEngine {
       try {
         entity.onDestroy();
       } catch (error) {
-        console.error(`Error running onDestroy script for ${entity.entityId}:`, error);
+        Logging.LogError(`Error running onDestroy script for ${entity.entityId}:` + error);
       }
     }
   }
@@ -97,7 +97,7 @@ export class ScriptEngine {
         try {
           entity.onUpdate(deltaTime);
         } catch (error) {
-          console.error(`Error running onUpdate script for ${entity.entityId}:`, error);
+          Logging.LogError(`Error running onUpdate script for ${entity.entityId}:` + error);
         }
       }
     });
