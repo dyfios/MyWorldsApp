@@ -3,32 +3,30 @@
   <metadata>
     <title>MyWorld Client v1.0-dev0</title>
 	<script>dist/myworlds-client.umd.js</script>
-	<inputevent input="move" event="MW_Input_Desktop_Move(?);"></inputevent>
-    <inputevent input="endmove" event="MW_Input_Desktop_EndMove();"></inputevent>
-	<inputevent input="look" event="MW_Input_Desktop_Look(?);"></inputevent>
-	<inputevent input="endlook" event="MW_Input_Desktop_EndLook();"></inputevent>
-	<inputevent input="left" event="MW_Input_Desktop_OnLeftPress();"></inputevent>
-	<inputevent input="right" event="MW_Input_Desktop_OnRightPress();"></inputevent>
-	<inputevent input="key" event="MW_Input_Desktop_OnKey(?);"></inputevent>
-	<inputevent input="endkey" event="MW_Input_Desktop_OnKeyRelease(?);"></inputevent>
-	<inputevent input="lefttouchpadvaluechange" event="MW_Input_VR_OnLeftTouchpadValueChange(?);"></inputevent>
-    <inputevent input="righttouchpadvaluechange" event="MW_Input_VR_OnRightTouchpadValueChange(?);"></inputevent>
-	<inputevent input="leftstickvaluechange" event="MW_Input_VR_OnLeftStickValueChange(?);"></inputevent>
-    <inputevent input="rightstickvaluechange" event="MW_Input_VR_OnRightStickValueChange(?);"></inputevent>
-	<inputevent input="leftprimarypress" event="MW_Input_VR_OnLeftPrimaryPress();"></inputevent>
-	<inputevent input="rightprimarypress" event="MW_Input_VR_OnRightPrimaryPress();"></inputevent>
-	<inputevent input="endleftprimarypress" event="MW_Input_VR_OnLeftPrimaryRelease();"></inputevent>
-	<inputevent input="endrightprimarypress" event="MW_Input_VR_OnRightPrimaryRelease();"></inputevent>
-	<inputevent input="leftsecondarypress" event="MW_Input_VR_OnLeftSecondaryPress();"></inputevent>
-	<inputevent input="rightsecondarypress" event="MW_Input_VR_OnRightSecondaryPress();"></inputevent>
-	<inputevent input="lefttouchpadpress" event="MW_Input_VR_OnLeftTouchpadPress();"></inputevent>
-	<inputevent input="righttouchpadpress" event="MW_Input_VR_OnRightTouchpadPress();"></inputevent>
-	<inputevent input="lefttriggerpress" event="MW_Input_VR_OnLeftTriggerPress();"></inputevent>
-	<inputevent input="righttriggerpress" event="MW_Input_VR_OnRightTriggerPress();"></inputevent>
-	<inputevent input="endlefttriggerpress" event="MW_Input_VR_OnLeftTriggerRelease();"></inputevent>
-	<inputevent input="endrighttriggerpress" event="MW_Input_VR_OnRightTriggerRelease();"></inputevent>
-	<inputevent input="leftgrippress" event="MW_Input_VR_OnLeftGripPress();"></inputevent>
-	<inputevent input="rightgrippress" event="MW_Input_VR_OnRightGripPress();"></inputevent>
+	<inputevent input="left" event="processLeftPress();"></inputevent>
+	<inputevent input="right" event="processRightPress();"></inputevent>
+	<inputevent input="key" event="processKeyPress(?);"></inputevent>
+	<inputevent input="endkey" event="processKeyRelease(?);"></inputevent>
+	<inputevent input="lefttouchpadvaluechange" event="processLeftTouchpadValueChange(?);"></inputevent>
+    <inputevent input="righttouchpadvaluechange" event="processRightTouchpadValueChange(?);"></inputevent>
+	<inputevent input="leftstickvaluechange" event="processLeftStickValueChange(?);"></inputevent>
+    <inputevent input="rightstickvaluechange" event="processRightStickValueChange(?);"></inputevent>
+	<inputevent input="leftprimarypress" event="processLeftPrimaryPress();"></inputevent>
+	<inputevent input="rightprimarypress" event="processRightPrimaryPress();"></inputevent>
+	<inputevent input="endleftprimarypress" event="processLeftPrimaryRelease();"></inputevent>
+	<inputevent input="endrightprimarypress" event="processRightPrimaryRelease();"></inputevent>
+	<inputevent input="leftsecondarypress" event="processLeftSecondaryPress();"></inputevent>
+	<inputevent input="rightsecondarypress" event="processRightSecondaryPress();"></inputevent>
+	<inputevent input="endleftprimarypress" event="processLeftSecondaryRelease();"></inputevent>
+	<inputevent input="endrightprimarypress" event="processRightSecondaryRelease();"></inputevent>
+	<inputevent input="lefttouchpadpress" event="processLeftTouchpadPress();"></inputevent>
+	<inputevent input="righttouchpadpress" event="processRightTouchpadPress();"></inputevent>
+	<inputevent input="lefttriggerpress" event="processLeftTriggerPress();"></inputevent>
+	<inputevent input="righttriggerpress" event="processRightTriggerPress();"></inputevent>
+	<inputevent input="endlefttriggerpress" event="processLeftTriggerRelease();"></inputevent>
+	<inputevent input="endrighttriggerpress" event="processRightTriggerRelease();"></inputevent>
+	<inputevent input="leftgrippress" event="processLeftGripPress();"></inputevent>
+	<inputevent input="rightgrippress" event="processRightGripPress();"></inputevent>
     <controlflags>
       <left-vr-pointer>teleport</left-vr-pointer>
       <right-vr-pointer>ui</right-vr-pointer>

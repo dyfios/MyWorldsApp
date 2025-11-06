@@ -1955,6 +1955,24 @@ declare class AirplaneEntity extends BaseEntity {
     static Create(parent: BaseEntity?, meshObject: string, meshResources: string[], position: Vector3, rotation: Quaternion, mass: number, id?: string, tag?: string, onLoaded?: string, checkForUpdateIfCached?: boolean): AirplaneEntity;
 
     /**
+     * Create an airplane entity.
+     * @param parent Parent of the entity to create.
+     * @param meshObject Path to the mesh object to load for this entity.
+     * @param meshResources Paths to mesh resources for this entity.
+     * @param mass Mass of the airplane entity.
+     * @param position Position of the entity relative to its parent.
+     * @param rotation Rotation of the entity relative to its parent.
+     * @param scale Scale of the entity.
+     * @param isSize Whether or not to use size instead of scale.
+     * @param id ID of the entity. One will be created if not provided.
+     * @param tag Tag of the entity.
+     * @param onLoaded Action to perform on load. This takes a single parameter containing the created airplane entity object.
+     * @param checkForUpdateIfCached Whether or not to check for update if in cache.
+     * @returns The airplane entity object.
+     */
+    static Create(parent: BaseEntity?, meshObject: string, meshResources: string[], mass: number, position: Vector3, rotation: Quaternion, scale: Vector3, isSize: boolean, id?: string, tag?: string, onLoaded?: string, checkForUpdateIfCached?: boolean): AirplaneEntity;
+
+    /**
      * Create an airplane entity from a JSON string.
      * @param jsonEntity JSON string containing the airplane entity configuration.
      * @param parent Parent entity for the airplane entity. If null, the entity will be created at the world root.
@@ -2080,6 +2098,25 @@ declare class AutomobileEntity extends BaseEntity {
      * @returns The automobile entity object.
      */
     static Create(parent: BaseEntity?, meshObject: string, meshResources: string[], position: Vector3, rotation: Quaternion, wheels: AutomobileEntityWheel[], mass: number, type: AutomobileType, id?: string, tag?: string, onLoaded?: string, checkForUpdateIfCached?: boolean): AutomobileEntity;
+
+    /**
+     * Create an automobile entity.
+     * @param parent Parent of the entity to create.
+     * @param meshObject Path to the mesh object to load for this entity.
+     * @param meshResources Paths to mesh resources for this entity.
+     * @param mass Mass of the automobile entity.
+     * @param type Type of automobile entity.
+     * @param position Position of the entity relative to its parent.
+     * @param rotation Rotation of the entity relative to its parent.
+     * @param scale Scale of the entity.
+     * @param isSize Whether or not to use size instead of scale.
+     * @param id ID of the entity. One will be created if not provided.
+     * @param tag Tag of the entity.
+     * @param onLoaded Action to perform on load. This takes a single parameter containing the created automobile entity object.
+     * @param checkForUpdateIfCached Whether or not to check for update if in cache.
+     * @returns The automobile entity object.
+     */
+    static Create(parent: BaseEntity?, meshObject: string, meshResources: string[], wheels: AutomobileEntityWheel[], mass: number, type: AutomobileType, position: Vector3, rotation: Quaternion, scale: Vector3, isSize: boolean, id?: string, tag?: string, onLoaded?: string, checkForUpdateIfCached?: boolean): AutomobileEntity;
 
     /**
      * Create an automobile entity from a JSON string.
@@ -2691,6 +2728,23 @@ declare class MeshEntity extends BaseEntity {
     static Create(parent: BaseEntity?, meshObject: string, meshResources: string[], position: Vector3, rotation: Quaternion, id?: string, onLoaded?: string, checkForUpdateIfCached?: boolean): MeshEntity;
 
     /**
+     * Create a mesh entity.
+     * @param parent Parent of the entity to create.
+     * @param meshObject Path to the mesh object to load for this entity.
+     * @param meshResources Paths to mesh resources for this entity.
+     * @param position Position of the entity relative to its parent.
+     * @param rotation Rotation of the entity relative to its parent.
+     * @param scale Scale of the entity relative to its parent.
+     * @param isSize Whether or not to use size instead of scale.
+     * @param id ID of the entity. One will be created if not provided.
+     * @param onLoaded Action to perform on load. This takes a single parameter containing the created mesh entity object.
+     * @param checkForUpdateIfCached Whether or not to check for update if in cache.
+     * @returns The mesh entity object.
+     */
+    static Create(parent: BaseEntity?, meshObject: string, meshResources: string[], position: Vector3, rotation: Quaternion, scale: Vector3, isSize: boolean, id?: string, onLoaded?: string, checkForUpdateIfCached?: boolean): MeshEntity;
+
+
+    /**
      * Create a mesh entity from a JSON string.
      * @param jsonEntity JSON string containing the mesh entity configuration.
      * @param parent Parent entity for the mesh entity. If null, the entity will be created at the world root.
@@ -2710,6 +2764,21 @@ declare class MeshEntity extends BaseEntity {
      * @param checkForUpdateIfCached Whether or not to check for update if in cache.
      */
     static QueueCreate(parent: BaseEntity?, meshObject: string, meshResources: string[], position: Vector3, rotation: Quaternion, id?: string, onLoaded?: string, checkForUpdateIfCached?: boolean): void;
+
+    /**
+     * Queue create a mesh entity synchronously.
+     * @param parent Parent of the entity to create.
+     * @param meshObject Path to the mesh object to load for this entity.
+     * @param meshResources Paths to mesh resources for this entity.
+     * @param position Position of the entity relative to its parent.
+     * @param rotation Rotation of the entity relative to its parent.
+     * @param scale Scale of the entity relative to its parent.
+     * @param isSize Whether or not to use size instead of scale.
+     * @param id ID of the entity. One will be created if not provided.
+     * @param onLoaded Action to perform on load. This takes a single parameter containing the created mesh entity object.
+     * @param checkForUpdateIfCached Whether or not to check for update if in cache.
+     */
+    static QueueCreate(parent: BaseEntity?, meshObject: string, meshResources: string[], position: Vector3, rotation: Quaternion, scale: Vector3, isSize?: boolean, id?: string, onLoaded?: string, checkForUpdateIfCached?: boolean): void;
 
     /**
      * Create a mesh entity collection from a JSON string.
@@ -3555,10 +3624,35 @@ declare enum VRTurnLocomotionMode {
     Snap = 2
 }
 
+// ============================================================================
+// Input
+// ============================================================================
+
+/**
+ * VR pointer mode enum.
+ */
+declare enum VRPointerMode {
+    None = 0,
+    Teleport = 1,
+    UI = 2
+}
+
+/**
+ * VR turn locomotion mode enum.
+ */
+declare enum VRTurnLocomotionMode {
+    None = 0,
+    Smooth = 1,
+    Snap = 2
+}
+
 /**
  * Class for input methods.
  */
 declare class Input {
+    static VRPointerMode: typeof VRPointerMode;
+    static VRTurnLocomotionMode: typeof VRTurnLocomotionMode;
+
     /** Whether or not VR is active. */
     static readonly IsVR: boolean;
 
@@ -3605,6 +3699,165 @@ declare class Input {
      * @returns Whether or not the right mouse button is pressed.
      */
     static GetRight(): boolean;
+
+    /**
+     * Get the current position of the left hand.
+     * @returns Current position of the left hand, or Vector3.zero if it does not exist.
+     */
+    static GetLeftHandPosition(): Vector3;
+
+    /**
+     * Get the current position of the right hand.
+     * @returns Current position of the right hand, or Vector3.zero if it does not exist.
+     */
+    static GetRightHandPosition(): Vector3;
+
+    /**
+     * Get the current rotation of the left hand.
+     * @returns Current rotation of the left hand, or Quaternion.identity if it does not exist.
+     */
+    static GetLeftHandRotation(): Quaternion;
+
+    /**
+     * Get the current rotation of the right hand.
+     * @returns Current rotation of the right hand, or Quaternion.identity if it does not exist.
+     */
+    static GetRightHandRotation(): Quaternion;
+
+    /**
+     * Get a raycast from the pointer.
+     * @param direction Direction to cast the ray in.
+     * @param pointerIndex Index of the pointer to get raycast from.
+     * @returns A raycast from the pointer, or null.
+     */
+    static GetPointerRaycast(direction: Vector3, pointerIndex?: number): RaycastHitInfo | null;
+
+    /** The pointer mode for the left hand. */
+    static leftVRPointerMode: VRPointerMode;
+
+    /** The pointer mode for the right hand. */
+    static rightVRPointerMode: VRPointerMode;
+
+    /** The poker mode for the left hand. */
+    static leftVRPokerEnabled: boolean;
+
+    /** The poker mode for the right hand. */
+    static rightVRPokerEnabled: boolean;
+
+    /** The interaction mode for the left hand. */
+    static leftInteractionEnabled: boolean;
+
+    /** The interaction mode for the right hand. */
+    static rightInteractionEnabled: boolean;
+
+    /** The turn locomotion mode. */
+    static turnLocomotionMode: VRTurnLocomotionMode;
+
+    /** The joystick motion mode. */
+    static joystickMotionEnabled: boolean;
+
+    /** The grab move mode for the left hand. */
+    static leftGrabMoveEnabled: boolean;
+
+    /** The grab move mode for the right hand. */
+    static rightGrabMoveEnabled: boolean;
+
+    /** The two-handed grab move mode. */
+    static twoHandedGrabMoveEnabled: boolean;
+
+    static gravityEnabled: boolean;
+
+    static wasdMotionEnabled: boolean;
+
+    static mouseLookEnabled: boolean;
+
+    static jumpEnabled: boolean;
+
+    static movementSpeed: number;
+
+    static lookSpeed: number;
+
+    /**
+     * Add a rig follower (an entity that follows the rig).
+     * @param entityToFollowRig Entity to follow the rig.
+     * @returns Whether or not the operation was successful.
+     */
+    static AddRigFollower(entityToFollowRig: BaseEntity): boolean;
+
+    /**
+     * Add a left hand follower (an entity that follows the left hand).
+     * @param entityToFollowLeftHand Entity to follow the left hand.
+     * @returns Whether or not the operation was successful.
+     */
+    static AddLeftHandFollower(entityToFollowLeftHand: BaseEntity): boolean;
+
+    /**
+     * Add a right hand follower (an entity that follows the right hand).
+     * @param entityToFollowRightHand Entity to follow the right hand.
+     * @returns Whether or not the operation was successful.
+     */
+    static AddRightHandFollower(entityToFollowRightHand: BaseEntity): boolean;
+
+    /**
+     * Remove a rig follower (an entity that follows the rig).
+     * @param entityToFollowRig Entity that follows the rig to remove.
+     * @returns Whether or not the operation was successful.
+     */
+    static RemoveRigFollower(entityToFollowRig: BaseEntity): boolean;
+
+    /**
+     * Remove a left hand follower (an entity that follows the left hand).
+     * @param entityToFollowLeftHand Entity that follows the left hand to remove.
+     * @returns Whether or not the operation was successful.
+     */
+    static RemoveLeftHandFollower(entityToFollowLeftHand: BaseEntity): boolean;
+
+    /**
+     * Remove a right hand follower (an entity that follows the right hand).
+     * @param entityToFollowRightHand Entity that follows the right hand to remove.
+     * @returns Whether or not the operation was successful.
+     */
+    static RemoveRightHandFollower(entityToFollowRightHand: BaseEntity): boolean;
+
+    // ============================================================
+    // Desktop Control Methods
+    // ============================================================
+
+    /**
+     * Set the avatar entity by tag for desktop input.
+     * The avatar entity is the 3D model representing the player.
+     * 
+     * @param entityTag The tag of the entity to use as the avatar
+     * @returns Whether or not the operation was successful
+     * 
+     * @example
+     * ```typescript
+     * // Set the player's avatar to an entity with tag "PlayerModel"
+     * const success = Input.SetAvatarEntityByTag("PlayerModel");
+     * if (success) {
+     *     console.log("Avatar set successfully");
+     * }
+     * ```
+     */
+    static SetAvatarEntityByTag(entityTag: string): boolean;
+
+    /**
+     * Set the rig offset from a string for desktop input.
+     * The rig offset adjusts the position of the player's viewpoint relative to the avatar.
+     * 
+     * @param rigOffsetString The rig offset string in format "x,y,z" (e.g., "0,1.6,0")
+     * @returns Whether or not the operation was successful
+     * 
+     * @example
+     * ```typescript
+     * // Set rig offset to 1.6 units above the avatar (eye level)
+     * const success = Input.SetRigOffset(new Vector3(0, 1.6, 0));
+     * if (success) {
+     *     console.log("Rig offset applied");
+     * }
+     * ```
+     */
+    static SetRigOffset(rigOffset: Vector3): boolean;
 }
 
 // ============================================================================

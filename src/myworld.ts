@@ -245,7 +245,6 @@ export class MyWorld {
         
         // Update modules
         this.context.modules.script.update(deltaTime);
-        this.context.modules.environmentModifier.update(deltaTime);
 
         // Render frame
         this.context.modules.worldRendering.renderFrame(deltaTime);

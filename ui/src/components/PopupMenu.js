@@ -1,3 +1,4 @@
+/* global postWorldMessage */
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './PopupMenu.css';
 
@@ -117,6 +118,7 @@ const PopupMenu = ({
     if (onOpen) {
       onOpen();
     }
+    postWorldMessage("POPUP_MENU.OPENED()");
   }, [onOpen]);
 
   // Close menu
@@ -125,6 +127,7 @@ const PopupMenu = ({
     if (onClose) {
       onClose();
     }
+    postWorldMessage("POPUP_MENU.CLOSED()");
   }, [onClose]);
 
   // Toggle menu

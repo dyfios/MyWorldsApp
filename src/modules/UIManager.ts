@@ -31,6 +31,18 @@ export class UIManager {
     (globalThis as any).handleToolbarMessage = (msg: string) => {
       this.handleToolbarMessage(msg);
     };
+
+    (globalThis as any).enableEditToolbar = () => {
+      this.enableEditToolbar();
+    };
+
+    (globalThis as any).disableEditToolbar = () => {
+      this.disableEditToolbar();
+    };
+
+    (globalThis as any).messageEditToolbar = (msg: string) => {
+      this.handleToolbarMessage(msg);
+    };
   }
 
   finishToolbarSetup(): void {
@@ -113,10 +125,27 @@ export class UIManager {
     Logging.Log('🎯 UIManager: UI_HandleToolbarMessage invoked with: ' + msg);
     try {
       Logging.Log('📨 UIManager: Processing toolbar message: ' + msg);
+
+      switch (msg) {
+        case 'CHAT_INPUT.OPENED()':
+        case 'CHAT_HISTORY.OPENED()':
+        case 'POPUP_MENU.OPENED()':
+          (globalThis as any).pauseForUI();
+          break;
+        case 'CHAT_INPUT.CLOSED()':
+        case 'CHAT_HISTORY.CLOSED()':
+        case 'POPUP_MENU.CLOSED()':
+          (globalThis as any).unpauseForUI();
+          break;
+      }
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       Logging.LogError('❌ UIManager: Error handling toolbar message: ' + errorMessage);
     }
+  }
+
+  messageEditToolbar(msg: string): void {
+    Logging.Log('🎯 UIManager: messageEditToolbar invoked with: ' + msg);
   }
 
   /**

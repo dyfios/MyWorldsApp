@@ -1,8 +1,10 @@
+/* global postWorldMessage */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './ChatConsole.css';
 
 const ChatConsole = ({
   toggleKey = '\\',
+  historyKey = '|',
   onChatInputOpen,
   onChatInputClose,
   onChatHistoryOpen,
@@ -16,10 +18,6 @@ const ChatConsole = ({
   const [isHistoryVisible, setIsHistoryVisible] = useState(false);
   const [showTempPanel, setShowTempPanel] = useState(false);
   
-  const lastKeyPressRef = useRef(0);
-  const longPressTimerRef = useRef(null);
-  const longPressThresholdRef = useRef(500); // ms for long press detection
-  const isLongPressRef = useRef(false); // Track if it was a long press
   const tempPanelTimerRef = useRef(null);
   const inputRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -76,6 +74,7 @@ const ChatConsole = ({
     if (onChatInputOpen) {
       onChatInputOpen();
     }
+    postWorldMessage("CHAT_INPUT.OPENED()");
     // Focus input after state update
     setTimeout(() => {
       if (inputRef.current) {
@@ -91,6 +90,7 @@ const ChatConsole = ({
     if (onChatInputClose) {
       onChatInputClose();
     }
+    postWorldMessage("CHAT_INPUT.CLOSED()");
   }, [onChatInputClose]);
 
   // Handle opening history
@@ -101,6 +101,7 @@ const ChatConsole = ({
     if (onChatHistoryOpen) {
       onChatHistoryOpen();
     }
+    postWorldMessage("CHAT_HISTORY.OPENED()");
     setTimeout(() => {
       if (inputRef.current) {
         inputRef.current.focus();
@@ -119,72 +120,33 @@ const ChatConsole = ({
     if (onChatHistoryClose) {
       onChatHistoryClose();
     }
+    postWorldMessage("CHAT_HISTORY.CLOSED()");
   }, [onChatHistoryClose]);
 
   // Keyboard event handler
   useEffect(() => {
     const handleKeyDown = (e) => {
-      console.log('Key pressed:', e.key, 'toggleKey:', toggleKey);
-      
-      // Check if it's the toggle key
-      if (e.key === toggleKey && !e.repeat) { // Ignore key repeat events
-        e.preventDefault();
-        console.log('Toggle key matched!');
-        
-        // If not already holding, start long press timer
-        if (!longPressTimerRef.current) {
-          console.log('Starting long press timer');
-          longPressTimerRef.current = setTimeout(() => {
-            // Long press: open history
-            console.log('Long press triggered!');
-            isLongPressRef.current = true; // Mark as long press
-            longPressTimerRef.current = null; // Clear the timer reference
-            if (!isHistoryVisible) {
-              console.log('Opening history (long press)');
-              handleOpenHistory();
-            }
-          }, longPressThresholdRef.current);
-        }
-      }
-    };
-
-    const handleKeyUp = (e) => {
-      // Check if it's the toggle key being released
+      // Toggle input with toggleKey (\)
       if (e.key === toggleKey) {
         e.preventDefault();
         
-        console.log('Key released. Timer active:', !!longPressTimerRef.current, 'Was long press:', isLongPressRef.current);
-        
-        // If long press already triggered, don't do anything
-        if (isLongPressRef.current) {
-          console.log('Long press completed, keeping history open');
-          isLongPressRef.current = false; // Reset for next time
-          return;
+        if (isHistoryVisible) {
+          // If history is visible, close everything
+          handleCloseHistory();
+        } else if (isInputActive) {
+          handleCloseInput();
+        } else {
+          handleOpenInput();
         }
+      }
+      
+      // Open history with historyKey (|)
+      if (e.key === historyKey) {
+        e.preventDefault();
         
-        // If timer is still active, it was a short press
-        if (longPressTimerRef.current) {
-          console.log('Clearing timer - was short press');
-          clearTimeout(longPressTimerRef.current);
-          longPressTimerRef.current = null;
-          
-          // Short press: toggle input
-          if (isHistoryVisible) {
-            // If history is visible, close everything
-            console.log('Closing history (short press)');
-            handleCloseHistory();
-          } else if (isInputActive) {
-            console.log('Closing input (short press)');
-            handleCloseInput();
-          } else {
-            console.log('Opening input (short press)');
-            handleOpenInput();
-          }
+        if (!isHistoryVisible) {
+          handleOpenHistory();
         }
-        
-        // Reset flags for next press (only if it wasn't handled above)
-        longPressTimerRef.current = null;
-        isLongPressRef.current = false;
       }
     };
 
@@ -192,14 +154,6 @@ const ChatConsole = ({
       // ESC key to close
       if (e.key === 'Escape' && (isInputActive || isHistoryVisible)) {
         e.preventDefault();
-        
-        // Clear any pending long press
-        if (longPressTimerRef.current) {
-          clearTimeout(longPressTimerRef.current);
-          longPressTimerRef.current = null;
-        }
-        
-        isLongPressRef.current = false;
         
         if (isHistoryVisible) {
           handleCloseHistory();
@@ -210,20 +164,13 @@ const ChatConsole = ({
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('keydown', handleKeyEscape);
     
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('keydown', handleKeyEscape);
-      
-      // Cleanup timer on unmount
-      if (longPressTimerRef.current) {
-        clearTimeout(longPressTimerRef.current);
-      }
     };
-  }, [toggleKey, isInputActive, isHistoryVisible, handleOpenInput, handleCloseInput, handleOpenHistory, handleCloseHistory]);
+  }, [toggleKey, historyKey, isInputActive, isHistoryVisible, handleOpenInput, handleCloseInput, handleOpenHistory, handleCloseHistory]);
 
   // Handle form submission
   const handleSubmit = (e) => {
@@ -307,7 +254,7 @@ const ChatConsole = ({
               className="chat-input"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder={`Type a message... (Press ${toggleKey} to close, hold ${toggleKey} for history)`}
+              placeholder={`Type a message... (Press ${toggleKey} to close, ${historyKey} to open history)`}
               autoComplete="off"
             />
             <button type="submit" className="chat-send-button">

@@ -2,87 +2,372 @@
  * Environment Modifier - Handles environmental changes and effects
  */
 
-import { Position } from '../types/config';
-
-export interface EnvironmentSettings {
-  timeOfDay: number; // 0-24 hours
-  weatherType: 'clear' | 'rain' | 'snow' | 'fog';
-  windSpeed: number;
-  windDirection: number;
-  temperature: number;
-}
-
 export class EnvironmentModifier {
-  private static readonly SECONDS_PER_HOUR = 3600;
-  private settings: EnvironmentSettings;
-
   constructor() {
-    this.settings = {
-      timeOfDay: 12, // noon
-      weatherType: 'clear',
-      windSpeed: 0,
-      windDirection: 0,
-      temperature: 20
+    this.setupGlobalCallbacks();
+  }
+
+  /**
+   * Setup global callback functions for input routing
+   */
+  private setupGlobalCallbacks(): void {
+    // Define global callback for handling left button press
+    (globalThis as any).handleLeftPress = () => {
+      this.handleLeftPress();
+    };
+
+    // Define global callback for handling right button press
+    (globalThis as any).handleRightPress = () => {
+      this.handleRightPress();
+    };
+
+    // Define global callback for performing rotation
+    (globalThis as any).performRotate = (direction: string, negative: boolean) => {
+      this.performRotate(direction, negative);
+    };
+
+    // Define global callback for processing grip press
+    (globalThis as any).processGripPress = () => {
+      this.processGripPress();
     };
   }
 
   /**
-   * Get current environment settings
+   * Handle left mouse button press
    */
-  getSettings(): EnvironmentSettings {
-    return { ...this.settings };
-  }
+  private handleLeftPress(): void {
+    var entityModule = Context.GetContext("ENTITY_MODULE");
+    //var digMode = WorldStorage.GetItem("DIG-MODE");
+    var interactionMode = WorldStorage.GetItem("INTERACTION-MODE");
 
-  /**
-   * Set time of day
-   */
-  setTimeOfDay(hours: number): void {
-    this.settings.timeOfDay = hours % 24;
-    Logging.Log(`Time of day set to ${this.settings.timeOfDay}`);
-  }
+    var hitInfo = Input.GetPointerRaycast(Vector3.forward);
 
-  /**
-   * Set weather type
-   */
-  setWeather(weatherType: EnvironmentSettings['weatherType']): void {
-    this.settings.weatherType = weatherType;
-    Logging.Log(`Weather set to ${weatherType}`);
-  }
-
-  /**
-   * Set wind conditions
-   */
-  setWind(speed: number, direction: number): void {
-    this.settings.windSpeed = speed;
-    this.settings.windDirection = direction;
-    Logging.Log(`Wind set to ${speed} m/s at ${direction} degrees`);
-  }
-
-  /**
-   * Set temperature
-   */
-  setTemperature(celsius: number): void {
-    this.settings.temperature = celsius;
-    Logging.Log(`Temperature set to ${celsius}°C`);
-  }
-
-  /**
-   * Apply environment effects at a position
-   */
-  applyEnvironmentEffects(position: Position): void {
-    // Logic to apply weather effects, time-based lighting, etc.
-    Logging.Log('Applying environment effects at position: ' + JSON.stringify(position));
-  }
-
-  /**
-   * Update environment state
-   */
-  update(deltaTime: number): void {
-    // Update time progression, weather transitions, etc.
-    // For now, just advance time slightly
-    this.settings.timeOfDay += deltaTime / EnvironmentModifier.SECONDS_PER_HOUR; // Advance time (assuming deltaTime is in seconds)
-    if (this.settings.timeOfDay >= 24) {
-      this.settings.timeOfDay -= 24;
+    if (interactionMode == "HAND") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo instanceof AutomobileEntity) {
+                    
+                }
+                else if (hitInfo.entity instanceof AirplaneEntity) {
+                    
+                }
+            }
+        }
     }
+    else if (interactionMode == "SQUARE-SHOVEL-1") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "SQUARE-SHOVEL-2") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 2);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "SQUARE-SHOVEL-4") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 4);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "SQUARE-SHOVEL-8") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 8);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "SLEDGE-HAMMER") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof MeshEntity ||
+                    hitInfo.entity instanceof AutomobileEntity || hitInfo.entity instanceof AirplaneEntity) {
+                    this.deleteEntity(hitInfo.entity);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-0") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performBuild(hitInfo.entity, hitInfo, 0);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-1") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performBuild(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-2") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performBuild(hitInfo.entity, hitInfo, 2);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-3") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performBuild(hitInfo.entity, hitInfo, 3);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-4") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performBuild(hitInfo.entity, hitInfo, 4);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-5") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performBuild(hitInfo.entity, hitInfo, 5);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-6") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performBuild(hitInfo.entity, hitInfo, 6);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-7") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performBuild(hitInfo.entity, hitInfo, 7);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "ENTITY-PLACING") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity || hitInfo.entity instanceof MeshEntity) {
+                    WorldStorage.SetItem("ENTITY-KEEP-SPAWNING", "TRUE");
+                    entityModule.entityPlacement.StopPlacing();
+                }
+            }
+        }
+    }
+  }
+
+  /**
+   * Perform digging action on a terrain entity
+   */
+  performDig(terrainEntity: TerrainEntity, hitInfo: RaycastHitInfo, layer: number): void {
+    Logging.Log('Digging on terrain entity "' + terrainEntity.id +
+      '" at layer ' + layer + ' at position ' + hitInfo.hitPoint.toString());
+  }
+
+  /**
+   * Perform building action on a terrain entity
+   */
+  performBuild(terrainEntity: TerrainEntity, hitInfo: RaycastHitInfo, layer: number): void {
+    Logging.Log('Building on terrain entity "' + terrainEntity.id +
+      '" at layer ' + layer + ' at position ' + hitInfo.hitPoint.toString());
+  }
+
+  /**
+   * Delete an entity
+   */
+  deleteEntity(entity: BaseEntity): void {
+    Logging.Log('Deleting entity "' + entity.id + '"');
+  }
+
+  /**
+   * Process grip press events
+   */
+  processGripPress(): void {
+    var entityModule = Context.GetContext("ENTITY_MODULE");
+
+    var interactionMode = WorldStorage.GetItem("INTERACTION-MODE");
+
+    var hitInfo = Input.GetPointerRaycast(Vector3.forward, 1);
+
+    if (interactionMode == "HAND") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo instanceof AutomobileEntity) {
+                    (globalThis as any).placePlayerInAutomobileEntity(hitInfo.entity);
+                }
+                else if (hitInfo.entity instanceof AirplaneEntity) {
+                    (globalThis as any).placePlayerInAirplaneEntity(hitInfo.entity);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "SQUARE-SHOVEL-1") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    
+                }
+            }
+        }
+    }
+    else if (interactionMode == "SQUARE-SHOVEL-2") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    
+                }
+            }
+        }
+    }
+    else if (interactionMode == "SQUARE-SHOVEL-4") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    
+                }
+            }
+        }
+    }
+    else if (interactionMode == "SQUARE-SHOVEL-8") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    
+                }
+            }
+        }
+    }
+    else if (interactionMode == "SLEDGE-HAMMER") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof MeshEntity) {
+                    
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-0") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-1") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-2") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-3") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-4") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-5") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-6") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "TERRAIN-LAYER-7") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (interactionMode == "ENTITY-PLACING") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity || hitInfo.entity instanceof MeshEntity) {
+                    entityModule.entityPlacement.CancelPlacing();
+                }
+            }
+        }
+    }
+  }
+
+  /**
+   * Perform rotation on an entity
+   */
+  private performRotate(direction: string, negative: boolean): void {
+    (globalThis as any).rotateOneStep(direction, negative);
+  }
+
+  /**
+   * Handle right mouse button press
+   */
+  private handleRightPress(): void {
+    Logging.Log('Right mouse button pressed');
   }
 }

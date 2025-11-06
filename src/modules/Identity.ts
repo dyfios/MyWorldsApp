@@ -39,7 +39,7 @@ export class Identity {
     this.setupGlobalCallbacks();
   }
 
-    /**
+  /**
    * Setup global callback functions for WebVerse entity loading
    */
   private setupGlobalCallbacks(): void {
@@ -198,7 +198,9 @@ export class Identity {
       Logging.Log('User ID: ' + mwTopLevelContext.userID);
       Logging.Log('User Tag: ' + mwTopLevelContext.userTag);
       
-      // Now that login is complete, trigger entity template loading
+      // Now that login is complete, trigger entity template loading and show main UI
+      Logging.Log('🔄 Showing main UI after login...');
+      (globalThis as any).enableEditToolbar();
       Logging.Log('🔄 Triggering entity templates request after successful login...');
       if (typeof (globalThis as any).triggerEntityTemplatesAfterLogin === 'function') {
         (globalThis as any).triggerEntityTemplatesAfterLogin();

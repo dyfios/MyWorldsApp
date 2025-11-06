@@ -1,3 +1,4 @@
+/* global postWorldMessage */
 import React, { useState, useCallback } from 'react';
 import './App.css';
 import ButtonDock from './components/ButtonDock';
@@ -33,6 +34,7 @@ function App() {
     setButtons(prev => prev.filter(btn => btn.id !== buttonId));
     if (selectedButtonId === buttonId) {
       setSelectedButtonId(null);
+      postWorldMessage(`BUTTON.UNSELECTED(NONE)`);
     }
   }, [selectedButtonId]);
 
@@ -50,6 +52,7 @@ function App() {
   const selectButton = useCallback((buttonId) => {
     setSelectedButtonId(buttonId);
     console.log('Button selected:', buttonId);
+    postWorldMessage(`BUTTON.SELECTED(${buttons[buttonId - 1].name})`);
   }, []);
 
   // API: Select previous button
@@ -59,6 +62,7 @@ function App() {
     const currentIndex = buttons.findIndex(btn => btn.id === selectedButtonId);
     const prevIndex = currentIndex <= 0 ? buttons.length - 1 : currentIndex - 1;
     setSelectedButtonId(buttons[prevIndex].id);
+    postWorldMessage(`BUTTON.SELECTED(${buttons[prevIndex].name})`);
   }, [buttons, selectedButtonId]);
 
   // API: Select next button
@@ -68,12 +72,14 @@ function App() {
     const currentIndex = buttons.findIndex(btn => btn.id === selectedButtonId);
     const nextIndex = currentIndex >= buttons.length - 1 ? 0 : currentIndex + 1;
     setSelectedButtonId(buttons[nextIndex].id);
+    postWorldMessage(`BUTTON.SELECTED(${buttons[nextIndex].name})`);
   }, [buttons, selectedButtonId]);
 
   // API: Select by number key
   const selectByNumber = useCallback((number) => {
     if (number > 0 && number <= buttons.length) {
       setSelectedButtonId(buttons[number - 1].id);
+      postWorldMessage(`BUTTON.SELECTED(${buttons[number - 1].name})`);
     }
   }, [buttons]);
 
@@ -95,21 +101,64 @@ function App() {
   // Chat event handlers
   const handleChatInputOpen = useCallback(() => {
     setIsChatActive(true);
+    // Close popup menu when chat opens
+    if (window.popupMenuAPI && window.popupMenuAPI.isOpen()) {
+      window.popupMenuAPI.closeMenu();
+    }
     console.log('Chat input opened');
   }, []);
 
   const handleChatInputClose = useCallback(() => {
     setIsChatActive(false);
+    // Close popup menu when chat input closes
+    if (window.popupMenuAPI && window.popupMenuAPI.isOpen()) {
+      window.popupMenuAPI.closeMenu();
+    }
     console.log('Chat input closed');
   }, []);
 
   const handleChatHistoryOpen = useCallback(() => {
     setIsChatActive(true);
+    // Close popup menu when chat history opens
+    if (window.popupMenuAPI && window.popupMenuAPI.isOpen()) {
+      window.popupMenuAPI.closeMenu();
+    }
     console.log('Chat history opened');
+  }, []);
+
+  // Popup menu event handlers
+  const handlePopupMenuOpen = useCallback(() => {
+    // Close chat when popup menu opens
+    if (window.chatConsoleAPI) {
+      if (window.chatConsoleAPI.isHistoryVisible()) {
+        window.chatConsoleAPI.closeHistory();
+      }
+      if (window.chatConsoleAPI.isInputActive()) {
+        window.chatConsoleAPI.closeInput();
+      }
+    }
+    console.log('Popup menu opened');
+  }, []);
+
+  const handlePopupMenuClose = useCallback(() => {
+    // Close chat when popup menu closes
+    if (window.chatConsoleAPI) {
+      if (window.chatConsoleAPI.isHistoryVisible()) {
+        window.chatConsoleAPI.closeHistory();
+      }
+      if (window.chatConsoleAPI.isInputActive()) {
+        window.chatConsoleAPI.closeInput();
+      }
+    }
+    console.log('Popup menu closed');
   }, []);
 
   const handleChatHistoryClose = useCallback(() => {
     setIsChatActive(false);
+    // Close popup menu when chat history closes
+    if (window.popupMenuAPI && window.popupMenuAPI.isOpen()) {
+      window.popupMenuAPI.closeMenu();
+    }
     console.log('Chat history closed');
   }, []);
 
@@ -117,7 +166,7 @@ function App() {
   React.useEffect(() => {
     setTimeout(() => {
       if (window.chatConsoleAPI) {
-        window.chatConsoleAPI.addMessage('Press \\ to open chat, or hold for history', 'System');
+        window.chatConsoleAPI.addMessage('Press \\ to toggle chat, | to open history', 'System');
       }
     }, 1000);
   }, []);
@@ -147,6 +196,8 @@ function App() {
 
       <PopupMenu
         toggleKey="`"
+        onOpen={handlePopupMenuOpen}
+        onClose={handlePopupMenuClose}
       />
     </div>
   );
