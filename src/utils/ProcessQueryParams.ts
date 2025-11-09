@@ -145,7 +145,7 @@ export class ProcessQueryParams {
         } catch (error) {
           const defaultPosition: UserPosition = { x: 0, y: 0, z: 0 };
           this.params[key] = defaultPosition;
-          return defaultPosition;
+          return new Vector3(defaultPosition.x, defaultPosition.y, defaultPosition.z);
         }
       } else if (key === 'worldMetadata') {
         try {
@@ -254,9 +254,9 @@ export class ProcessQueryParams {
   /**
    * Get user position as a 3D vector
    */
-  getUserPosition(): UserPosition {
-    const position = this.get('userPosition') as UserPosition;
-    return position || { x: 0, y: 0, z: 0 };
+  getUserPosition(): Vector3 {
+    const position = this.get('userPosition') as Vector3;
+    return position || new Vector3(0, 0, 0);
   }
 
   /**

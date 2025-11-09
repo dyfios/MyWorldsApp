@@ -20,6 +20,20 @@ const DockButton = ({
   onTouchEnd,
   onTouchMove
 }) => {
+  // Calculate font size based on text length for non-URL thumbnails
+  const getFontSize = (thumbnail) => {
+    if (!thumbnail || thumbnail.startsWith('http')) {
+      return '2rem'; // Default for images
+    }
+    
+    const length = thumbnail.length;
+    if (length <= 2) return '2rem';      // Emoji or 1-2 chars
+    if (length <= 4) return '1.2rem';    // 3-4 chars
+    if (length <= 6) return '0.9rem';    // 5-6 chars
+    if (length <= 8) return '0.75rem';   // 7-8 chars
+    return '0.6rem';                      // 9+ chars
+  };
+
   const handleMouseDown = (e) => {
     onMouseDown(index, e);
   };
@@ -61,7 +75,12 @@ const DockButton = ({
             typeof button.thumbnail === 'string' && button.thumbnail.startsWith('http') ? (
               <img src={button.thumbnail} alt={button.name} className="button-thumbnail" />
             ) : (
-              <span className="button-emoji">{button.thumbnail}</span>
+              <span 
+                className="button-emoji"
+                style={{ fontSize: getFontSize(button.thumbnail) }}
+              >
+                {button.thumbnail}
+              </span>
             )
           )}
         </div>

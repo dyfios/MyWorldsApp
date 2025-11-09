@@ -25,6 +25,8 @@ export { PlayerController } from './modules/PlayerController';
 export { ScriptEngine } from './modules/ScriptEngine';
 export { SyncManager, SyncMsgHandler } from './modules/SyncManager';
 export type { SyncMsgHandlerDependencies } from './modules/SyncManager';
+export { default as VOSSynchronizer } from './modules/VOSSynchronizer';
+export type { VOSSynchronizerConfig, VOSMessage, VOSSessionMessage, VOSEntityMessage } from './modules/VOSSynchronizer';
 export { UIManager } from './modules/UIManager';
 export type { UIUpdateData } from './modules/UIManager';
 export {

@@ -6,6 +6,7 @@ import { WorldConfig } from '../types/config';
 import { REST } from '../api/REST';
 import { ProcessQueryParams, WorldMetadata } from '../utils/ProcessQueryParams';
 import { EntityManager } from './EntityManager';
+import { DockButtonInfo } from './UIManager';
 
 /**
  * Entity instance format received from the server
@@ -99,7 +100,20 @@ export class StaticSurfaceRenderer extends WorldRendering {
       Logging.Log('📋 StaticSurfaceRenderer: Entity templates received: ' + templates);
       Logging.Log('✓ StaticSurfaceRenderer: Entity templates request completed successfully');
       Context.DefineContext('MW_ENTITY_TEMPLATES', templates);
-      
+
+      let dockButtons: DockButtonInfo[] = [];
+      for (const template of templates['templates']) {
+        dockButtons.push({
+          name: template.entity_tag + "_" + template.variant_tag,
+          thumbnail: template.entity_tag,
+          onClick: `ENTITY_TEMPLATE.ENTITY_SELECTED('${template.entity_id}','${template.variant_id}');`
+        });
+        Time.SetTimeout("addEditToolbarButton('" + template.entity_tag + "_" +
+          template.variant_tag + "', '" + template.entity_tag +
+          "', 'ENTITY_TEMPLATE.ENTITY_SELECTED(" + template.entity_id + "," +
+          template.variant_id + ");')", 3000);
+      }
+
       // Now that templates are complete, trigger entity instances loading
       Logging.Log('🔄 Triggering entity instances request after templates completion...');
       if (typeof (globalThis as any).triggerEntityInstancesAfterTemplates === 'function') {
@@ -108,7 +122,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
         Logging.LogError('triggerEntityInstancesAfterTemplates function not available');
       }
     } catch (error) {
-      Logging.LogError('❌ StaticSurfaceRenderer: Failed to parse entity templates response: '  + error);
+      Logging.LogError('❌ StaticSurfaceRenderer: Failed to parse entity templates response: ' + error);
     }
   }
 
@@ -129,19 +143,19 @@ export class StaticSurfaceRenderer extends WorldRendering {
       // Instantiate all entities using EntityManager
       const worldRendererFactoryWrapper = Context.GetContext('WorldRendererFactory');
       Logging.Log('🔍 WorldRendererFactory from context: ' + (worldRendererFactoryWrapper ? 'Found' : 'Not found'));
-      
+
       if (worldRendererFactoryWrapper) {
         Logging.Log('🔍 WorldRendererFactory type: ' + typeof worldRendererFactoryWrapper);
         Logging.Log('🔍 Checking for getStaticSurfaceRenderer method: ' + (typeof worldRendererFactoryWrapper.getStaticSurfaceRenderer));
-        
+
         if (worldRendererFactoryWrapper.getStaticSurfaceRenderer) {
           try {
             const staticRenderer = worldRendererFactoryWrapper.getStaticSurfaceRenderer();
             Logging.Log('🔍 StaticSurfaceRenderer retrieved: ' + (staticRenderer ? 'Found' : 'Not found'));
-            
+
             if (staticRenderer) {
               Logging.Log('🔍 Checking for instantiateEntities method: ' + (typeof staticRenderer.instantiateEntities));
-              
+
               if (staticRenderer.instantiateEntities) {
                 Logging.Log('🎯 Calling instantiateEntities with ' + instances['assets'].length + ' instances');
                 staticRenderer.instantiateEntities(instances['assets']);
@@ -171,18 +185,16 @@ export class StaticSurfaceRenderer extends WorldRendering {
     Logging.LogError('❌ StaticSurfaceRenderer: Failed to request entity instances: ' + errorMessage);
   }
 
-  async initialize(config: WorldConfig): Promise<void> {
-    this.config = config;
-    
+  async initialize(): Promise<void> {
     // Parse query parameters to ensure they're available
     this.queryParams.parse();
-    
+
     // Parse world metadata from query parameters
     this.parseWorldMetadata();
-    
+
     // Get world address from query parameters
     const worldAddress = this.queryParams.getWorldAddress();
-    
+
     if (worldAddress) {
       Logging.Log('🌐 StaticSurfaceRenderer: Using world address: ' + worldAddress);
       // Create new REST client with the world address as base URL
@@ -191,9 +203,9 @@ export class StaticSurfaceRenderer extends WorldRendering {
       Logging.Log('🌐 StaticSurfaceRenderer: No world address specified, using default API endpoint');
       // Keep the default REST client
     }
-    
+
     Logging.Log('StaticSurfaceRenderer initialized');
-    
+
     // Attempt to load entity templates if we have world metadata
     //if (this.worldMetadata && this.worldMetadata.id) {
     //  Logging.Log('🔄 StaticSurfaceRenderer: Auto-requesting entity templates during initialization');
@@ -211,10 +223,10 @@ export class StaticSurfaceRenderer extends WorldRendering {
   private parseWorldMetadata(): void {
     try {
       Logging.Log('🌍 StaticSurfaceRenderer: Parsing world metadata...');
-      
+
       // Try to get parsed world metadata first
       this.worldMetadata = this.queryParams.getWorldMetadata();
-      
+
       if (this.worldMetadata) {
         Logging.Log('🌍 StaticSurfaceRenderer: World metadata parsed successfully:');
         Logging.Log('  - ID: ' + this.worldMetadata.id);
@@ -271,10 +283,10 @@ export class StaticSurfaceRenderer extends WorldRendering {
   private registerForPostLoginLoading(): void {
     try {
       Logging.Log('📝 StaticSurfaceRenderer: Registering for post-login entity template loading...');
-      
+
       // Set the global pending request variable
       (globalThis as any).pendingEntityTemplateRequest = this;
-      
+
       Logging.Log('✓ StaticSurfaceRenderer: Registered for post-login loading');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -288,7 +300,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
   requestEntityTemplates(): void {
     try {
       Logging.Log('🔍 StaticSurfaceRenderer: Requesting entity templates...');
-      
+
       // Check authentication before making requests
       if (!this.isUserAuthenticated()) {
         Logging.Log('🔐 StaticSurfaceRenderer: User not authenticated - registering for post-login loading...');
@@ -303,25 +315,25 @@ export class StaticSurfaceRenderer extends WorldRendering {
 
       // Verify callbacks exist
       Logging.Log('🔧 StaticSurfaceRenderer: Using callback functions: ' + onComplete + ', ' + onError);
-      
+
       // Get world ID from parsed metadata
       if (this.worldMetadata && this.worldMetadata.id) {
         Logging.Log('🌍 StaticSurfaceRenderer: Using world ID from metadata: ' + this.worldMetadata.id);
-        
+
         // Get authenticated user credentials
         const userId = this.getUserId();
         const userToken = this.getUserToken();
-        
+
         Logging.Log('👤 StaticSurfaceRenderer: Using authenticated user ID: ' + userId);
         Logging.Log('🔑 StaticSurfaceRenderer: Using authenticated user token: ' + (userToken ? '[PRESENT]' : '[MISSING]'));
-        
+
         // Make the request with world ID, user credentials, and callbacks
         this.restClient.sendGetEntityTemplatesRequest(this.worldMetadata.id, userId, userToken, onComplete);
       } else {
         Logging.LogError('❌ StaticSurfaceRenderer: No world ID available in metadata - cannot request entity templates');
         return;
       }
-      
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ StaticSurfaceRenderer: Failed to setup entity templates request: ' + errorMessage);
@@ -334,7 +346,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
   requestEntityInstances(): void {
     try {
       Logging.Log('🔍 StaticSurfaceRenderer: Requesting entity instances...');
-      
+
       // Check authentication before making requests
       if (!this.isUserAuthenticated()) {
         Logging.LogError('❌ StaticSurfaceRenderer: User not authenticated - cannot request entity instances');
@@ -347,7 +359,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
 
       // Verify callbacks exist
       Logging.Log('🔧 StaticSurfaceRenderer: Using callback functions: ' + onComplete + ', ' + onError);
-      
+
       if (this.worldMetadata && this.worldMetadata.id) {
         Logging.Log('🌍 StaticSurfaceRenderer: Using world ID from metadata: ' + this.worldMetadata.id)
 
@@ -357,7 +369,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
 
         Logging.Log('👤 StaticSurfaceRenderer: Using authenticated user ID: ' + userId)
         Logging.Log('🔑 StaticSurfaceRenderer: Using authenticated user token: ' + (userToken ? '[PRESENT]' : '[MISSING]'));
-        
+
         // Make the request with world ID, user credentials, and callbacks
         this.restClient.sendGetEntityInstancesRequest(this.worldMetadata.id, userId, userToken, onComplete);
       } else {
@@ -375,7 +387,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
    */
   public instantiateEntities(instances: EntityInstance[]): void {
     Logging.Log('🏗️ StaticSurfaceRenderer: Instantiating ' + instances.length + ' entities...');
-    
+
     if (!Array.isArray(instances)) {
       Logging.LogError('❌ StaticSurfaceRenderer: Expected instances to be an array, got: ' + typeof instances);
       return;
@@ -384,14 +396,14 @@ export class StaticSurfaceRenderer extends WorldRendering {
     instances.forEach((instance, index) => {
       try {
         Logging.Log(`🎯 StaticSurfaceRenderer: Processing entity ${index + 1}/${instances.length}: ${instance.instanceid || 'unknown'}`);
-        
+
         // Extract entity data from instance
         const instanceId = instance.instanceid;
         const instanceTag = instance.instancetag; // May be used later for entity tagging
         const entityId = instance.entity_id;
         const variantId = instance.variant_id;
         const entityParent = instance.entity_parent; // May be used later for hierarchical entities
-        
+
         // Parse position from separate x, y, z fields
         const position = new Vector3(
           instance.pos_x || 0,
@@ -413,7 +425,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
           instance.scl_y || 1,
           instance.scl_z || 1
         );
-        
+
         let type = 'mesh';
         let meshObject = "";
         let meshResources: string[] = [];
@@ -432,7 +444,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
 
             meshObject = this.queryParams.getWorldAddress() + "/get-asset/" +
               this.worldMetadata.id + "/" + JSON.parse(template["assets"]).model_path;
-            meshResources = [ meshObject ];
+            meshResources = [meshObject];
             type = template.type;
 
             if (type != 'mesh') {
@@ -443,9 +455,9 @@ export class StaticSurfaceRenderer extends WorldRendering {
         }
 
         Logging.Log(`📍 Entity ${instanceId}: pos(${position.x}, ${position.y}, ${position.z}), rot(${rotation.x}, ${rotation.y}, ${rotation.z}, ${rotation.w}), scale(${scale})`);
-        
+
         // Load entity using EntityManager with correct parameters
-        const loadedInstanceId = this.entityManager.MW_Entity_LoadEntity(
+        const loadedInstanceId = this.entityManager.loadEntity(
           instanceId,
           instanceTag,
           entityId,
@@ -458,14 +470,14 @@ export class StaticSurfaceRenderer extends WorldRendering {
           meshObject,
           meshResources
         );
-        
+
         Logging.Log(`✅ StaticSurfaceRenderer: Successfully instantiated entity ${entityId} with loaded instance ID ${loadedInstanceId}`);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         Logging.LogError(`❌ StaticSurfaceRenderer: Failed to instantiate entity ${index}: ${errorMessage}`);
       }
     });
-    
+
     Logging.Log(`🎉 StaticSurfaceRenderer: Completed instantiating ${instances.length} entities`);
   }
 
@@ -483,7 +495,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
     } catch (error) {
       Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user ID from context: ' + error);
     }
-    
+
     // Return empty string if not authenticated (no fallback)
     return "";
   }
@@ -502,7 +514,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
     } catch (error) {
       Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user token from context: ' + error);
     }
-    
+
     // Return empty string if not authenticated (no fallback)
     return "";
   }
@@ -515,7 +527,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
     try {
       const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
       const hasValidAuth = contextUser && contextUser.userID && contextUser.token;
-      
+
       if (hasValidAuth) {
         Logging.Log('✅ StaticSurfaceRenderer: User is authenticated');
         return true;
@@ -535,19 +547,19 @@ export class StaticSurfaceRenderer extends WorldRendering {
   private startLoginProcess(): void {
     try {
       Logging.Log('🔐 StaticSurfaceRenderer: Starting login process...');
-      
+
       // Import Identity module dynamically to avoid circular dependencies
       import('./Identity').then(({ Identity }) => {
         Logging.Log('🔐 StaticSurfaceRenderer: Identity module loaded, starting login...');
-        
+
         Identity.startUserLogin();
         Logging.Log('🔐 StaticSurfaceRenderer: Login process initiated (completion handled by global callbacks)');
-        
+
       }).catch((error) => {
         const errorMessage = error instanceof Error ? error.message : String(error);
         Logging.LogError('❌ StaticSurfaceRenderer: Failed to import Identity module: ' + errorMessage);
       });
-      
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ StaticSurfaceRenderer: Failed to start login process: ' + errorMessage);
@@ -563,8 +575,930 @@ export class StaticSurfaceRenderer extends WorldRendering {
  * Tiled surface renderer for large terrains
  */
 export class TiledSurfaceRenderer extends WorldRendering {
-  async initialize(config: WorldConfig): Promise<void> {
-    this.config = config;
+  private restClient: REST;
+  private queryParams: ProcessQueryParams;
+  private entityManager: EntityManager;
+  private worldConfig: any;
+  private entitiesConfig: any;
+  private terrainConfig: any;
+  private biomesConfig: any;
+  private worldAddress: string | undefined;
+  private maintenanceFunctionID: UUID | null = null;
+  private startPos: Vector3 = Vector3.zero;
+  private characterInitialized: boolean = false;
+  private currentRegion: Vector2Int = new Vector2Int(0, 0);
+  private water: WaterEntity | null = null;
+  private regionLoadInProgress: boolean = false;
+  private terrainTiles: { [key: string]: TerrainEntity } = {};
+  private biomeMap: { [key: string]: any } = {};
+  private characterSynchronizer: string | null = null;
+  private regionSynchronizers: { [key: string]: string } = {};
+
+  constructor() {
+    super();
+    this.queryParams = new ProcessQueryParams();
+    // Initialize with default, will be updated in initialize()
+    this.restClient = new REST();
+    this.entityManager = new EntityManager();
+    this.setupGlobalCallbacks();
+  }
+
+  /**
+ * Get user ID for API requests
+ * @returns User ID from Identity module if authenticated
+ */
+  private getUserId(): string {
+    // Access Identity from global context if available
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      if (contextUser && contextUser.userID) {
+        return contextUser.userID;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user ID from context: ' + error);
+    }
+
+    // Return empty string if not authenticated (no fallback)
+    return "";
+  }
+
+  /**
+   * Get user token for API requests
+   * @returns User token from Identity module or fallback value
+   */
+  private getUserToken(): string {
+    // Access Identity from global context if available
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      if (contextUser && contextUser.token) {
+        return contextUser.token;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user token from context: ' + error);
+    }
+
+    // Return empty string if not authenticated (no fallback)
+    return "";
+  }
+
+  /**
+   * Check if user is authenticated
+   * @returns True if user has valid authentication credentials
+   */
+  private isUserAuthenticated(): boolean {
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      const hasValidAuth = contextUser && contextUser.userID && contextUser.token;
+
+      if (hasValidAuth) {
+        Logging.Log('✅ StaticSurfaceRenderer: User is authenticated');
+        return true;
+      } else {
+        Logging.Log('❌ StaticSurfaceRenderer: User is not authenticated');
+        return false;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not check authentication status: ' + error);
+      return false;
+    }
+  }
+
+  startMaintenance(): void {
+    this.maintenanceFunctionID = Time.SetInterval("tiledsurfacerenderer_maintenance", 0.5);
+  }
+
+  stopMaintenance(): void {
+    if (this.maintenanceFunctionID != null) {
+      Time.StopInterval(this.maintenanceFunctionID.ToString());
+      this.maintenanceFunctionID = null;
+    }
+  }
+
+  maintenance(): void {
+    var renderedPos = Vector3.zero;
+    if ((globalThis as any).playerController.internalCharacterEntity != null) {
+      renderedPos = (globalThis as any).playerController.internalCharacterEntity.GetPosition();
+      if (!this.characterInitialized) {
+        Environment.SetTrackedCharacterEntity((globalThis as any).playerController.internalCharacterEntity);
+        this.characterInitialized = true;
+      }
+    }
+    var newRegion = this.getRegionIndexForWorldPos(this.getWorldPositionForRenderedPosition(renderedPos));
+    if (this.currentRegion != newRegion) {
+      this.currentRegion = newRegion;
+    }
+
+    this.ensureRegionsAreLoaded(this.currentRegion);
+    this.unloadUnnecessaryRegions(this.currentRegion);
+
+    this.ensureCharacterIsInCorrectSession();
+
+    if (this.water != null) {
+      this.water.SetPosition(new Vector3(
+        renderedPos.x, 127, renderedPos.z), false);
+    }
+  }
+
+  ensureRegionsAreLoaded(centerRegionIdx: Vector2Int) {
+    if (this.regionLoadInProgress == true) {
+      return;
+    }
+
+    if (this.terrainTiles[centerRegionIdx.x + "." + centerRegionIdx.y] == null) {
+      this.loadRegion(centerRegionIdx);
+      return;
+    }
+
+    if (this.terrainTiles[centerRegionIdx.x + "." + (centerRegionIdx.y + 1)] == null) {
+      this.loadRegion(new Vector2Int(centerRegionIdx.x, centerRegionIdx.y + 1));
+      return;
+    }
+
+    if (this.terrainTiles[(centerRegionIdx.x + 1) + "." + centerRegionIdx.y] == null) {
+      this.loadRegion(new Vector2Int(centerRegionIdx.x + 1, centerRegionIdx.y));
+      return;
+    }
+
+    if (this.terrainTiles[(centerRegionIdx.x + 1) + "." + (centerRegionIdx.y + 1)] == null) {
+      this.loadRegion(new Vector2Int(centerRegionIdx.x + 1, centerRegionIdx.y + 1));
+      return;
+    }
+
+    if (this.terrainTiles[centerRegionIdx.x + "." + (centerRegionIdx.y - 1)] == null) {
+      this.loadRegion(new Vector2Int(centerRegionIdx.x, centerRegionIdx.y - 1));
+      return;
+    }
+
+    if (this.terrainTiles[(centerRegionIdx.x - 1) + "." + centerRegionIdx.y] == null) {
+      this.loadRegion(new Vector2Int(centerRegionIdx.x - 1, centerRegionIdx.y));
+      return;
+    }
+
+    if (this.terrainTiles[(centerRegionIdx.x - 1) + "." + (centerRegionIdx.y - 1)] == null) {
+      this.loadRegion(new Vector2Int(centerRegionIdx.x - 1, centerRegionIdx.y - 1));
+      return;
+    }
+
+    if (this.terrainTiles[(centerRegionIdx.x - 1) + "." + (centerRegionIdx.y + 1)] == null) {
+      this.loadRegion(new Vector2Int(centerRegionIdx.x - 1, centerRegionIdx.y + 1));
+      return;
+    }
+
+    if (this.terrainTiles[(centerRegionIdx.x + 1) + "." + (centerRegionIdx.y - 1)] == null) {
+      this.loadRegion(new Vector2Int(centerRegionIdx.x + 1, centerRegionIdx.y - 1));
+      return;
+    }
+  }
+
+  unloadUnnecessaryRegions(centerRegionIdx: Vector2Int) {
+    for (const tile in this.terrainTiles) {
+      if (tile != centerRegionIdx.x + "." + centerRegionIdx.y &&
+        tile != centerRegionIdx.x + "." + (centerRegionIdx.y + 1) &&
+        tile != (centerRegionIdx.x + 1) + "." + centerRegionIdx.y &&
+        tile != (centerRegionIdx.x + 1) + "." + (centerRegionIdx.y + 1) &&
+        tile != centerRegionIdx.x + "." + (centerRegionIdx.y - 1) &&
+        tile != (centerRegionIdx.x - 1) + "." + centerRegionIdx.y &&
+        tile != (centerRegionIdx.x - 1) + "." + (centerRegionIdx.y - 1) &&
+        tile != (centerRegionIdx.x - 1) + "." + (centerRegionIdx.y + 1) &&
+        tile != (centerRegionIdx.x + 1) + "." + (centerRegionIdx.y - 1)
+      ) {
+        if (this.terrainTiles[tile] != null) {
+          if (typeof this.terrainTiles[tile] === 'string') {
+
+          }
+          else {
+            this.terrainTiles[tile].Delete(false);
+          }
+        }
+        delete this.terrainTiles[tile];
+      }
+    }
+  }
+
+  ensureCharacterIsInCorrectSession() {
+    if ((globalThis as any).playerController.internalCharacterEntity === null) {
+      return;
+    }
+
+    if (this.characterSynchronizer == null) {
+      if (this.regionSynchronizers[this.currentRegion.x
+        + "." + this.currentRegion.y] == null) {
+        return;
+      }
+
+      if (!VOSSynchronization.IsSessionEstablished(
+        this.regionSynchronizers[this.currentRegion.x
+        + "." + this.currentRegion.y])) {
+        return;
+      }
+
+      VOSSynchronization.StartSynchronizingEntity(
+        this.regionSynchronizers[this.currentRegion.x
+        + "." + this.currentRegion.y], (globalThis as any).playerController.internalCharacterEntity.id, true);
+      this.characterSynchronizer
+        = this.currentRegion.x + "." + this.currentRegion.y;
+    }
+    else if (this.characterSynchronizer
+      != this.currentRegion.x + "." + this.currentRegion.y) {
+      VOSSynchronization.StopSynchronizingEntity(
+        this.regionSynchronizers[this.characterSynchronizer],
+        (globalThis as any).playerController.internalCharacterEntity.id);
+
+      if (!VOSSynchronization.IsSessionEstablished(
+        this.regionSynchronizers[this.currentRegion.x
+        + "." + this.currentRegion.y])) {
+        return;
+      }
+      this.characterSynchronizer = null;
+
+      VOSSynchronization.StartSynchronizingEntity(
+        this.regionSynchronizers[this.currentRegion.x
+        + "." + this.currentRegion.y], (globalThis as any).playerController.internalCharacterEntity.id, true);
+      this.characterSynchronizer
+        = this.currentRegion.x + "." + this.currentRegion.y;
+    }
+  }
+
+  loadWorldManifest(): void {
+    Logging.Log('TiledSurfaceRenderer: Loading world manifest...');
+
+    this.restClient.sendWorldManifestRequest('onWorldManifestReceived');
+  }
+
+  loadRegion(regionIdx: Vector2Int): void {
+    Logging.Log('TiledSurfaceRenderer: Loading region at index: ' + regionIdx);
+
+    const onComplete = 'onTerrainReceived';
+
+    // Check authentication before making requests
+    if (!this.isUserAuthenticated()) {
+      Logging.LogError('❌ TiledSurfaceRenderer: User not authenticated - cannot load region');
+      return;
+    }
+
+    const userId = this.getUserId();
+    const userToken = this.getUserToken();
+
+    this.restClient.sendGetTerrainRequest(regionIdx, userId, userToken, onComplete);
+  }
+
+  validateWorldConfig(config: WorldConfig): boolean {
+    Logging.Log("Validating World Config...");
+    if (config == null) {
+      // Making TypeScript happy for now.
+    }
+    return true;
+  }
+
+  validateEntitiesConfig(config: any): boolean {
+    Logging.Log("Validating Entities Config...");
+    if (config == null) {
+      // Making TypeScript happy for now.
+    }
+    return true;
+  }
+
+  validateTerrainConfig(config: any): boolean {
+    Logging.Log("Validating Terrain Config...");
+    if (config == null) {
+      // Making TypeScript happy for now.
+    }
+    return true;
+  }
+
+  validateBiomesConfig(config: any): boolean {
+    Logging.Log("Validating Biomes Config...");
+    if (config == null) {
+      // Making TypeScript happy for now.
+    }
+    return true;
+  }
+
+  applyEntitiesConfig(): void {
+    Logging.Log("Applying Entities Config...");
+
+    for (var entity in this.entitiesConfig) {
+      if (this.entitiesConfig[entity].id == null) {
+        Logging.LogError("applyEntitiesConfig: Invalid entity config: " + entity + " missing id");
+      }
+      else {
+        WorldStorage.SetItem("METAWORLD.CONFIGURATION.ENTITYID." + this.entitiesConfig[entity].id, entity);
+      }
+
+      if (this.entitiesConfig[entity].variants == null) {
+        Logging.LogError("applyEntitiesConfig: Invalid entity config: " + entity + " missing variants");
+      }
+
+      for (var variant in this.entitiesConfig[entity].variants) {
+        if (this.entitiesConfig[entity].variants[variant].variant_id == null) {
+          Logging.LogError("applyEntitiesConfig: Invalid entity variant: " + entity + ":" + variant + " missing variant_id");
+        }
+        else {
+          WorldStorage.SetItem("METAWORLD.CONFIGURATION.VARIANTID."
+            + this.entitiesConfig[entity].id + "." + this.entitiesConfig[entity].variants[variant].variant_id, variant);
+        }
+
+        if (this.entitiesConfig[entity].variants[variant].model == null) {
+          Logging.LogError("applyEntitiesConfig: Invalid entity variant: " + entity + ":" + variant + " missing model");
+        }
+        else if (this.entitiesConfig[entity].variants[variant].display_name == null) {
+          Logging.LogError("applyEntitiesConfig: Invalid entity variant: " + entity + ":" + variant + " missing display_name");
+        }
+        else if (this.entitiesConfig[entity].variants[variant].thumbnail == null) {
+          Logging.LogError("applyEntitiesConfig: Invalid entity variant: " + entity + ":" + variant + " missing thumbnail");
+        }
+        else {
+          this.entitiesConfig[entity].variants[variant].model =
+            this.worldAddress + "/" + this.worldConfig["entities-directory"] + "/"
+            + this.entitiesConfig[entity].variants[variant].model;
+          this.entitiesConfig[entity].variants[variant].thumbnail =
+            this.worldAddress + "/" + this.worldConfig["entities-directory"] + "/"
+            + this.entitiesConfig[entity].variants[variant].thumbnail;
+        }
+
+        for (var valid_orientation in this.entitiesConfig[entity].variants[variant].valid_orientations) {
+          var curr_orientation = this.entitiesConfig[entity].variants[variant].valid_orientations[valid_orientation];
+          if (curr_orientation.model_offset == null || curr_orientation.model_offset.x == null
+            || curr_orientation.model_offset.y == null || curr_orientation.model_offset.z == null) {
+            Logging.LogError("applyEntitiesConfig: Invalid entity variant: "
+              + entity + ":" + variant + " invalid valid_orientation model_offset.");
+          }
+          if (curr_orientation.model_rotation == null || curr_orientation.model_rotation.x == null
+            || curr_orientation.model_rotation.y == null || curr_orientation.model_rotation.z == null
+            || curr_orientation.model_rotation.w == null) {
+            Logging.LogError("applyEntitiesConfig: Invalid entity variant: "
+              + entity + ":" + variant + " invalid valid_orientation model_rotation.");
+          }
+          if (curr_orientation.placement_offset == null || curr_orientation.placement_offset.x == null
+            || curr_orientation.placement_offset.y == null || curr_orientation.placement_offset.z == null) {
+            Logging.LogError("applyEntitiesConfig: Invalid entity variant: "
+              + entity + ":" + variant + " invalid valid_orientation placement_offset.");
+          }
+        }
+
+        if (this.entitiesConfig[entity].variants[variant].model.startsWith("/") ||
+          this.entitiesConfig[entity].variants[variant].model[1] == ":") {
+          this.entitiesConfig[entity].variants[variant].model = "file://" +
+            this.entitiesConfig[entity].variants[variant].model;
+        }
+      }
+    }
+
+    if (this.terrainConfig != null && this.entitiesConfig != null && this.biomesConfig != null) {
+      // Connect to global synchronizer, update toolbar buttons, start loading world around user.
+      this.startMaintenance();
+    }
+  }
+
+  applyTerrainConfig(): void {
+    Logging.Log("Applying Terrain Config...");
+
+    if (this.terrainConfig["grid-size"] === null) {
+      Logging.LogError("applyTerrainConfig: Invalid terrain config: missing grid-size");
+    }
+
+    if (this.terrainConfig.layers === null) {
+      Logging.LogError("applyTerrainConfig: Invalid terrain config: missing layers");
+    }
+    else {
+      for (var terrainLayer in this.terrainConfig.layers) {
+        if (this.terrainConfig.layers[terrainLayer].layer == null) {
+          Logging.LogError("applyTerrainConfig: Invalid terrain config: " + terrainLayer + " missing layer");
+        }
+
+        if (this.terrainConfig.layers[terrainLayer].color_texture == null) {
+          Logging.LogError("applyTerrainConfig: Invalid terrain config: " + terrainLayer + " missing color_texture");
+        }
+        else {
+          this.terrainConfig.layers[terrainLayer].color_texture = this.worldAddress + "/" + this.worldConfig["terrain-directory"]
+            + "/" + this.terrainConfig.layers[terrainLayer].color_texture;
+        }
+
+        if (this.terrainConfig.layers[terrainLayer].color_texture.startsWith("/") ||
+          this.terrainConfig.layers[terrainLayer].color_texture[1] == ":") {
+          this.terrainConfig.layers[terrainLayer].color_texture = "file://" + this.terrainConfig.layers[terrainLayer].color_texture;
+        }
+
+        if (this.terrainConfig.layers[terrainLayer].normal_texture == null) {
+          Logging.LogError("applyTerrainConfig: Invalid terrain config: " + terrainLayer + " missing normal_texture");
+        }
+        else {
+          this.terrainConfig.layers[terrainLayer].normal_texture = this.worldAddress + "/" + this.worldConfig["terrain-directory"]
+            + "/" + this.terrainConfig.layers[terrainLayer].normal_texture;
+        }
+
+        if (this.terrainConfig.layers[terrainLayer].normal_texture.startsWith("/") ||
+          this.terrainConfig.layers[terrainLayer].normal_texture[1] == ":") {
+          this.terrainConfig.layers[terrainLayer].normal_texture = "file://" + this.terrainConfig.layers[terrainLayer].normal_texture;
+        }
+      }
+    }
+
+    if (this.terrainConfig != null && this.entitiesConfig != null && this.biomesConfig != null) {
+      // Connect to global synchronizer, update toolbar buttons, start loading world around user.
+      this.startMaintenance();
+    }
+  }
+
+  applyBiomesConfig(): void {
+    Logging.Log("Applying Biomes Config...");
+
+    if (this.terrainConfig != null && this.entitiesConfig != null && this.biomesConfig != null) {
+      // Connect to global synchronizer, update toolbar buttons, start loading world around user.
+      this.startMaintenance();
+    }
+  }
+
+  onEntitiesManifestReceived(response: string): void {
+    try {
+      Logging.Log('🎯 TiledSurfaceRenderer: onEntitiesManifestReceived callback invoked');
+
+      if (response != null) {
+        this.entitiesConfig = JSON.parse(response);
+        if (this.validateEntitiesConfig(this.entitiesConfig) != true) {
+          Logging.LogError("applyEntitiesConfig: Invalid Entities Config. Aborting.");
+        } else {
+          this.applyEntitiesConfig();
+        }
+      }
+
+      Logging.Log('✓ TiledSurfaceRenderer: Entities manifest request completed successfully');
+    } catch (error) {
+      Logging.LogError('❌ TiledSurfaceRenderer: Failed to parse entities manifest response: ' + error);
+    }
+  }
+
+  onTerrainManifestReceived(response: string): void {
+    try {
+      Logging.Log('🎯 TiledSurfaceRenderer: onTerrainManifestReceived callback invoked');
+      this.terrainConfig = JSON.parse(response);
+      Logging.Log('📋 TiledSurfaceRenderer: Terrain manifest received: ' + this.terrainConfig);
+
+      if (this.validateTerrainConfig(this.terrainConfig) != true) {
+        Logging.LogError("MetaWorld->GotTerrainConfig: Invalid Terrain Config. Aborting.");
+      } else {
+        this.applyTerrainConfig();
+      }
+
+      Logging.Log('✓ TiledSurfaceRenderer: Terrain manifest request completed successfully');
+    } catch (error) {
+      Logging.LogError('❌ TiledSurfaceRenderer: Failed to parse terrain manifest response: ' + error);
+    }
+  }
+
+  onBiomeManifestReceived(response: string): void {
+    try {
+      Logging.Log('🎯 TiledSurfaceRenderer: onBiomeManifestReceived callback invoked');
+      this.biomesConfig = JSON.parse(response);
+      Logging.Log('📋 TiledSurfaceRenderer: Biome manifest received: ' + this.biomesConfig);
+
+      if (this.validateBiomesConfig(this.biomesConfig) != true) {
+        Logging.LogError("MetaWorld->GotBiomeConfig: Invalid Biome Config. Aborting.");
+      } else {
+        this.applyBiomesConfig();
+      }
+
+      Logging.Log('✓ TiledSurfaceRenderer: Biome manifest request completed successfully');
+    } catch (error) {
+      Logging.LogError('❌ TiledSurfaceRenderer: Failed to parse biome manifest response: ' + error);
+    }
+  }
+
+  enableWater(water: WaterEntity): void {
+    Logging.Log("Enabling Water...");
+    water.SetInteractionState(InteractionState.Static);
+    water.SetVisibility(true);
+    this.water = water;
+    (globalThis as any).playerController.setMotionModeFree();
+    var adjustedPos = this.getRenderedPositionForWorldPosition(this.startPos);
+    (globalThis as any).playerController.setCharacterPosition(adjustedPos);
+    (globalThis as any).playerController.setMotionModePhysical();
+  }
+
+  applyWorldConfig(): void {
+    Logging.Log("Applying World Config...");
+
+    WaterEntity.CreateWaterBody(null, Color.cyan, new Color(0, 66 / 255, 102 / 255, 1),
+      Color.white, Color.blue, -2, 6, 32, 0.675, 1, 0.1, 0.5, 0.25, 1, 128, 1,
+      new Vector3(512, 127, 512), Quaternion.identity, new Vector3(16384, 1, 16384),
+      undefined, undefined, "tiledsurfacerenderer_enableWater");
+
+    this.restClient.sendWorldEntitiesManifestRequest('onEntitiesManifestReceived');
+    this.restClient.sendWorldTerrainManifestRequest('onTerrainManifestReceived');
+    this.restClient.sendBiomeManifestRequest('onBiomeManifestReceived');
+  }
+
+  onWorldManifestReceived(response: string): void {
+    try {
+      Logging.Log('🎯 TiledSurfaceRenderer: onWorldManifestReceived callback invoked');
+      const manifest = JSON.parse(response);
+      Logging.Log('📋 TiledSurfaceRenderer: World manifest received: ' + manifest);
+
+      if (response != null) {
+        this.worldConfig = JSON.parse(response);
+        if (this.validateWorldConfig(this.worldConfig) != true) {
+          Logging.LogError("MetaWorld->GotWorldConfig: Invalid World Config. Aborting.");
+        } else {
+          this.applyWorldConfig();
+        }
+      }
+
+      Logging.Log('✓ TiledSurfaceRenderer: World manifest request completed successfully');
+    } catch (error) {
+      Logging.LogError('❌ TiledSurfaceRenderer: Failed to parse world manifest response: ' + error);
+    }
+  }
+
+  onTerrainLoaded(terrain: TerrainEntity) {
+    Logging.Log('✓ TiledSurfaceRenderer: Terrain loaded successfully: ' + terrain);
+
+    var worldRenderingModule = Context.GetContext("WORLD_RENDERING_MODULE");
+    var configModule = Context.GetContext("CONFIGURATION_MODULE");
+    var identityModule = Context.GetContext("IDENTITY_MODULE");
+    terrain.SetInteractionState(InteractionState.Physical);
+    terrain.SetVisibility(true);
+
+    var terrainIndex = this.getIndexForTerrainTile(terrain) as Vector2Int;
+    worldRenderingModule.biomeMap[terrainIndex.x + "." + terrainIndex.y] =
+      this.getBiomeIDForTerrainTile(terrain);
+    worldRenderingModule.terrainTiles[terrainIndex.x + "." + terrainIndex.y] = terrain;
+
+    terrain.SetPosition(this.getRenderedPositionForWorldPosition(this.getWorldPosForRegionIndex(
+      new Vector2Int(terrainIndex.x, terrainIndex.y))), false);
+
+    // Set up entities.
+    if (configModule == null || worldRenderingModule == null || identityModule == null) {
+      Logging.LogError("MW_Rend_EnableTerrain: Unable to get context.");
+    }
+    else {
+      worldRenderingModule.regionLoadInProgress = false;
+      this.restClient.sendGetEntitiesRequest(terrainIndex, identityModule.userID,
+        identityModule.token, "onEntitiesReceived");
+      this.restClient.sendGetRegionInfoRequest(terrainIndex, identityModule.userID,
+        identityModule.token, "onRegionInfoReceived");
+      worldRenderingModule.terrainHasBeenLoaded = true;
+      Context.DefineContext("WORLD_RENDERING_MODULE", worldRenderingModule);
+    }
+
+  }
+
+  onTerrainReceived(response: string): void {
+    try {
+      Logging.Log('🎯 TiledSurfaceRenderer: onTerrainReceived callback invoked');
+      const terrainInfo = JSON.parse(response);
+      Logging.Log('📋 TiledSurfaceRenderer: Terrain received: ' + terrainInfo);
+      Logging.Log('✓ TiledSurfaceRenderer: Terrain request completed successfully');
+
+      TerrainEntity.Create(terrainInfo, undefined, "MW_Rend_onTerrainLoaded");
+
+      // Now that templates are complete, trigger entity instances loading
+      /*Logging.Log('🔄 Triggering entity instances request after templates completion...');
+      if (typeof (globalThis as any).triggerEntityInstancesAfterTemplates === 'function') {
+        (globalThis as any).triggerEntityInstancesAfterTemplates();
+      } else {
+        Logging.LogError('triggerEntityInstancesAfterTemplates function not available');
+      }*/
+    } catch (error) {
+      Logging.LogError('❌ TiledSurfaceRenderer: Failed to parse terrain response: ' + error);
+    }
+  }
+
+  onEntitiesReceived(entityInfo: string): void {
+    try {
+      Logging.Log('🎯 TiledSurfaceRenderer: onEntitiesReceived callback invoked');
+      const entities = JSON.parse(entityInfo);
+      Logging.Log('📋 TiledSurfaceRenderer: Entities received: ' + entities);
+
+      // Process each entity
+      var worldRenderingModule = Context.GetContext("WORLD_RENDERING_MODULE");
+      var configModule = Context.GetContext("CONFIGURATION_MODULE");
+
+      if (entities["region_x"] == null) {
+        Logging.LogError("MW_Rend_OnEntitiesReceived: Unable to get region X index.");
+        return;
+      }
+
+      if (entities["region_y"] == null) {
+        Logging.LogError("MW_Rend_OnEntitiesReceived: Unable to get region Y index.");
+        return;
+      }
+
+      var terrainTile = worldRenderingModule.terrainTiles[entities["region_x"] + "." + entities["region_y"]];
+      if (terrainTile == null) {
+        Logging.LogError("MW_Rend_OnEntitiesReceived: Unable to get terrain tile.");
+        return;
+      }
+
+      var entityColl = entities["mesh-entities"];
+      for (var entity in entityColl) {
+        var entityName = WorldStorage.GetItem("METAWORLD.CONFIGURATION.ENTITYID." +
+          entityColl[entity].entityid) as string;
+        var variantName = WorldStorage.GetItem("METAWORLD.CONFIGURATION.VARIANTID."
+          + entityColl[entity].entityid + "." + entityColl[entity].variantid) as string;
+        var entityPos =
+          new Vector3(entityColl[entity].xposition, entityColl[entity].yposition,
+            entityColl[entity].zposition);
+        var entityType = configModule.entitiesConfig[entityName].variants[variantName].type;
+        if (entityType == null || entityType == "") {
+          entityType = "mesh";
+        }
+        this.entityManager.loadEntity(entityColl[entity].instanceid, undefined, entityColl[entity].entityid,
+          entityColl[entity].variantid, undefined, entityType, entityPos,
+          new Quaternion(entityColl[entity].xrotation, entityColl[entity].yrotation,
+            entityColl[entity].zrotation, entityColl[entity].wrotation), Vector3.one,
+          configModule.entitiesConfig[entityName].variants[variantName].model,
+          [configModule.entitiesConfig[entityName].variants[variantName].model],
+          configModule.entitiesConfig[entityName].variants[variantName].wheels,
+          configModule.entitiesConfig[entityName].variants[variantName].mass,
+          AutomobileType.Car,
+          configModule.entitiesConfig[entityName].variants[variantName].scripts);
+      }
+      worldRenderingModule.worldLoaded = true;
+
+      Logging.Log('✓ TiledSurfaceRenderer: Entities request completed successfully');
+    } catch (error) {
+      Logging.LogError('❌ TiledSurfaceRenderer: Failed to parse entities response: ' + error);
+    }
+  }
+
+  onRegionInfoReceived(regionInfo: string): void {
+    try {
+      //var worldRenderingModule = Context.GetContext("WORLD_RENDERING_MODULE");
+      //var configModule = Context.GetContext("CONFIGURATION_MODULE");
+      //var identityModule = Context.GetContext("IDENTITY_MODULE");
+
+      Logging.Log('🎯 TiledSurfaceRenderer: onRegionInfoReceived callback invoked');
+      const region = JSON.parse(regionInfo);
+      Logging.Log('📋 TiledSurfaceRenderer: Region info received: ' + region);
+
+      if (region == null) {
+        Logging.LogError("MW_Rend_OnRegionInfoReceived: Unable to get region info.");
+        return;
+      }
+
+      if (region["synchronizer_id"] == null || region["synchronizer_id"] == "") {
+        Logging.LogError("MW_Rend_OnRegionInfoReceived: Unable to get synchronizer id.");
+        return;
+      }
+
+      if (region["synchronizer_tag"] == null || region["synchronizer_tag"] == "") {
+        Logging.LogError("MW_Rend_OnRegionInfoReceived: Unable to get synchronizer tag.");
+        return;
+      }
+      /*VOSSynchronization.JoinSession(configModule.worldConfig["vos-synchronization-service"]["host"],
+        configModule.worldConfig["vos-synchronization-service"]["port"],
+        configModule.worldConfig["vos-synchronization-service"].tls,
+        region["synchronizer_id"], region["synchronizer_tag"], worldRenderingModule.worldOffset, null,
+        configModule.worldConfig["vos-synchronization-service"].transport == "tcp" ?
+          VSSTransport.TCP : VSSTransport.WebSocket, identityModule.userID, identityModule.token);
+      worldRenderingModule.regionSynchronizers[region["region_x"] + "." + region["region_y"]]
+        = region["synchronizer_id"];*/
+
+      Logging.Log('✓ TiledSurfaceRenderer: Region info request completed successfully');
+
+    } catch (error) {
+      Logging.LogError('❌ TiledSurfaceRenderer: Failed to parse region info response: ' + error);
+    }
+  }
+
+  getIndexForTerrainTile(terrainTile: TerrainEntity): Vector2Int | undefined {
+    var terrainTileTag = terrainTile.tag;
+    var terrainIndexStart = terrainTileTag.indexOf("-");
+    if (terrainIndexStart == -1) {
+      Logging.LogError("getIndexForTerrainTile: Unable to get index of terrain tile.");
+      return;
+    }
+
+    var terrainIndexParts = terrainTileTag.substring(terrainIndexStart + 1).split(".");
+    if (terrainIndexParts.length != 3) {
+      Logging.LogError("getIndexForTerrainTile: Invalid terrain tile index.");
+      return;
+    }
+
+    return new Vector2Int(parseInt(terrainIndexParts[0]), parseInt(terrainIndexParts[1]));
+  }
+
+  getBiomeIDForTerrainTile(terrainTile: TerrainEntity): number | undefined {
+    var terrainTileTag = terrainTile.tag;
+    var terrainIndexStart = terrainTileTag.indexOf("-");
+    if (terrainIndexStart == -1) {
+      Logging.LogError("getBiomeIDForTerrainTile: Unable to get index of terrain tile.");
+      return;
+    }
+
+    var terrainIndexParts = terrainTileTag.substring(terrainIndexStart + 1).split(".");
+    if (terrainIndexParts.length != 3) {
+      Logging.LogError("getBiomeIDForTerrainTile: Invalid terrain tile index.");
+      return;
+    }
+
+    return parseInt(terrainIndexParts[2]);
+  }
+
+  getWorldPosForRegionPos(regionPos: Vector3, regionIdx: Vector2Int): Vector3 {
+    var worldRenderingModule = Context.GetContext("WORLD_RENDERING_MODULE");
+    var configModule = Context.GetContext("CONFIGURATION_MODULE");
+    if (configModule == null || worldRenderingModule == null) {
+      Logging.LogError("getWorldPosForRegionPos: Unable to get modules.");
+      return Vector3.zero;
+    }
+    else {
+      var regionSize_meters = worldRenderingModule.regionSize * worldRenderingModule.regionScale;
+      return new Vector3(regionIdx.x * regionSize_meters + regionPos.x, regionPos.y, regionIdx.y * regionSize_meters + regionPos.z);
+    }
+  }
+
+  getRegionPosForWorldPos(worldPos: Vector3, regionIdx: Vector2Int): Vector3 {
+    var worldRenderingModule = Context.GetContext("WORLD_RENDERING_MODULE");
+    var configModule = Context.GetContext("CONFIGURATION_MODULE");
+    if (configModule == null || worldRenderingModule == null) {
+      Logging.LogError("getRegionPosForWorldPos: Unable to get modules.");
+      return Vector3.zero;
+    }
+    else {
+      var regionSize_meters = worldRenderingModule.regionSize * worldRenderingModule.regionScale;
+      return new Vector3(worldPos.z - regionIdx.y * regionSize_meters, worldPos.y,
+        worldPos.x - regionIdx.x * regionSize_meters);
+    }
+  }
+
+  getRegionIndexForWorldPos(worldPos: Vector3): Vector2Int {
+    var worldRenderingModule = Context.GetContext("WORLD_RENDERING_MODULE");
+    var configModule = Context.GetContext("CONFIGURATION_MODULE");
+    if (configModule == null || worldRenderingModule == null) {
+      Logging.LogError("getRegionIndexForWorldPos: Unable to get modules.");
+      return Vector2Int.zero;
+    }
+    else {
+      var regionSize_meters = worldRenderingModule.regionSize * worldRenderingModule.regionScale;
+      return new Vector2Int(Math.floor(worldPos.x / regionSize_meters), Math.floor(worldPos.z / regionSize_meters));
+    }
+  }
+
+  getWorldPosForRegionIndex(regionIdx: Vector2Int): Vector3 {
+    var worldRenderingModule = Context.GetContext("WORLD_RENDERING_MODULE");
+    var configModule = Context.GetContext("CONFIGURATION_MODULE");
+    if (configModule == null || worldRenderingModule == null) {
+      Logging.LogError("getWorldPosForRegionIndex: Unable to get modules.");
+      return Vector3.zero;
+    }
+    else {
+      var regionSize_meters = worldRenderingModule.regionSize * worldRenderingModule.regionScale;
+      return new Vector3(regionIdx.x * regionSize_meters, 0, regionIdx.y * regionSize_meters);
+    }
+  }
+
+  getWorldPositionForRenderedPosition(renderedPos: Vector3): Vector3 {
+    return new Vector3(renderedPos.z, renderedPos.y, renderedPos.x);
+  }
+
+  getRenderedPositionForWorldPosition(worldPos: Vector3): Vector3 {
+    return new Vector3(worldPos.z, worldPos.y, worldPos.x);
+  }
+
+  getTerrainTileForIndex(index: Vector2Int): TerrainEntity {
+    return Entity.GetByTag("TerrainTile-" + index.x + "." + index.y) as TerrainEntity;
+  }
+
+  getTerrainTileIndexForEntity(entity: TerrainEntity): Vector2Int | undefined {
+    var parentTerrain = entity.GetParent();
+    if (parentTerrain == null) {
+      Logging.Log("getTerrainTileIndexForEntity: Unable to get parent terrain.");
+      return undefined;
+    }
+
+    if (!(parentTerrain instanceof TerrainEntity)) {
+      Logging.Log("getTerrainTileIndexForEntity: Parent entity not terrain.");
+      return undefined;
+    }
+
+    return this.getIndexForTerrainTile(parentTerrain);
+  }
+
+  getMaterialForDigging(regionIdx: Vector2Int, height: number) {
+    var biomeID = this.biomeMap[regionIdx.x + "." + regionIdx.y];
+    if (biomeID == null) {
+      Logging.LogError("getMaterialForDigging: Unable to get biome ID.");
+      return;
+    }
+
+    var terrainLayers = this.biomesConfig[biomeID]["terrain-layers"];
+
+    var diggingLayer = 0;
+    for (var i = 0; i < Object.keys(terrainLayers).length; i++) {
+      var terrainLayer = terrainLayers[Object.keys(terrainLayers)[i]];
+      if (terrainLayer["max-height"] <= height) {
+        diggingLayer = Object.keys(terrainLayers)[i] as unknown as number;
+      }
+    }
+
+    var randomizer = Math.random();
+    if (randomizer < 0.125) {
+      if (diggingLayer - 1 < 0) {
+        return diggingLayer;
+      }
+      else {
+        return diggingLayer - 1;
+      }
+    }
+    else if (randomizer < 0.875) {
+      return diggingLayer;
+    }
+    else {
+      if (diggingLayer + 1 >= Object.keys(terrainLayers).length) {
+        return diggingLayer;
+      }
+      else {
+        return diggingLayer + 1;
+      }
+    }
+  }
+
+  /**
+   * Setup global callback functions for WebVerse entity loading
+   */
+  private setupGlobalCallbacks(): void {
+    // Define global function for loading world manifest
+    (globalThis as any).loadWorldManifest = () => {
+      this.loadWorldManifest();
+    };
+
+    // Define global callback for world manifest completion
+    (globalThis as any).onWorldManifestReceived = (response: string) => {
+      this.onWorldManifestReceived(response);
+    }
+
+    // Define global callback for terrain manifest completion
+    (globalThis as any).onEntitiesManifestReceived = (response: string) => {
+      this.onEntitiesManifestReceived(response);
+    };
+
+    // Define global callback for terrain manifest completion
+    (globalThis as any).onTerrainManifestReceived = (response: string) => {
+      this.onTerrainManifestReceived(response);
+    };
+
+    // Define global function for tiled surface renderer maintenance
+    (globalThis as any).tiledsurfacerenderer_maintenance = () => {
+      this.maintenance();
+    };
+
+    // Define global callback for terrain loading completion
+    (globalThis as any).onTerrainReceived = (response: string) => {
+      this.onTerrainReceived(response);
+    };
+
+    // Define global callback for entities loading completion
+    (globalThis as any).onEntitiesReceived = (response: string) => {
+      this.onEntitiesReceived(response);
+    };
+
+    // Define global callback for region info loading completion
+    (globalThis as any).onRegionInfoReceived = (response: string) => {
+      this.onRegionInfoReceived(response);
+    };
+
+    /*
+        // Define global callback for entity templates loading completion
+        (globalThis as any).onEntityTemplatesComplete = (response: string) => {
+          this.onEntityTemplatesComplete(response);
+        };
+    
+        // Define global callback for entity templates loading error
+        (globalThis as any).onEntityTemplatesError = (error: any) => {
+          this.onEntityTemplatesError(error);
+        };
+    
+        // Define global callback for entity instances loading completion
+        (globalThis as any).onEntityInstancesComplete = (response: string) => {
+          this.onEntityInstancesComplete(response);
+        };
+    
+        // Define global callback for entity instances loading error
+        (globalThis as any).onEntityInstancesError = (error: any) => {
+          this.onEntityInstancesError(error);
+        };*/
+  }
+
+  async initialize(): Promise<void> {
+    // Parse query parameters to ensure they're available
+    this.queryParams.parse();
+
+    // Get start position from query parameters
+    this.startPos = this.queryParams.getUserPosition();
+
+    // Get world address from query parameters
+    this.worldAddress = this.queryParams.getWorldAddress();
+
+    if (this.worldAddress) {
+      Logging.Log('🌐 TiledSurfaceRenderer: Using world address: ' + this.worldAddress);
+      // Create new REST client with the world address as base URL
+      this.restClient = new REST(this.worldAddress);
+    } else {
+      Logging.Log('🌐 TiledSurfaceRenderer: No world address specified, using default API endpoint');
+      // Keep the default REST client
+    }
+
     Logging.Log('TiledSurfaceRenderer initialized');
   }
 
@@ -581,8 +1515,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
  * Globe renderer for planetary scale
  */
 export class GlobeRenderer extends WorldRendering {
-  async initialize(config: WorldConfig): Promise<void> {
-    this.config = config;
+  async initialize(): Promise<void> {
     Logging.Log('GlobeRenderer initialized');
   }
 
@@ -599,8 +1532,7 @@ export class GlobeRenderer extends WorldRendering {
  * Atmosphere renderer
  */
 export class AtmosphereRenderer extends WorldRendering {
-  async initialize(config: WorldConfig): Promise<void> {
-    this.config = config;
+  async initialize(): Promise<void> {
     Logging.Log('AtmosphereRenderer initialized');
   }
 
@@ -617,8 +1549,7 @@ export class AtmosphereRenderer extends WorldRendering {
  * Orbital renderer for space scale
  */
 export class OrbitalRenderer extends WorldRendering {
-  async initialize(config: WorldConfig): Promise<void> {
-    this.config = config;
+  async initialize(): Promise<void> {
     Logging.Log('OrbitalRenderer initialized');
   }
 
@@ -635,8 +1566,7 @@ export class OrbitalRenderer extends WorldRendering {
  * Stellar system renderer
  */
 export class StellarSystemRenderer extends WorldRendering {
-  async initialize(config: WorldConfig): Promise<void> {
-    this.config = config;
+  async initialize(): Promise<void> {
     Logging.Log('StellarSystemRenderer initialized');
   }
 
@@ -653,8 +1583,7 @@ export class StellarSystemRenderer extends WorldRendering {
  * Galactic renderer
  */
 export class GalacticRenderer extends WorldRendering {
-  async initialize(config: WorldConfig): Promise<void> {
-    this.config = config;
+  async initialize(): Promise<void> {
     Logging.Log('GalacticRenderer initialized');
   }
 
@@ -671,8 +1600,7 @@ export class GalacticRenderer extends WorldRendering {
  * Sun controller for lighting
  */
 export class SunController extends WorldRendering {
-  async initialize(config: WorldConfig): Promise<void> {
-    this.config = config;
+  async initialize(): Promise<void> {
     Logging.Log('SunController initialized');
   }
 
@@ -695,14 +1623,14 @@ export class SunController extends WorldRendering {
 export class WorldRendererFactory {
   private renderers: WorldRendering[] = [];
 
-  async createAndLoadRenderers(config: WorldConfig): Promise<void> {
+  async createAndLoadRenderers(): Promise<void> {
     // Create appropriate renderers based on config
     const staticRenderer = new StaticSurfaceRenderer();
-    await staticRenderer.initialize(config);
+    await staticRenderer.initialize();
     this.renderers.push(staticRenderer);
 
     const sunController = new SunController();
-    await sunController.initialize(config);
+    await sunController.initialize();
     this.renderers.push(sunController);
 
     Logging.Log('All renderers loaded');

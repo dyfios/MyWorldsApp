@@ -110,6 +110,19 @@ export class PlayerController {
     this.enterNonVRMode();
   }
 
+  setCharacterPosition(newPosition: Vector3): void {
+    if (this.internalCharacterEntity != null) {
+        var currentTransform = this.internalCharacterEntity.GetTransform();
+        var newMotion = new Vector3(newPosition.x - currentTransform.position.x,
+            newPosition.y - currentTransform.position.y, newPosition.z - currentTransform.position.z);
+        if (this.motionMode == MotionMode.Physical) {
+            this.internalCharacterEntity.Move(new Vector3(newMotion.x, newMotion.y, newMotion.z));
+        } else {
+            this.internalCharacterEntity.SetPosition(newPosition, false);
+        }
+    }
+  }
+
   /**
    * Set motion mode to free
    */

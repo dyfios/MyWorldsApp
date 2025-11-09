@@ -13,6 +13,9 @@ const PopupMenu = ({
     { id: 'settings', name: 'Settings', type: 'settings' }
   ]);
   const [activeTabId, setActiveTabId] = useState('settings');
+  const [quality, setQuality] = useState('Med');
+  const [renderDistance, setRenderDistance] = useState('Near');
+  const [versionInfo, setVersionInfo] = useState('Version 1.0.0');
   const menuRef = useRef(null);
   const messageHandlersRef = useRef({});
 
@@ -190,9 +193,24 @@ const PopupMenu = ({
       getActiveTab: () => activeTabId,
       onTabMessage,
       offTabMessage,
-      sendMessageToTab
+      sendMessageToTab,
+      // Settings APIs
+      setQuality: (value) => {
+        if (['Low', 'Med', 'High'].includes(value)) {
+          setQuality(value);
+        }
+      },
+      getQuality: () => quality,
+      setRenderDistance: (value) => {
+        if (['Close', 'Near', 'Far'].includes(value)) {
+          setRenderDistance(value);
+        }
+      },
+      getRenderDistance: () => renderDistance,
+      setVersionInfo: (text) => setVersionInfo(text),
+      getVersionInfo: () => versionInfo
     };
-  }, [addTab, removeTab, reorderTabs, getTabs, setActiveTab, openMenu, closeMenu, toggleMenu, isOpen, activeTabId, onTabMessage, offTabMessage, sendMessageToTab]);
+  }, [addTab, removeTab, reorderTabs, getTabs, setActiveTab, openMenu, closeMenu, toggleMenu, isOpen, activeTabId, onTabMessage, offTabMessage, sendMessageToTab, quality, renderDistance, versionInfo]);
 
   // Keyboard handler
   useEffect(() => {
@@ -260,54 +278,84 @@ const PopupMenu = ({
           {activeTab && activeTab.type === 'settings' && (
             <div className="popup-menu-settings">
               <h2>Settings</h2>
-              <div className="settings-section">
-                <h3>Menu Tabs</h3>
-                <div className="settings-tabs-list">
-                  {tabs.filter(tab => tab.type !== 'settings').map((tab, index) => (
-                    <div key={tab.id} className="settings-tab-item">
-                      <span className="settings-tab-name">{tab.name}</span>
-                      <span className="settings-tab-url">{tab.url}</span>
-                      <button
-                        className="settings-tab-remove"
-                        onClick={() => removeTab(tab.id)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  {tabs.filter(tab => tab.type !== 'settings').length === 0 && (
-                    <p className="settings-no-tabs">No tabs yet. Use the API to add tabs.</p>
-                  )}
-                </div>
-              </div>
               
+              {/* Quality Setting */}
               <div className="settings-section">
-                <h3>API Usage</h3>
-                <div className="settings-code">
-                  <code>window.popupMenuAPI.addTab('My Tab', 'https://example.com');</code>
-                  <code>window.popupMenuAPI.removeTab(tabId);</code>
-                  <code>window.popupMenuAPI.setActiveTab(tabId);</code>
+                <h3>Quality</h3>
+                <div className="settings-radio-group">
+                  <label className="settings-radio-label">
+                    <input
+                      type="radio"
+                      name="quality"
+                      value="Low"
+                      checked={quality === 'Low'}
+                      onChange={(e) => setQuality(e.target.value)}
+                    />
+                    <span>Low</span>
+                  </label>
+                  <label className="settings-radio-label">
+                    <input
+                      type="radio"
+                      name="quality"
+                      value="Med"
+                      checked={quality === 'Med'}
+                      onChange={(e) => setQuality(e.target.value)}
+                    />
+                    <span>Med</span>
+                  </label>
+                  <label className="settings-radio-label">
+                    <input
+                      type="radio"
+                      name="quality"
+                      value="High"
+                      checked={quality === 'High'}
+                      onChange={(e) => setQuality(e.target.value)}
+                    />
+                    <span>High</span>
+                  </label>
                 </div>
               </div>
 
+              {/* Render Distance Setting */}
               <div className="settings-section">
-                <h3>Messaging API</h3>
-                <p className="settings-help">Iframes can send messages to the main page:</p>
-                <div className="settings-code">
-                  <code>{'// In iframe:'}</code>
-                  <code>{'window.parent.postMessage({'}</code>
-                  <code>{'  source: "myworlds-iframe-tab",'}</code>
-                  <code>{'  tabId: "YOUR_TAB_ID",'}</code>
-                  <code>{'  type: "custom-event",'}</code>
-                  <code>{'  data: { key: "value" }'}</code>
-                  <code>{'}, "*");'}</code>
+                <h3>Render Distance</h3>
+                <div className="settings-radio-group">
+                  <label className="settings-radio-label">
+                    <input
+                      type="radio"
+                      name="renderDistance"
+                      value="Close"
+                      checked={renderDistance === 'Close'}
+                      onChange={(e) => setRenderDistance(e.target.value)}
+                    />
+                    <span>Close</span>
+                  </label>
+                  <label className="settings-radio-label">
+                    <input
+                      type="radio"
+                      name="renderDistance"
+                      value="Near"
+                      checked={renderDistance === 'Near'}
+                      onChange={(e) => setRenderDistance(e.target.value)}
+                    />
+                    <span>Near</span>
+                  </label>
+                  <label className="settings-radio-label">
+                    <input
+                      type="radio"
+                      name="renderDistance"
+                      value="Far"
+                      checked={renderDistance === 'Far'}
+                      onChange={(e) => setRenderDistance(e.target.value)}
+                    />
+                    <span>Far</span>
+                  </label>
                 </div>
-                <p className="settings-help">Main page can listen for messages:</p>
-                <div className="settings-code">
-                  <code>{'window.popupMenuAPI.onTabMessage((msg) => {'}</code>
-                  <code>{'  console.log(msg.tabName, msg.type, msg.data);'}</code>
-                  <code>{'});'}</code>
-                </div>
+              </div>
+
+              {/* Version Info */}
+              <div className="settings-section settings-version">
+                <div className="settings-version-text">{versionInfo}</div>
               </div>
             </div>
           )}

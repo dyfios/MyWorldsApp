@@ -6,24 +6,18 @@ import ChatConsole from './components/ChatConsole';
 import PopupMenu from './components/PopupMenu';
 
 function App() {
-  const [buttons, setButtons] = useState([
-    { id: 1, name: 'Home', thumbnail: '🏠' },
-    { id: 2, name: 'Profile', thumbnail: '👤' },
-    { id: 3, name: 'Settings', thumbnail: '⚙️' },
-    { id: 4, name: 'Messages', thumbnail: '💬' },
-    { id: 5, name: 'Notifications', thumbnail: '🔔' },
-    { id: 6, name: 'Gallery', thumbnail: 'https://picsum.photos/200' }
-  ]);
+  const [buttons, setButtons] = useState([]);
 
   const [selectedButtonId, setSelectedButtonId] = useState(null);
   const [isChatActive, setIsChatActive] = useState(false);
 
   // API: Add a button
-  const addButton = useCallback((name, thumbnail) => {
+  const addButton = useCallback((name, thumbnail, onClick = null) => {
     const newButton = {
       id: Date.now(),
       name,
-      thumbnail
+      thumbnail,
+      onClick
     };
     setButtons(prev => [...prev, newButton]);
     return newButton.id;
@@ -52,8 +46,18 @@ function App() {
   const selectButton = useCallback((buttonId) => {
     setSelectedButtonId(buttonId);
     console.log('Button selected:', buttonId);
-    postWorldMessage(`BUTTON.SELECTED(${buttons[buttonId - 1].name})`);
-  }, []);
+    
+    // Find the button and invoke its onClick if it exists
+    const button = buttons.find(btn => btn.id === buttonId);
+    if (button && button.onClick) {
+      // Call postWorldMessage if it exists
+      if (typeof window.postWorldMessage === 'function') {
+        window.postWorldMessage(button.onClick);
+      } else {
+        console.warn('postWorldMessage is not defined');
+      }
+    }
+  }, [buttons]);
 
   // API: Select previous button
   const selectPrevious = useCallback(() => {

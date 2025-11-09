@@ -45,16 +45,30 @@ export class REST {
     this.get('/time', undefined, onComplete);
   }
 
-  sendGetEntitiesRequest(onComplete: string): void {
-    this.get('/entities', undefined, onComplete);
+  sendGetEntitiesRequest(regionIdx: Vector2Int, userId: string, userToken: string, onComplete: string): void {
+    this.get('/getentities', {
+      'regionX': regionIdx.x,
+      'regionY': regionIdx.y,
+      'userId': userId,
+      'userToken': userToken
+    }, onComplete);
   }
 
   sendRegionInfoRequest(regionId: string, onComplete: string): void {
     this.get(`/region/${regionId}`, undefined, onComplete);
   }
 
-  sendGetTerrainRequest(bounds: any, onComplete: string): void {
-    this.get('/terrain', { bounds }, onComplete);
+  sendGetTerrainRequest(regionIdx: Vector2Int, userID: string, userToken: string, onComplete: string): void {
+    this.get('/getterrain', {
+      'regionX': regionIdx.x,
+      'regionY': regionIdx.y,
+      'minX': 0,
+      'minY': 0,
+      'maxX': 512,
+      'maxY': 512,
+      'userID': userID,
+      'userToken': userToken
+    }, onComplete);
   }
 
   sendGetEntityInstancesRequest(worldId: string, userId: string, userToken: string, onComplete: string): void {
@@ -65,12 +79,37 @@ export class REST {
     }, onComplete);
   }
 
+  sendGetRegionInfoRequest(regionIdx: Vector2Int, userId: string, userToken: string, onComplete: string): void {
+    this.get('/getregioninfo', {
+      'regionX': regionIdx.x,
+      'regionY': regionIdx.y,
+      'userId': userId,
+      'userToken': userToken
+    }, onComplete);
+  }
+
   sendGetEntityTemplatesRequest(worldId: string, userId: string, userToken: string, onComplete: string): void {
     this.get('/list-entity-templates', {
       'world-id': worldId,
       'user-id': userId,
       'user-token': userToken
     }, onComplete);
+  }
+
+  sendWorldManifestRequest(onComplete: string): void {
+    this.get('/world.json', null, onComplete);
+  }
+
+  sendWorldEntitiesManifestRequest(onComplete: string): void {
+    this.get('/entities.json', null, onComplete);
+  }
+
+  sendWorldTerrainManifestRequest(onComplete: string): void {
+    this.get('/terrain.json', null, onComplete);
+  }
+
+  sendBiomeManifestRequest(onComplete: string): void {
+    this.get('/getbiomeinfo', null, onComplete);
   }
 
   async sendAddEntityInstanceRequest(data: EntityPlacementData): Promise<EntityData> {

@@ -6,6 +6,7 @@ import { EntityManager } from './EntityManager';
 import { PlayerController } from './PlayerController';
 import { UIManager } from './UIManager';
 import { WorldRendererFactory } from './WorldRendererFactory';
+import VOSSynchronizer, { VOSSynchronizerConfig, VOSMessage } from './VOSSynchronizer';
 
 export interface SyncDiff {
   type: string;
@@ -16,16 +17,64 @@ export interface SyncDiff {
 export class SyncManager {
   private listeners: ((diff: SyncDiff) => void)[] = [];
   private connected: boolean = false;
+  private vosSynchronizer?: VOSSynchronizer;
+  private syncConfig?: VOSSynchronizerConfig;
+
+  constructor(syncConfig?: VOSSynchronizerConfig) {
+    this.syncConfig = syncConfig;
+  }
 
   /**
    * Connect to synchronization service
    */
   async connectToSynchronizers(): Promise<void> {
     Logging.Log('Connecting to synchronizers...');
-    // Simulation of connection
-    //await new Promise(resolve => setTimeout(resolve, 100));
-    this.connected = true;
-    Logging.Log('Connected to synchronizers');
+    
+    if (this.syncConfig) {
+      try {
+        this.vosSynchronizer = new VOSSynchronizer(this.syncConfig);
+        
+        // Setup message handlers
+        this.vosSynchronizer.OnMessage('entity_update', (message: VOSMessage) => {
+          this.handleSyncMessage({
+            type: 'entity_update',
+            data: message.data,
+            timestamp: message.timestamp || Date.now()
+          });
+        });
+        
+        this.vosSynchronizer.OnMessage('player_update', (message: VOSMessage) => {
+          this.handleSyncMessage({
+            type: 'player_update',
+            data: message.data,
+            timestamp: message.timestamp || Date.now()
+          });
+        });
+        
+        this.vosSynchronizer.OnMessage('ui_update', (message: VOSMessage) => {
+          this.handleSyncMessage({
+            type: 'ui_update',
+            data: message.data,
+            timestamp: message.timestamp || Date.now()
+          });
+        });
+        
+        this.connected = await this.vosSynchronizer.Connect();
+        
+        if (this.connected) {
+          Logging.Log('Connected to VOS synchronizers');
+        } else {
+          Logging.LogError('Failed to connect to VOS synchronizers');
+        }
+      } catch (error) {
+        Logging.LogError('Error connecting to VOS synchronizers: ' + error);
+        this.connected = false;
+      }
+    } else {
+      // Fallback to simulation mode
+      this.connected = true;
+      Logging.Log('Connected to synchronizers (simulation mode)');
+    }
   }
 
   /**
@@ -54,11 +103,27 @@ export class SyncManager {
       return;
     }
     
-    // In a real implementation, this would send to server
-    Logging.Log('Publishing sync diff: ' + JSON.stringify(diff));
-    
-    // For simulation, notify local listeners
-    this.handleSyncMessage(diff);
+    if (this.vosSynchronizer) {
+      // Send through VOS
+      const vosMessage: VOSMessage = {
+        type: diff.type,
+        data: diff.data,
+        timestamp: diff.timestamp
+      };
+      
+      const success = this.vosSynchronizer.SendMessage(vosMessage);
+      if (success) {
+        Logging.Log('Published VOS sync diff: ' + JSON.stringify(diff));
+      } else {
+        Logging.LogError('Failed to publish VOS sync diff');
+      }
+    } else {
+      // Fallback to simulation mode
+      Logging.Log('Publishing sync diff (simulation): ' + JSON.stringify(diff));
+      
+      // For simulation, notify local listeners
+      this.handleSyncMessage(diff);
+    }
   }
 
   /**
@@ -72,9 +137,51 @@ export class SyncManager {
    * Disconnect from synchronizers
    */
   disconnect(): void {
+    if (this.vosSynchronizer) {
+      this.vosSynchronizer.Disconnect();
+      this.vosSynchronizer = undefined;
+    }
+    
     this.connected = false;
     this.listeners = [];
     Logging.Log('Disconnected from synchronizers');
+  }
+
+  /**
+   * Sync an entity through VOS
+   */
+  syncEntity(entityId: string, entityData: any): boolean {
+    if (!this.connected || !this.vosSynchronizer) {
+      Logging.LogWarning('Cannot sync entity: not connected to VOS');
+      return false;
+    }
+    
+    return this.vosSynchronizer.SyncEntity(entityId, entityData);
+  }
+
+  /**
+   * Register entity sync callback
+   */
+  registerEntitySync(entityId: string, callback: (entity: any) => void): void {
+    if (this.vosSynchronizer) {
+      this.vosSynchronizer.RegisterEntitySync(entityId, callback);
+    }
+  }
+
+  /**
+   * Unregister entity sync callback
+   */
+  unregisterEntitySync(entityId: string): void {
+    if (this.vosSynchronizer) {
+      this.vosSynchronizer.UnregisterEntitySync(entityId);
+    }
+  }
+
+  /**
+   * Check if connected to VOS
+   */
+  isVOSConnected(): boolean {
+    return this.vosSynchronizer?.IsConnected() || false;
   }
 }
 

@@ -5,7 +5,7 @@
 
 import { ClientContext } from './modules/ClientContext';
 import { ProcessQueryParams } from './utils/ProcessQueryParams';
-import { StaticSurfaceRenderer } from './modules/WorldRendererFactory';
+import { StaticSurfaceRenderer, TiledSurfaceRenderer } from './modules/WorldRendererFactory';
 
 export class MyWorld {
   private context: ClientContext;
@@ -52,7 +52,7 @@ export class MyWorld {
       Logging.Log('🌍 Step 4: Loading world configuration...');
       const worldUri = params.worldUri as string | undefined;
       Logging.Log('🌍 Step 4a: World URI = ' + (worldUri || 'default'));
-      const worldConfig = await this.context.modules.config.loadWorldConfig(worldUri);
+      //const worldConfig = await this.context.modules.config.loadWorldConfig(worldUri);
       Logging.Log('✓ World configuration loaded successfully');
 
       // 5. Connect to synchronization sessions
@@ -62,7 +62,7 @@ export class MyWorld {
 
       // 6. Instantiate and load world renderers
       Logging.Log('🎨 Step 6: Creating and loading world renderers...');
-      await this.context.modules.worldRendering.createAndLoadRenderers(worldConfig);
+      await this.context.modules.worldRendering.createAndLoadRenderers();
       // Ensure WorldRendererFactory is available in context after renderers are loaded
       Logging.Log('🔍 Storing WorldRendererFactory in context. Type: ' + typeof this.context.modules.worldRendering);
       Logging.Log('🔍 Available methods: ' + Object.getOwnPropertyNames(Object.getPrototypeOf(this.context.modules.worldRendering)));
@@ -149,7 +149,7 @@ export class MyWorld {
         break;
       case 'planet':
         Logging.Log('🌍 World Type: planet - Initializing for planetary-scale world rendering');
-        // TODO: Add planet specific initialization here
+        await this.setupPlanetRenderer();
         break;
       case 'galaxy':
         Logging.Log('🌌 World Type: galaxy - Initializing for galactic-scale world rendering');
@@ -165,6 +165,31 @@ export class MyWorld {
   }
 
   /**
+   * Set up planet renderer for planet world type
+   */
+  private async setupPlanetRenderer(): Promise<void> {
+    try {
+      Logging.Log('🏗️ Setting up planet renderer for planet world type...');
+
+      // Use the imported TiledSurfaceRenderer
+
+      Logging.Log('🏗️ Step 1: Creating TiledSurfaceRenderer instance...');
+      const tiledRenderer = new TiledSurfaceRenderer();
+
+      Logging.Log('🏗️ Step 2: Initializing tiled surface renderer...');
+      await tiledRenderer.initialize();
+
+      Logging.Log('🏗️ Step 3: Loading world manifest...');
+      tiledRenderer.loadWorldManifest();
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ Failed to setup planet renderer: ' + errorMessage);
+      throw error;
+    }
+  }
+
+  /**
    * Set up static surface renderer for mini-world type
    */
   private async setupStaticSurfaceRenderer(): Promise<void> {
@@ -173,31 +198,23 @@ export class MyWorld {
       
       // Use the imported StaticSurfaceRenderer
       
-      // Create a basic world config for the renderer
-      Logging.Log('🏗️ Step 1: Creating world configuration...');
-      const worldConfig = {
-        name: 'Mini World',
-        type: 'mini-world',
-        scale: 'small'
-      } as any; // Use basic config structure
-      
       // Create and initialize the static surface renderer
-      Logging.Log('🏗️ Step 2: Creating StaticSurfaceRenderer instance...');
+      Logging.Log('🏗️ Step 1: Creating StaticSurfaceRenderer instance...');
       const staticRenderer = new StaticSurfaceRenderer();
-      
-      Logging.Log('🏗️ Step 3: Initializing static surface renderer...');
-      await staticRenderer.initialize(worldConfig);
+
+      Logging.Log('🏗️ Step 2: Initializing static surface renderer...');
+      await staticRenderer.initialize();
       
       // Request entity templates
-      Logging.Log('🏗️ Step 4: Requesting entity templates...');
+      Logging.Log('🏗️ Step 3: Requesting entity templates...');
       staticRenderer.requestEntityTemplates();
       
       // Register for entity instances trigger after templates complete
-      Logging.Log('🏗️ Step 4a: Registering for entity instances trigger...');
+      Logging.Log('🏗️ Step 3a: Registering for entity instances trigger...');
       this.registerForEntityInstancesTrigger(staticRenderer);
       
       // The renderer is now initialized and ready to use
-      Logging.Log('🏗️ Step 5: Static surface renderer ready for use');
+      Logging.Log('🏗️ Step 4: Static surface renderer ready for use');
       Logging.Log('🏗️ Note: Renderer will be used by WorldRendererFactory.renderFrame()');
       
       Logging.Log('✓ Static surface renderer setup completed for mini-world');

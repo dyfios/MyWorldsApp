@@ -7,6 +7,18 @@ export interface UIUpdateData {
   payload?: any;
 }
 
+export class DockButtonInfo {
+  name: string;
+  thumbnail: string;
+  onClick: string;
+
+  constructor(name: string, thumbnail: string, onClick: string) {
+    this.name = name;
+    this.thumbnail = thumbnail;
+    this.onClick = onClick;
+  }
+}
+
 export class UIManager {
   private editToolbar?: HTMLElement;
   private isInitialized: boolean = false;
@@ -42,6 +54,10 @@ export class UIManager {
 
     (globalThis as any).messageEditToolbar = (msg: string) => {
       this.handleToolbarMessage(msg);
+    };
+
+    (globalThis as any).addEditToolbarButton = (name: string, thumbnail: string, onClick: string) => {
+      this.addEditToolbarButton(name, thumbnail, onClick);
     };
   }
 
@@ -202,6 +218,27 @@ export class UIManager {
     }
 
     toolbarCanvas.SetVisibility(false);
+  }
+
+  /**
+   * Set up edit toolbar buttons
+   */
+  private addEditToolbarButton(name: string, thumbnail: string, onClick: string): void {
+    Logging.Log('🎨 UIManager: Setting up edit toolbar buttons...');
+    const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+      if (!mainToolbarId) {
+        Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found in storage');
+        return;
+      }
+      
+      const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+      if (!mainToolbar) {
+        Logging.LogError('❌ UIManager: Main toolbar entity not found');
+        return;
+      }
+
+      const jsCommand = `window.buttonDockAPI.addButton('${name}', '${thumbnail}', '${onClick}');`;
+      mainToolbar.ExecuteJavaScript(jsCommand, '');
   }
 
   /**

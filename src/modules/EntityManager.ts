@@ -383,12 +383,12 @@ export class EntityManager {
   /**
    * Load an entity into the world
    */
-  MW_Entity_LoadEntity(
+  loadEntity(
     instanceId: string,
-    instanceTag: string,
+    instanceTag: string | undefined,
     entityId: string,
     variantId: string,
-    entityParent: string,
+    entityParent: string | undefined,
     type: string,
     position: Vector3,
     rotation: Quaternion,
@@ -397,10 +397,11 @@ export class EntityManager {
     meshResources: string[],
     wheels: AutomobileEntityWheel[] | undefined = undefined,
     mass: number | undefined = undefined,
-    autoType: AutomobileType | undefined = undefined
+    autoType: AutomobileType | undefined = undefined,
+    scripts: string | undefined = undefined
   ): string {
     let parentEntity = null;
-    if (entityParent != null && entityParent !== "" && entityParent != "null") {
+    if (entityParent != null && entityParent != undefined && entityParent !== "" && entityParent != "null") {
       parentEntity = Entity.Get(entityParent);
     }
 if (entityId == null || variantId == null || scale == null) {
@@ -431,7 +432,9 @@ if (entityId == null || variantId == null || scale == null) {
         throw new Error(`Unknown entity type: ${type}`);
     }
 
-    this.MW_Entity_FinishLoadingPlacingEntity(instanceId);
+    Logging.Log("scripts " + scripts);
+
+    this.finishLoadingPlacingEntity(instanceId);
 
     return instanceId;
   }
@@ -439,7 +442,7 @@ if (entityId == null || variantId == null || scale == null) {
   /**
    * Snap entity to terrain
    */
-  MW_Entity_SnapEntityToTerrain(entityId: string): void {
+  snapEntityToTerrain(entityId: string): void {
     const entity = this.entities.get(entityId);
     if (!entity) {
       Logging.LogWarning(`Entity ${entityId} not found for terrain snapping`);
@@ -454,7 +457,7 @@ if (entityId == null || variantId == null || scale == null) {
   /**
    * Finish loading and placing an entity
    */
-  MW_Entity_FinishLoadingPlacingEntity(entityId: string): void {
+  finishLoadingPlacingEntity(entityId: string): void {
     const metadata = this.worldStorage.get(entityId);
     if (!metadata) {
       Logging.LogWarning(`No metadata found for entity ${entityId}`);
@@ -462,7 +465,7 @@ if (entityId == null || variantId == null || scale == null) {
     }
 
     // Snap to terrain
-    this.MW_Entity_SnapEntityToTerrain(entityId);
+    this.snapEntityToTerrain(entityId);
 
     // Add to script engine (would integrate with ScriptEngine module)
     Logging.Log(`Entity ${entityId} loading complete`);
@@ -471,7 +474,7 @@ if (entityId == null || variantId == null || scale == null) {
   /**
    * Finish loading a placed entity
    */
-  MW_Entity_FinishLoadingPlacedEntity(entityId: string): void {
+  finishLoadingPlacedEntity(entityId: string): void {
     Logging.Log(`Entity ${entityId} placement complete`);
   }
 
@@ -578,7 +581,7 @@ if (entityId == null || variantId == null || scale == null) {
 }
 
 // Global helper functions for entity placement
-export function MW_Entity_Placement_OnPositionEntityResponseReceived(response: string): void {
+export function onPositionEntityResponseReceived(response: string): void {
   if (response != null) {
     try {
       const parsedResponse = JSON.parse(response);

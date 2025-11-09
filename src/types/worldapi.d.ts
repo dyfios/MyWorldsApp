@@ -78,6 +78,18 @@ declare interface RaycastHitInfo {
 }
 
 /**
+ * Struct for a transform containing position, rotation, and scale.
+ */
+declare interface Transform {
+    /** Position of the transform. */
+    position: Vector3;
+    /** Rotation of the transform. */
+    rotation: Quaternion;
+    /** Scale of the transform. */
+    scale: Vector3;
+}
+
+/**
  * Class for a 2-dimensional vector.
  */
 declare class Vector2 {
@@ -1779,6 +1791,24 @@ declare class BaseEntity {
     GetParent(): BaseEntity | null;
 
     /**
+     * Place the world camera on this entity.
+     * @returns Whether or not the operation was successful.
+     */
+    PlaceCameraOn(): boolean;
+
+    /**
+     * Get the children of the entity.
+     * @returns An array of entities that are children of this one.
+     */
+    GetChildren(): BaseEntity[];
+
+    /**
+     * Get the transform of the entity.
+     * @returns The transform of the entity.
+     */
+    GetTransform(): Transform;
+
+    /**
      * Get the position of the entity.
      * @param local Whether or not to get the local position.
      * @returns The position of the entity.
@@ -1789,9 +1819,10 @@ declare class BaseEntity {
      * Set the position of the entity.
      * @param position Position to set.
      * @param local Whether or not to set the local position.
+     * @param synchronizeChange Whether or not to synchronize the change.
      * @returns Whether or not the operation was successful.
      */
-    SetPosition(position: Vector3, local?: boolean): boolean;
+    SetPosition(position: Vector3, local?: boolean, synchronizeChange?: boolean): boolean;
 
     /**
      * Get the rotation of the entity.
@@ -1804,9 +1835,26 @@ declare class BaseEntity {
      * Set the rotation of the entity.
      * @param rotation Rotation to set.
      * @param local Whether or not to set the local rotation.
+     * @param synchronizeChange Whether or not to synchronize the change.
      * @returns Whether or not the operation was successful.
      */
-    SetRotation(rotation: Quaternion, local?: boolean): boolean;
+    SetRotation(rotation: Quaternion, local?: boolean, synchronizeChange?: boolean): boolean;
+
+    /**
+     * Get the Euler rotation of the entity.
+     * @param local Whether or not to get the local rotation.
+     * @returns The Euler rotation of the entity.
+     */
+    GetEulerRotation(local: boolean): Vector3;
+
+    /**
+     * Set the Euler rotation of the entity.
+     * @param eulerRotation Euler rotation to set.
+     * @param local Whether or not the rotation is local.
+     * @param synchronizeChange Whether or not to synchronize the change.
+     * @returns Whether or not the operation was successful.
+     */
+    SetEulerRotation(eulerRotation: Vector3, local: boolean, synchronizeChange?: boolean): boolean;
 
     /**
      * Get the scale of the entity.
@@ -1817,9 +1865,10 @@ declare class BaseEntity {
     /**
      * Set the scale of the entity.
      * @param scale Scale to set.
+     * @param synchronizeChange Whether or not to synchronize the change with other clients.
      * @returns Whether or not the operation was successful.
      */
-    SetScale(scale: Vector3): boolean;
+    SetScale(scale: Vector3, synchronizeChange?: boolean): boolean;
 
     /**
      * Get the size of the entity.
@@ -1830,9 +1879,10 @@ declare class BaseEntity {
     /**
      * Set the size of the entity.
      * @param size Size to set.
+     * @param synchronizeChange Whether or not to synchronize the change with other clients.
      * @returns Whether or not the operation was successful.
      */
-    SetSize(size: Vector3): boolean;
+    SetSize(size: Vector3, synchronizeChange?: boolean): boolean;
 
     /**
      * Get the visibility of the entity.
@@ -1843,9 +1893,10 @@ declare class BaseEntity {
     /**
      * Set the visibility of the entity.
      * @param visible Whether or not the entity should be visible.
+     * @param synchronize Whether or not to synchronize the change with other clients.
      * @returns Whether or not the operation was successful.
      */
-    SetVisibility(visible: boolean): boolean;
+    SetVisibility(visible: boolean, synchronize?: boolean): boolean;
 
     /**
      * Get the highlight state of the entity.
@@ -1901,9 +1952,10 @@ declare class BaseEntity {
 
     /**
      * Delete the entity.
+     * @param synchronizeChange Whether or not to synchronize the change with other clients.
      * @returns Whether or not the operation was successful.
      */
-    Delete(): boolean;
+    Delete(synchronizeChange?: boolean): boolean;
 
     /**
      * Place camera on the entity.
@@ -1911,12 +1963,81 @@ declare class BaseEntity {
     PlaceCameraOn(): void;
 
     /**
-     * Perform a raycast from the entity.
-     * @param direction Direction to cast the ray.
-     * @param distance Maximum distance to cast.
-     * @returns Raycast hit information.
+     * Compare this entity with another.
+     * @param other Other entity to compare with.
+     * @returns Whether or not the entities match.
      */
-    Raycast(direction: Vector3, distance: number): RaycastHitInfo;
+    Compare(other: BaseEntity): boolean;
+
+    /**
+     * Get a raycast forward from this entity.
+     * @returns A raycast forward from this entity, or null.
+     */
+    GetRaycast(): RaycastHitInfo | null;
+
+    /**
+     * Get a raycast from this entity.
+     * @param direction Direction to cast the ray in.
+     * @returns A raycast from this entity, or null.
+     */
+    GetRaycast(direction: Vector3): RaycastHitInfo | null;
+
+    /**
+     * Add a placement socket to the entity.
+     * @param position Position of the placement socket relative to the entity.
+     * @param rotation Rotation of the placement socket relative to the entity.
+     * @param connectingOffset Offset to apply when connecting to another socket.
+     * @returns Whether or not the operation was successful.
+     */
+    AddSocket(position: Vector3, rotation: Quaternion, connectingOffset: Vector3): boolean;
+
+    /**
+     * Play an animation.
+     * @param animationName Name of animation to play.
+     * @returns Whether or not the operation was successful.
+     */
+    PlayAnimation(animationName: string): boolean;
+
+    /**
+     * Stop an animation.
+     * @param animationName Name of animation to stop.
+     * @returns Whether or not the operation was successful.
+     */
+    StopAnimation(animationName: string): boolean;
+
+    /**
+     * Set the speed of an animation.
+     * @param animationName Name of animation to set speed of.
+     * @param speed Speed to set animation to.
+     * @returns Whether or not the operation was successful.
+     */
+    SetAnimationSpeed(animationName: string, speed: number): boolean;
+
+    /**
+     * Enable broadcasting of position via synchronizer.
+     * @param interval Interval at which to broadcast, <= 0 to not broadcast.
+     * @returns Whether or not the operation was successful.
+     */
+    EnablePositionBroadcast(interval: number): boolean;
+
+    /**
+     * Disable broadcasting of position via synchronizer.
+     * @returns Whether or not the operation was successful.
+     */
+    DisablePositionBroadcast(): boolean;
+
+    /**
+     * Enable broadcasting of rotation via synchronizer.
+     * @param interval Interval at which to broadcast, <= 0 to not broadcast.
+     * @returns Whether or not the operation was successful.
+     */
+    EnableRotationBroadcast(interval: number): boolean;
+
+    /**
+     * Disable broadcasting of rotation via synchronizer.
+     * @returns Whether or not the operation was successful.
+     */
+    DisableRotationBroadcast(): boolean;
 }
 
 /**
@@ -3347,7 +3468,7 @@ declare class WaterEntity extends BaseEntity {
      * @param onLoaded Action to perform on load. This takes a single parameter containing the created water entity object.
      * @returns The water entity object.
      */
-    static CreateWaterBody(parent: BaseEntity, shallowColor: Color, deepColor: Color, specularColor: Color, scatteringColor: Color, deepStart: number, deepEnd: number, distortion: number, smoothness: number, numWaves: number, waveAmplitude: number, waveSteepness: number, waveSpeed: number, waveLength: number, waveScale: number, intensity: number, position: Vector3, rotation: Quaternion, scale: Vector3, id?: string, tag?: string, onLoaded?: string): WaterEntity;
+    static CreateWaterBody(parent: BaseEntity?, shallowColor: Color, deepColor: Color, specularColor: Color, scatteringColor: Color, deepStart: number, deepEnd: number, distortion: number, smoothness: number, numWaves: number, waveAmplitude: number, waveSteepness: number, waveSpeed: number, waveLength: number, waveScale: number, intensity: number, position: Vector3, rotation: Quaternion, scale: Vector3, id?: string, tag?: string, onLoaded?: string): WaterEntity;
 
     /**
      * Create a water entity from a JSON string.
@@ -3960,23 +4081,121 @@ declare class VOSSynchronization {
      * @param tls Whether to use TLS.
      * @param id RFC 4122-encoded UUID identifier for the session.
      * @param tag Tag for the session.
-     * @param transport Transport to use.
+     * @param transport Transport to use (default: TCP).
      * @returns Whether or not the operation was successful.
      */
     static CreateSession(host: string, port: number, tls: boolean, id: string, tag: string, transport?: VSSTransport): boolean;
 
     /**
-     * Create a VOS Synchronization Session with position.
+     * Create a VOS Synchronization Session with world offset.
      * @param host Host of the connection to create the session on.
      * @param port Port of the connection to create the session on.
      * @param tls Whether to use TLS.
      * @param id RFC 4122-encoded UUID identifier for the session.
      * @param tag Tag for the session.
-     * @param position Initial position for the session.
-     * @param transport Transport to use.
+     * @param worldOffset Offset for this synchronized client in the world.
+     * @param transport Transport to use (default: TCP).
+     * @param clientID Optional client ID.
+     * @param clientToken Optional client token.
      * @returns Whether or not the operation was successful.
      */
-    static CreateSession(host: string, port: number, tls: boolean, id: string, tag: string, position: Vector3, transport?: VSSTransport): boolean;
+    static CreateSession(host: string, port: number, tls: boolean, id: string, tag: string, worldOffset: Vector3, transport?: VSSTransport, clientID?: string, clientToken?: string): boolean;
+
+    /**
+     * Destroy a VOS Synchronization Session.
+     * @param id ID of the session to destroy.
+     * @returns Whether or not the operation was successful.
+     */
+    static DestroySession(id: string): boolean;
+
+    /**
+     * Join a VOS Synchronization Session.
+     * @param host Host of the connection of the session to join.
+     * @param port Port of the connection of the session to join.
+     * @param tls Whether to use TLS.
+     * @param id RFC 4122-encoded UUID identifier of the session.
+     * @param tag Tag of the client.
+     * @param callback Optional callback function name to invoke when joined.
+     * @param transport Transport to use (default: TCP).
+     * @param clientID Optional client ID.
+     * @param clientToken Optional client token.
+     * @returns Client ID of the joined session, or null if failed.
+     */
+    static JoinSession(host: string, port: number, tls: boolean, id: string, tag: string, callback?: string, transport?: VSSTransport, clientID?: string, clientToken?: string): string | null;
+
+    /**
+     * Join a VOS Synchronization Session with world offset.
+     * @param host Host of the connection of the session to join.
+     * @param port Port of the connection of the session to join.
+     * @param tls Whether to use TLS.
+     * @param id RFC 4122-encoded UUID identifier of the session.
+     * @param tag Tag of the client.
+     * @param worldOffset Offset for this synchronized client in the world.
+     * @param callback Optional callback function name to invoke when joined.
+     * @param transport Transport to use (default: TCP).
+     * @param clientID Optional client ID.
+     * @param clientToken Optional client token.
+     * @returns Client ID of the joined session, or null if failed.
+     */
+    static JoinSession(host: string, port: number, tls: boolean, id: string, tag: string, worldOffset: Vector3, callback?: string, transport?: VSSTransport, clientID?: string, clientToken?: string): string | null;
+
+    /**
+     * Exit a VOS Synchronization Session.
+     * @param id ID of the session to exit.
+     * @returns Whether or not the operation was successful.
+     */
+    static ExitSession(id: string): boolean;
+
+    /**
+     * Check if a session is established.
+     * @param sessionID ID of session to check.
+     * @returns Whether or not the session is established.
+     */
+    static IsSessionEstablished(sessionID: string): boolean;
+
+    /**
+     * Start synchronizing an entity.
+     * @param sessionID Session ID to synchronize the entity on.
+     * @param entityID ID of the entity to synchronize.
+     * @param deleteWithClient Whether or not to delete the entity upon disconnection of the client (default: false).
+     * @param filePath Optional path to a file to load with the entity.
+     * @param resources Optional resources to include with the entity.
+     * @returns Whether or not the operation was successful.
+     */
+    static StartSynchronizingEntity(sessionID: string, entityID: string, deleteWithClient?: boolean, filePath?: string, resources?: string[]): boolean;
+
+    /**
+     * Stop synchronizing an entity.
+     * @param sessionID Session ID to stop synchronizing the entity on.
+     * @param entityID ID of the entity to stop synchronizing.
+     * @returns Whether or not the operation was successful.
+     */
+    static StopSynchronizingEntity(sessionID: string, entityID: string): boolean;
+
+    /**
+     * Send a message.
+     * @param sessionID Session ID to send the message on.
+     * @param topic Topic to send the message on.
+     * @param message Message to send.
+     * @returns Whether or not the operation was successful.
+     */
+    static SendMessage(sessionID: string, topic: string, message: string): boolean;
+
+    /**
+     * Register a message callback.
+     * @param sessionID Session ID to register the message callback on.
+     * @param callback Function name to invoke when a message is received. Function receives (topic: string, senderID: string, message: string).
+     * @returns Whether or not the operation was successful.
+     */
+    static RegisterMessageCallback(sessionID: string, callback: string): boolean;
+
+    /**
+     * Get the tag for a user.
+     * @param sessionID Session ID of the session containing the user.
+     * @param userID ID of the user to get the tag of.
+     * @returns Tag of the user, or null if not found.
+     */
+    static GetUserTag(sessionID: string, userID: string): string | null;
 }
 
 // ============================================================================
@@ -4260,7 +4479,7 @@ declare class Time {
      * @param id ID of the registered function to stop running.
      * @returns Whether or not the operation was successful.
      */
-    static StopInterval(id: string): boolean;
+    static StopInterval(id: string | null): boolean;
 
     /**
      * Set timeout after which to run logic.
