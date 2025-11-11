@@ -371,10 +371,6 @@ export class EntityManager {
       this.onMeshEntityLoadedGeneric(entity);
     };
 
-    (globalThis as any).triggerEntityTemplatesAfterLogin = () => {
-      this.triggerEntityTemplatesAfterLogin();
-    };
-
     (globalThis as any).triggerEntityInstancesAfterTemplates = () => {
       this.triggerEntityInstancesAfterTemplates();
     };
@@ -482,18 +478,6 @@ if (entityId == null || variantId == null || scale == null) {
     Logging.Log(`✓ Mesh entity loaded successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
-  }
-
-  triggerEntityTemplatesAfterLogin(): void {
-    Logging.Log('🎯 triggerEntityTemplatesAfterLogin: Called after successful authentication');
-    if ((globalThis as any).pendingEntityTemplateRequest &&
-      typeof (globalThis as any).pendingEntityTemplateRequest.loadEntityTemplates === 'function') {
-      Logging.Log('🔄 Executing pending entity templates request...');
-      (globalThis as any).pendingEntityTemplateRequest.loadEntityTemplates();
-      (globalThis as any).pendingEntityTemplateRequest = null;
-    } else {
-      Logging.Log('⚠️ No pending entity template request found');
-    }
   }
 
   triggerEntityInstancesAfterTemplates(): void {

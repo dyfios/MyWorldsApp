@@ -1813,7 +1813,7 @@ declare class BaseEntity {
      * @param local Whether or not to get the local position.
      * @returns The position of the entity.
      */
-    GetPosition(local?: boolean): Vector3;
+    GetPosition(local: boolean): Vector3;
 
     /**
      * Set the position of the entity.
@@ -4031,6 +4031,316 @@ declare class Environment {
      * @returns Whether or not the operation was successful.
      */
     static SetSolidColorSky(color: Color): boolean;
+
+    /**
+     * Set the sky to lite-mode day/night procedural with default settings.
+     * @param sunEntity Entity to use for the sun.
+     * @returns Whether or not the operation was successful.
+     */
+    static SetLiteDayNightSky(sunEntity: LightEntity): boolean;
+
+    /**
+     * Set the sky to lite-mode day/night procedural with basic settings.
+     * @param sunEntity Entity to use for the sun.
+     * @param enableGround Whether or not to enable procedural ground.
+     * @param groundColor Color for the ground.
+     * @param groundHeight Height to place ground at.
+     * @param dayHorizonColor Color for horizon during day.
+     * @param daySkyColor Color for sky during day.
+     * @param nightHorizonColor Color for horizon during night.
+     * @param nightSkyColor Color for sky during night.
+     * @param enableSun Whether or not to enable procedural sun.
+     * @param sunDiameter Diameter of sun.
+     * @param sunColor Color of sun.
+     * @param enableMoon Whether or not to enable procedural moon.
+     * @param moonDiameter Diameter of moon.
+     * @param moonColor Color of moon.
+     * @param enableStars Whether or not to enable stars.
+     * @param starsBrightness Brightness for stars.
+     * @param starRotationSpeed Rotation speed for non-procedural stars.
+     * @param enableClouds Whether or not to enable procedural clouds.
+     * @param cloudsSpeed Speed for clouds.
+     * @param cloudiness Cloudiness level.
+     * @param cloudsOpacity Cloud opacity level.
+     * @param cloudsDayColor Color for clouds during day.
+     * @param cloudsNightColor Color for clouds during night.
+     * @returns Whether or not the operation was successful.
+     */
+    static SetLiteDayNightSky(sunEntity: LightEntity, enableGround: boolean, groundColor: Color,
+        groundHeight: number, dayHorizonColor: Color, daySkyColor: Color,
+        nightHorizonColor: Color, nightSkyColor: Color, enableSun: boolean, sunDiameter: number,
+        sunColor: Color, enableMoon: boolean, moonDiameter: number, moonColor: Color,
+        enableStars: boolean, starsBrightness: number, starRotationSpeed: number, enableClouds: boolean,
+        cloudsSpeed: Vector2, cloudiness: number, cloudsOpacity: number, cloudsDayColor: Color,
+        cloudsNightColor: Color): boolean;
+
+    /**
+     * Set the sky to lite-mode day/night procedural with custom textures.
+     * @param sunEntity Entity to use for the sun.
+     * @param enableGround Whether or not to enable procedural ground.
+     * @param groundColor Color for the ground.
+     * @param groundHeight Height to place ground at.
+     * @param dayHorizonColor Color for horizon during day.
+     * @param daySkyColor Color for sky during day.
+     * @param nightHorizonColor Color for horizon during night.
+     * @param nightSkyColor Color for sky during night.
+     * @param enableSun Whether or not to enable procedural sun.
+     * @param sunDiameter Diameter of sun.
+     * @param sunColor Color of sun.
+     * @param enableMoon Whether or not to enable procedural moon.
+     * @param moonDiameter Diameter of moon.
+     * @param moonColor Color of moon.
+     * @param enableStars Whether or not to enable stars.
+     * @param starsBrightness Brightness for stars.
+     * @param starTextureURI URI to the texture for non-procedural stars.
+     * @param starTint Tint for non-procedural stars.
+     * @param starScale Scale for non-procedural stars.
+     * @param starRotationSpeed Rotation speed for non-procedural stars.
+     * @param enableClouds Whether or not to enable procedural clouds.
+     * @param cloudsTextureURI URI to texture for clouds.
+     * @param cloudsScale Scale for clouds.
+     * @param cloudsSpeed Speed for clouds.
+     * @param cloudiness Cloudiness level.
+     * @param cloudsOpacity Cloud opacity level.
+     * @param cloudsDayColor Color for clouds during day.
+     * @param cloudsNightColor Color for clouds during night.
+     * @returns Whether or not the operation was successful.
+     */
+    static SetLiteDayNightSky(sunEntity: LightEntity, enableGround: boolean, groundColor: Color,
+        groundHeight: number, dayHorizonColor: Color, daySkyColor: Color,
+        nightHorizonColor: Color, nightSkyColor: Color, enableSun: boolean, sunDiameter: number,
+        sunColor: Color, enableMoon: boolean, moonDiameter: number, moonColor: Color,
+        enableStars: boolean, starsBrightness: number, starTextureURI: string, starTint: Color, starScale: number,
+        starRotationSpeed: number, enableClouds: boolean, cloudsTextureURI: string, cloudsScale: Vector2,
+        cloudsSpeed: Vector2, cloudiness: number, cloudsOpacity: number, cloudsDayColor: Color,
+        cloudsNightColor: Color): boolean;
+
+    /**
+     * Set the sky to lite-mode day/night procedural with full settings.
+     * @param sunEntity Entity to use for the sun.
+     * @param enableGround Whether or not to enable procedural ground.
+     * @param groundColor Color for the ground.
+     * @param groundHeight Height to place ground at.
+     * @param groundFadeAmount Factor for fade between ground and horizon.
+     * @param horizonSkyBlend Blending factor between horizon and sky.
+     * @param dayHorizonColor Color for horizon during day.
+     * @param daySkyColor Color for sky during day.
+     * @param nightHorizonColor Color for horizon during night.
+     * @param nightSkyColor Color for sky during night.
+     * @param horizonSaturationAmount Saturation amount for horizon.
+     * @param horizonSaturationFalloff Saturation falloff for horizon.
+     * @param enableSun Whether or not to enable procedural sun.
+     * @param sunDiameter Diameter of sun.
+     * @param sunHorizonColor Color of sun at horizon.
+     * @param sunZenithColor Color of sun at zenith.
+     * @param enableSunSkyLighting Whether or not to enable lighting of sky from sun.
+     * @param skyLightingFalloffAmount Falloff amount for sky lighting.
+     * @param skyLightingFalloffIntensity Falloff intensity for sky lighting.
+     * @param sunsetIntensity Intensity of sunset.
+     * @param sunsetRadialFalloff Radial falloff of sunset.
+     * @param sunsetHorizontalFalloff Horizontal falloff of sunset.
+     * @param sunsetVerticalFalloff Vertical falloff of sunset.
+     * @param enableMoon Whether or not to enable procedural moon.
+     * @param moonDiameter Diameter of moon.
+     * @param moonColor Color of moon.
+     * @param moonFalloffAmount Falloff amount for moonlight.
+     * @param enableStars Whether or not to enable stars.
+     * @param starsBrightness Brightness for stars.
+     * @param starsDaytimeBrightness Daytime brightness for stars.
+     * @param starsHorizonFalloff Falloff for stars at horizon.
+     * @param starsSaturation Saturation for stars.
+     * @param enableProceduralStars Whether or not to enable procedural stars.
+     * @param proceduralStarsSharpness Sharpness for procedural stars.
+     * @param proceduralStarsAmount Amount of procedural stars.
+     * @param enableStarsTexture Whether or not to enable star texture (overlaid on top of procedural stars).
+     * @param starTextureURI URI to the texture for non-procedural stars.
+     * @param starTint Tint for non-procedural stars.
+     * @param starScale Scale for non-procedural stars.
+     * @param starRotationSpeed Rotation speed for non-procedural stars.
+     * @param enableClouds Whether or not to enable procedural clouds.
+     * @param cloudsTextureURI URI to texture for clouds.
+     * @param cloudsScale Scale for clouds.
+     * @param cloudsSpeed Speed for clouds.
+     * @param cloudiness Cloudiness level.
+     * @param cloudsOpacity Cloud opacity level.
+     * @param cloudsSharpness Cloud sharpness level.
+     * @param cloudsShadingIntensity Intensity of cloud shading.
+     * @param cloudsZenithFalloff Falloff for clouds at zenith.
+     * @param cloudsIterations Number of iterations for procedural clouds.
+     * @param cloudsGain Gain for procedural clouds.
+     * @param cloudsLacunarity Lacunarity for procedural clouds.
+     * @param cloudsDayColor Color for clouds during day.
+     * @param cloudsNightColor Color for clouds during night.
+     * @returns Whether or not the operation was successful.
+     */
+    static SetLiteDayNightSky(sunEntity: LightEntity, enableGround: boolean, groundColor: Color,
+        groundHeight: number, groundFadeAmount: number, horizonSkyBlend: number, dayHorizonColor: Color,
+        daySkyColor: Color, nightHorizonColor: Color, nightSkyColor: Color,
+        horizonSaturationAmount: number, horizonSaturationFalloff: number, enableSun: boolean, sunDiameter: number,
+        sunHorizonColor: Color, sunZenithColor: Color, enableSunSkyLighting: boolean,
+        skyLightingFalloffAmount: number, skyLightingFalloffIntensity: number, sunsetIntensity: number,
+        sunsetRadialFalloff: number, sunsetHorizontalFalloff: number, sunsetVerticalFalloff: number, enableMoon: boolean,
+        moonDiameter: number, moonColor: Color, moonFalloffAmount: number, enableStars: boolean, starsBrightness: number,
+        starsDaytimeBrightness: number, starsHorizonFalloff: number, starsSaturation: number, enableProceduralStars: boolean,
+        proceduralStarsSharpness: number, proceduralStarsAmount: number, enableStarsTexture: boolean, starTextureURI: string,
+        starTint: Color, starScale: number, starRotationSpeed: number, enableClouds: boolean, cloudsTextureURI: string,
+        cloudsScale: Vector2, cloudsSpeed: Vector2, cloudiness: number, cloudsOpacity: number, cloudsSharpness: number,
+        cloudsShadingIntensity: number, cloudsZenithFalloff: number, cloudsIterations: number, cloudsGain: number, cloudsLacunarity: number,
+        cloudsDayColor: Color, cloudsNightColor: Color): boolean;
+
+    /**
+     * Set the sky to lite-mode constant color procedural with default settings.
+     * @param sunEntity Entity to use for the sun.
+     * @returns Whether or not the operation was successful.
+     */
+    static SetLiteConstantColorSky(sunEntity: LightEntity): boolean;
+
+    /**
+     * Set the sky to lite-mode constant color procedural with basic settings.
+     * @param sunEntity Entity to use for the sun.
+     * @param enableGround Whether or not to enable procedural ground.
+     * @param groundColor Color for the ground.
+     * @param groundHeight Height to place ground at.
+     * @param horizonColor Color for horizon.
+     * @param skyColor Color for sky.
+     * @param enableSun Whether or not to enable procedural sun.
+     * @param sunDiameter Diameter of sun.
+     * @param sunColor Color of sun.
+     * @param enableMoon Whether or not to enable procedural moon.
+     * @param moonDiameter Diameter of moon.
+     * @param moonColor Color of moon.
+     * @param enableStars Whether or not to enable stars.
+     * @param starsBrightness Brightness for stars.
+     * @param starRotationSpeed Rotation speed for non-procedural stars.
+     * @param enableClouds Whether or not to enable procedural clouds.
+     * @param cloudsSpeed Speed for clouds.
+     * @param cloudiness Cloudiness level.
+     * @param cloudsOpacity Cloud opacity level.
+     * @param cloudsColor Color for clouds.
+     * @returns Whether or not the operation was successful.
+     */
+    static SetLiteConstantColorSky(sunEntity: LightEntity, enableGround: boolean, groundColor: Color,
+        groundHeight: number, horizonColor: Color, skyColor: Color, enableSun: boolean, sunDiameter: number,
+        sunColor: Color, enableMoon: boolean, moonDiameter: number, moonColor: Color, enableStars: boolean,
+        starsBrightness: number, starRotationSpeed: number, enableClouds: boolean, cloudsSpeed: Vector2, cloudiness: number,
+        cloudsOpacity: number, cloudsColor: Color): boolean;
+
+    /**
+     * Set the sky to lite-mode constant color procedural with custom textures.
+     * @param sunEntity Entity to use for the sun.
+     * @param enableGround Whether or not to enable procedural ground.
+     * @param groundColor Color for the ground.
+     * @param groundHeight Height to place ground at.
+     * @param horizonColor Color for horizon.
+     * @param skyColor Color for sky.
+     * @param enableSun Whether or not to enable procedural sun.
+     * @param sunDiameter Diameter of sun.
+     * @param sunColor Color of sun.
+     * @param enableMoon Whether or not to enable procedural moon.
+     * @param moonDiameter Diameter of moon.
+     * @param moonColor Color of moon.
+     * @param enableStars Whether or not to enable stars.
+     * @param starsBrightness Brightness for stars.
+     * @param starTextureURI URI to the texture for non-procedural stars.
+     * @param starTint Tint for non-procedural stars.
+     * @param starScale Scale for non-procedural stars.
+     * @param starRotationSpeed Rotation speed for non-procedural stars.
+     * @param enableClouds Whether or not to enable procedural clouds.
+     * @param cloudsTextureURI URI to texture for clouds.
+     * @param cloudsScale Scale for clouds.
+     * @param cloudsSpeed Speed for clouds.
+     * @param cloudiness Cloudiness level.
+     * @param cloudsOpacity Cloud opacity level.
+     * @param cloudsColor Color for clouds.
+     * @returns Whether or not the operation was successful.
+     */
+    static SetLiteConstantColorSky(sunEntity: LightEntity, enableGround: boolean, groundColor: Color,
+        groundHeight: number, horizonColor: Color, skyColor: Color, enableSun: boolean, sunDiameter: number,
+        sunColor: Color, enableMoon: boolean, moonDiameter: number, moonColor: Color,
+        enableStars: boolean, starsBrightness: number, starTextureURI: string, starTint: Color, starScale: number,
+        starRotationSpeed: number, enableClouds: boolean, cloudsTextureURI: string, cloudsScale: Vector2,
+        cloudsSpeed: Vector2, cloudiness: number, cloudsOpacity: number, cloudsColor: Color): boolean;
+
+    /**
+     * Set the sky to lite-mode constant color procedural with full settings.
+     * @param sunEntity Entity to use for the sun.
+     * @param enableGround Whether or not to enable procedural ground.
+     * @param groundColor Color for the ground.
+     * @param groundHeight Height to place ground at.
+     * @param groundFadeAmount Factor for fade between ground and horizon.
+     * @param horizonSkyBlend Blending factor between horizon and sky.
+     * @param horizonColor Color for horizon.
+     * @param skyColor Color for sky.
+     * @param horizonSaturationAmount Saturation amount for horizon.
+     * @param horizonSaturationFalloff Saturation falloff for horizon.
+     * @param enableSun Whether or not to enable procedural sun.
+     * @param sunDiameter Diameter of sun.
+     * @param sunHorizonColor Color of sun at horizon.
+     * @param sunZenithColor Color of sun at zenith.
+     * @param enableSunSkyLighting Whether or not to enable lighting of sky from sun.
+     * @param skyLightingFalloffAmount Falloff amount for sky lighting.
+     * @param skyLightingFalloffIntensity Falloff intensity for sky lighting.
+     * @param sunsetIntensity Intensity of sunset.
+     * @param sunsetRadialFalloff Radial falloff of sunset.
+     * @param sunsetHorizontalFalloff Horizontal falloff of sunset.
+     * @param sunsetVerticalFalloff Vertical falloff of sunset.
+     * @param enableMoon Whether or not to enable procedural moon.
+     * @param moonDiameter Diameter of moon.
+     * @param moonColor Color of moon.
+     * @param moonFalloffAmount Falloff amount for moonlight.
+     * @param enableStars Whether or not to enable stars.
+     * @param starsBrightness Brightness for stars.
+     * @param starsDaytimeBrightness Daytime brightness for stars.
+     * @param starsHorizonFalloff Falloff for stars at horizon.
+     * @param starsSaturation Saturation for stars.
+     * @param enableProceduralStars Whether or not to enable procedural stars.
+     * @param proceduralStarsSharpness Sharpness for procedural stars.
+     * @param proceduralStarsAmount Amount of procedural stars.
+     * @param enableStarsTexture Whether or not to enable star texture (overlaid on top of procedural stars).
+     * @param starTextureURI URI to the texture for non-procedural stars.
+     * @param starTint Tint for non-procedural stars.
+     * @param starScale Scale for non-procedural stars.
+     * @param starRotationSpeed Rotation speed for non-procedural stars.
+     * @param enableClouds Whether or not to enable procedural clouds.
+     * @param cloudsTextureURI URI to texture for clouds.
+     * @param cloudsScale Scale for clouds.
+     * @param cloudsSpeed Speed for clouds.
+     * @param cloudiness Cloudiness level.
+     * @param cloudsOpacity Cloud opacity level.
+     * @param cloudsSharpness Cloud sharpness level.
+     * @param cloudsShadingIntensity Intensity of cloud shading.
+     * @param cloudsZenithFalloff Falloff for clouds at zenith.
+     * @param cloudsIterations Number of iterations for procedural clouds.
+     * @param cloudsGain Gain for procedural clouds.
+     * @param cloudsLacunarity Lacunarity for procedural clouds.
+     * @param cloudsColor Color for clouds.
+     * @returns Whether or not the operation was successful.
+     */
+    static SetLiteConstantColorSky(sunEntity: LightEntity, enableGround: boolean, groundColor: Color,
+        groundHeight: number, groundFadeAmount: number, horizonSkyBlend: number, horizonColor: Color, skyColor: Color,
+        horizonSaturationAmount: number, horizonSaturationFalloff: number, enableSun: boolean, sunDiameter: number, sunHorizonColor: Color,
+        sunZenithColor: Color, enableSunSkyLighting: boolean, skyLightingFalloffAmount: number, skyLightingFalloffIntensity: number,
+        sunsetIntensity: number, sunsetRadialFalloff: number, sunsetHorizontalFalloff: number, sunsetVerticalFalloff: number, enableMoon: boolean,
+        moonDiameter: number, moonColor: Color, moonFalloffAmount: number, enableStars: boolean, starsBrightness: number,
+        starsDaytimeBrightness: number, starsHorizonFalloff: number, starsSaturation: number, enableProceduralStars: boolean,
+        proceduralStarsSharpness: number, proceduralStarsAmount: number, enableStarsTexture: boolean, starTextureURI: string, starTint: Color,
+        starScale: number, starRotationSpeed: number, enableClouds: boolean, cloudsTextureURI: string, cloudsScale: Vector2,
+        cloudsSpeed: Vector2, cloudiness: number, cloudsOpacity: number, cloudsSharpness: number, cloudsShadingIntensity: number,
+        cloudsZenithFalloff: number, cloudsIterations: number, cloudsGain: number, cloudsLacunarity: number, cloudsColor: Color): boolean;
+
+    /**
+     * Activate lite-mode fog.
+     * @param color Color of the fog.
+     * @param density Density of the fog.
+     * @returns Whether or not the operation was successful.
+     */
+    static ActivateLiteFog(color: Color, density: number): boolean;
+
+    /**
+     * Disable all fog.
+     * @returns Whether or not the operation was successful.
+     */
+    static DisableFog(): boolean;
 }
 
 // ============================================================================

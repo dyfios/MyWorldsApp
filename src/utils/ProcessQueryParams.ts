@@ -21,6 +21,7 @@ export interface WorldMetadata {
   description: string;
   owner: string;
   permissions: string;
+  stateService?: string; // Used for tiled surface renderer
 }
 
 export interface QueryParams {
@@ -264,6 +265,15 @@ export class ProcessQueryParams {
    */
   getWorldAddress(): string | undefined {
     return this.get('worldAddress') as string;
+  }
+
+  /**
+   * Get state service address from world metadata
+   * Used for tiled surface renderer state management
+   */
+  getStateService(): string | undefined {
+    const metadata = this.getWorldMetadata();
+    return metadata?.stateService;
   }
 
   /**

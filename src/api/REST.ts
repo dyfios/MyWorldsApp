@@ -42,7 +42,7 @@ export class REST {
   }
 
   sendTimeRequest(onComplete: string): void {
-    this.get('/time', undefined, onComplete);
+    this.get('/gettime', undefined, onComplete);
   }
 
   sendGetEntitiesRequest(regionIdx: Vector2Int, userId: string, userToken: string, onComplete: string): void {

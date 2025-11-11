@@ -30,12 +30,14 @@ interface MyWorldsTopLevelContext {
  * Identity management class for WebVerse HTML panel authentication
  */
 export class Identity {
-  private static readonly LOGIN_CONTEXT_KEY = "LOGIN_CONTEXT";
-  private static readonly MW_TOP_LEVEL_CONTEXT_KEY = "MW_TOP_LEVEL_CONTEXT";
-  private static readonly LOGIN_CANVAS_ID_KEY = "LOGIN-CANVAS-ID";
-  private static readonly LOGIN_PANEL_ID_KEY = "LOGIN-PANEL-ID";
+  private readonly MW_TOP_LEVEL_CONTEXT_KEY = "MW_TOP_LEVEL_CONTEXT";
+  private readonly LOGIN_CANVAS_ID_KEY = "LOGIN-CANVAS-ID";
+  private readonly LOGIN_PANEL_ID_KEY = "LOGIN-PANEL-ID";
+
+  private loginCallbackFunction?: () => void;
 
   constructor() {
+    this.loginCallbackFunction = undefined;
     this.setupGlobalCallbacks();
   }
 
@@ -62,12 +64,6 @@ export class Identity {
   finishLoginCanvasSetup(): void {
     Logging.Log('🎯 Identity: finishLoginCanvasSetup callback invoked');
     try {
-      const loginContext = Context.GetContext('LOGIN_CONTEXT');
-      if (!loginContext) {
-        Logging.LogError('LOGIN_CONTEXT not found. Cannot finish login canvas setup.');
-        return;
-      }
-      
       const loginPanelId = UUID.NewUUID().ToString();
       if (!loginPanelId) {
         Logging.LogError('Failed to generate login panel ID');
@@ -103,8 +99,7 @@ export class Identity {
         'handleUserLoginMessage',
         'finishLoginPanelSetup'
       );
-      
-      Context.DefineContext('LOGIN_CONTEXT', loginContext);
+
       Logging.Log('✓ Login canvas setup completed');
       
     } catch (error: any) {
@@ -115,12 +110,6 @@ export class Identity {
   finishLoginPanelSetup(): void {
     Logging.Log('🎯 Identity: finishLoginPanelSetup callback invoked');
     try {
-      const loginContext = Context.GetContext('LOGIN_CONTEXT');
-      if (!loginContext) {
-        Logging.LogError('LOGIN_CONTEXT not found. Cannot finish login panel setup.');
-        return;
-      }
-      
       const loginPanelId = WorldStorage.GetItem('LOGIN-PANEL-ID');
       if (!loginPanelId) {
         Logging.LogError('Login panel ID not found in storage');
@@ -139,7 +128,6 @@ export class Identity {
         loginPanel.LoadFromURL('https://id.worldhub.me:35526/login');
       }
       
-      Context.DefineContext('LOGIN_CONTEXT', loginContext);
       Logging.Log('✓ Login panel setup completed');
       
     } catch (error: any) {
@@ -201,12 +189,15 @@ export class Identity {
       // Now that login is complete, trigger entity template loading and show main UI
       Logging.Log('🔄 Showing main UI after login...');
       (globalThis as any).enableEditToolbar();
-      Logging.Log('🔄 Triggering entity templates request after successful login...');
+      if (this.loginCallbackFunction) {
+          this.loginCallbackFunction();
+      }
+      /*Logging.Log('🔄 Triggering entity templates request after successful login...');
       if (typeof (globalThis as any).triggerEntityTemplatesAfterLogin === 'function') {
         (globalThis as any).triggerEntityTemplatesAfterLogin();
       } else {
         Logging.LogError('triggerEntityTemplatesAfterLogin function not available');
-      }
+      }*/
       
     } catch (error: any) {
       Logging.LogError('❌ Error in handleUserLoginMessage: ' + (error.message || error));
@@ -216,8 +207,10 @@ export class Identity {
   /**
    * Start the user login process by creating a login canvas
    */
-  public static startUserLogin(): void {
+  public startUserLogin(onLoggedIn: () => void): void {
       Logging.Log("Starting User Login...");
+
+      this.loginCallbackFunction = onLoggedIn;
 
       const loginContext: LoginContext = {};
       const loginCanvasId = UUID.NewUUID().ToString();
@@ -240,15 +233,13 @@ export class Identity {
           "LoginCanvas",
           "finishLoginCanvasSetup" // callback when creation is complete
       );
-
-      Context.DefineContext(this.LOGIN_CONTEXT_KEY, loginContext);
   }
 
   /**
    * Get the current user's authentication data
    * @returns The user's authentication data or null if not logged in
    */
-  public static getCurrentUser(): MyWorldsTopLevelContext | null {
+  public getCurrentUser(): MyWorldsTopLevelContext | null {
       return Context.GetContext(this.MW_TOP_LEVEL_CONTEXT_KEY) as MyWorldsTopLevelContext || null;
   }
 
@@ -256,7 +247,7 @@ export class Identity {
    * Check if the user is currently logged in
    * @returns True if the user is logged in, false otherwise
    */
-  public static isLoggedIn(): boolean {
+  public isLoggedIn(): boolean {
       const user = this.getCurrentUser();
       return !!(user && user.userID && user.token);
   }
@@ -265,7 +256,7 @@ export class Identity {
    * Get the user's ID
    * @returns The user's ID or null if not logged in
    */
-  public static getUserId(): string | null {
+  public getUserId(): string | null {
       const user = this.getCurrentUser();
       return user?.userID || null;
   }
@@ -274,7 +265,7 @@ export class Identity {
    * Get the user's authentication token
    * @returns The user's token or null if not logged in
    */
-  public static getUserToken(): string | null {
+  public getUserToken(): string | null {
       const user = this.getCurrentUser();
       return user?.token || null;
   }
@@ -282,7 +273,7 @@ export class Identity {
   /**
    * Log out the current user
    */
-  public static logout(): void {
+  public logout(): void {
       // Clear the context
       Context.DefineContext(this.MW_TOP_LEVEL_CONTEXT_KEY, {});
       
@@ -298,8 +289,8 @@ export class Identity {
   /**
    * Public method to start login (maintains compatibility)
    */
-  public static StartLogin(onSuccess?: () => void): void {
-      this.startUserLogin();
+  public StartLogin(onSuccess?: () => void): void {
+      this.startUserLogin(onSuccess || (() => {}));
       // Note: onSuccess callback will be handled through the WebVerse message system
       if (onSuccess) {
           Logging.Log("Login success callback provided but will be handled through WebVerse messaging");
@@ -310,13 +301,13 @@ export class Identity {
    * Check if login is required and start it if needed
    * @returns True if login is required, false if already logged in
    */
-  public static ensureLogin(): boolean {
+  public ensureLogin(onSuccess?: () => void): boolean {
       if (this.isLoggedIn()) {
           return false; // Already logged in
       }
       
       Logging.Log("🔐 Identity: User authentication required - starting login process");
-      this.startUserLogin();
+      this.startUserLogin(onSuccess || (() => {}));
       return true; // Login was started
   }
 }

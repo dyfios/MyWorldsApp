@@ -40,8 +40,6 @@ export class MyWorld {
 
       // 2. Trigger login via Identity module (non-blocking)
       Logging.Log('🔐 Step 2: Starting user login process (async)...');
-      this.startUserLogin(); // Don't await - let it run in background
-      Logging.Log('✓ User login process initiated (will complete asynchronously)');
 
       // 3. Initialize all core modules into ClientContext
       Logging.Log('⚙️ Step 3: Initializing core modules...');
@@ -92,46 +90,6 @@ export class MyWorld {
       Logging.LogError('❌ Failed to launch MyWorld Client: ' + errorMessage);
       Logging.LogError('❌ Full error details: ' + errorDetails);
       throw error;
-    }
-  }
-
-  /**
-   * Start user login process (async, non-blocking)
-   */
-  private startUserLogin(): void {
-    try {
-      Logging.Log('🔐 Step 2a: Starting WebVerse HTML panel login...');
-      
-      // Import the WebVerse Identity module
-      import('./modules/Identity').then(({ Identity }) => {
-        Logging.Log('🔐 Step 2b: Identity module imported successfully');
-        
-        // Check if user is already logged in
-        if (Identity.isLoggedIn()) {
-          Logging.Log('🔐 Step 2c: User already logged in');
-          const user = Identity.getCurrentUser();
-          if (user) {
-            Logging.Log('👤 Current user: ' + user.userID);
-          }
-          // If already logged in, trigger entity template loading immediately
-          if (typeof (globalThis as any).triggerEntityTemplatesAfterLogin === 'function') {
-            (globalThis as any).triggerEntityTemplatesAfterLogin();
-          }
-          return;
-        }
-        
-        Logging.Log('🔐 Step 2c: Starting WebVerse login process...');
-        Identity.startUserLogin();
-        Logging.Log('🔐 Step 2d: WebVerse login process initiated (will complete via global callback)');
-        
-      }).catch((error) => {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        Logging.LogError('❌ Failed to import Identity module: ' + errorMessage);
-      });
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      Logging.LogError('❌ Error in startUserLogin: ' + errorMessage);
     }
   }
 
