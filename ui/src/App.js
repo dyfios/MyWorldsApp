@@ -87,7 +87,7 @@ function App() {
     }
   }, [buttons]);
 
-  // Expose APIs globally for demonstration
+  // Expose APIs globally
   React.useEffect(() => {
     window.buttonDockAPI = {
       addButton,

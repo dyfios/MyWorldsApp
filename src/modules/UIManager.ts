@@ -412,45 +412,86 @@ export class UIManager {
    * Initialize UI Settings for supported world types
    * Called from myworld.ts when world type is determined
    */
-  initializeUISettingsForWorldType(worldType: string): void {
+  initializeUISettingsForWorldType(worldType: string, retryCount: number = 0): void {
+    const maxRetries = 5;
+    
     try {
-      Logging.Log('🎛️ UIManager: Initializing UI Settings for world type: ' + worldType);
+      Logging.Log('🎛️ UIManager: Initializing UI Settings for world type: ' + worldType + ' (attempt ' + (retryCount + 1) + ')');
 
       const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
       if (!mainToolbarId) {
-        Logging.Log('⚠️ UIManager: MAIN-TOOLBAR-ID not found, UI may not be ready yet');
-        // Retry after a delay
-        setTimeout(() => {
-          this.initializeUISettingsForWorldType(worldType);
-        }, 1000);
+        if (retryCount < maxRetries) {
+          Logging.Log('⚠️ UIManager: MAIN-TOOLBAR-ID not found, retrying in 1000ms...');
+          setTimeout(() => {
+            this.initializeUISettingsForWorldType(worldType, retryCount + 1);
+          }, 1000);
+        } else {
+          Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found after ' + maxRetries + ' attempts');
+        }
         return;
       }
 
       const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
       if (!mainToolbar) {
-        Logging.Log('⚠️ UIManager: Main toolbar entity not found, UI may not be ready yet');
-        // Retry after a delay
-        setTimeout(() => {
-          this.initializeUISettingsForWorldType(worldType);
-        }, 1000);
+        if (retryCount < maxRetries) {
+          Logging.Log('⚠️ UIManager: Main toolbar entity not found, retrying in 1000ms...');
+          setTimeout(() => {
+            this.initializeUISettingsForWorldType(worldType, retryCount + 1);
+          }, 1000);
+        } else {
+          Logging.LogError('❌ UIManager: Main toolbar entity not found after ' + maxRetries + ' attempts');
+        }
         return;
       }
 
-      // Call the initialization function in the UI space
+      // Enhanced JavaScript command with better error handling and retry logic
       const jsCommand = `
-        if (typeof window.initializeUISettings === 'function') {
-          window.initializeUISettings('${worldType}');
-        } else {
-          console.warn('initializeUISettings function not available in UI space');
-        }
+        (function() {
+          console.log('UIManager: Attempting to initialize UI Settings for ${worldType}');
+          
+          function tryInitialize(attempt = 1) {
+            const maxAttempts = 10;
+            
+            if (typeof window.initializeUISettings === 'function') {
+              console.log('UIManager: initializeUISettings function found, calling...');
+              try {
+                const result = window.initializeUISettings('${worldType}');
+                console.log('UIManager: initializeUISettings returned:', result);
+                return true;
+              } catch (error) {
+                console.error('UIManager: Error calling initializeUISettings:', error);
+                return false;
+              }
+            } else {
+              console.warn('UIManager: initializeUISettings function not available (attempt ' + attempt + '/' + maxAttempts + ')');
+              
+              if (attempt < maxAttempts) {
+                setTimeout(() => tryInitialize(attempt + 1), 200);
+              } else {
+                console.error('UIManager: initializeUISettings function not available after ' + maxAttempts + ' attempts');
+              }
+              return false;
+            }
+          }
+          
+          tryInitialize();
+        })();
       `;
       
       mainToolbar.ExecuteJavaScript(jsCommand, '');
-      Logging.Log('✅ UIManager: Sent UI Settings initialization command to UI space');
+      Logging.Log('✅ UIManager: Sent enhanced UI Settings initialization command to UI space');
 
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       Logging.LogError('❌ UIManager: Error initializing UI Settings: ' + errorMessage);
+      
+      // Retry on error if we haven't exceeded max retries
+      if (retryCount < maxRetries) {
+        Logging.Log('🔄 UIManager: Retrying UI Settings initialization due to error...');
+        setTimeout(() => {
+          this.initializeUISettingsForWorldType(worldType, retryCount + 1);
+        }, 2000);
+      }
     }
   }
 
@@ -483,7 +524,7 @@ export class UIManager {
    */
   static initializeUISettingsForWorldType(worldType: string): void {
     if (UIManager.instance) {
-      UIManager.instance.initializeUISettingsForWorldType(worldType);
+      UIManager.instance.initializeUISettingsForWorldType(worldType, 0);
     } else {
       Logging.Log('⚠️ UIManager: Cannot initialize UI Settings - UIManager not initialized');
     }
