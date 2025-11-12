@@ -1290,14 +1290,19 @@ export class TiledSurfaceRenderer extends WorldRendering {
         Logging.LogError("MW_Rend_OnRegionInfoReceived: Unable to get synchronizer tag.");
         return;
       }
-      /*VOSSynchronization.JoinSession(configModule.worldConfig["vos-synchronization-service"]["host"],
-        configModule.worldConfig["vos-synchronization-service"]["port"],
-        configModule.worldConfig["vos-synchronization-service"].tls,
-        region["synchronizer_id"], region["synchronizer_tag"], worldRenderingModule.worldOffset, null,
-        configModule.worldConfig["vos-synchronization-service"].transport == "tcp" ?
-          VSSTransport.TCP : VSSTransport.WebSocket, identityModule.userID, identityModule.token);
-      worldRenderingModule.regionSynchronizers[region["region_x"] + "." + region["region_y"]]
-        = region["synchronizer_id"];*/
+
+      // Get authenticated user credentials
+        const userId = this.getUserId();
+        const userToken = this.getUserToken();
+
+      VOSSynchronization.JoinSession(this.worldConfig["vos-synchronization-service"]["host"],
+        this.worldConfig["vos-synchronization-service"]["port"],
+        this.worldConfig["vos-synchronization-service"].tls,
+        region["synchronizer_id"], region["synchronizer_tag"], Environment.GetWorldOffset(), undefined,
+        this.worldConfig["vos-synchronization-service"].transport == "tcp" ?
+          VSSTransport.TCP : VSSTransport.WebSocket, userId, userToken);
+      this.regionSynchronizers[region["region_x"] + "." + region["region_y"]]
+        = region["synchronizer_id"];
 
       Logging.Log('✓ TiledSurfaceRenderer: Region info request completed successfully');
 
