@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UI Settings</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        h1 {
+            margin: 0 0 30px 0;
+            font-size: 24px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .settings-section {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #3a3a3a;
+        }
+
+        .settings-section h2 {
+            margin: 0 0 20px 0;
+            font-size: 18px;
+            font-weight: 500;
+            color: #ffffff;
+            border-bottom: 1px solid #3a3a3a;
+            padding-bottom: 10px;
+        }
+
+        .setting-item {
+            margin-bottom: 20px;
+        }
+
+        .setting-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .setting-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #cccccc;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #cccccc;
+        }
+
+        .radio-option input[type="radio"] {
+            accent-color: #4CAF50;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #3a3a3a;
+            outline: none;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .slider:hover {
+            opacity: 1;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .slider-value {
+            min-width: 50px;
+            text-align: center;
+            font-size: 14px;
+            color: #ffffff;
+            background: #3a3a3a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 25px;
+            background-color: #3a3a3a;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .toggle-switch.active {
+            background-color: #4CAF50;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 21px;
+            height: 21px;
+            background-color: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(25px);
+        }
+
+        .empty-section {
+            text-align: center;
+            padding: 40px 20px;
+            color: #666666;
+            font-style: italic;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #666666;
+            font-size: 12px;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
+            }
+            
+            .slider-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .radio-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>UI Settings</h1>
+
+    <!-- Desktop/Touch Section -->
+    <div class="settings-section">
+        <h2>Desktop / Touch</h2>
+        
+        <!-- Camera Mode -->
+        <div class="setting-item">
+            <label class="setting-label">Camera Mode</label>
+            <div class="radio-group">
+                <label class="radio-option">
+                    <input type="radio" name="cameraMode" value="firstPerson" checked>
+                    <span>First Person</span>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="cameraMode" value="thirdPerson">
+                    <span>Third Person</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Movement Speed -->
+        <div class="setting-item">
+            <label class="setting-label">Movement Speed</label>
+            <div class="slider-container">
+                <input type="range" class="slider" id="movementSpeed" min="0.1" max="10.0" step="0.1" value="1.0">
+                <div class="slider-value" id="movementSpeedValue">1.0x</div>
+            </div>
+        </div>
+
+        <!-- Look Speed -->
+        <div class="setting-item">
+            <label class="setting-label">Look Speed</label>
+            <div class="slider-container">
+                <input type="range" class="slider" id="lookSpeed" min="0.1" max="3.0" step="0.1" value="1.0">
+                <div class="slider-value" id="lookSpeedValue">1.0x</div>
+            </div>
+        </div>
+
+        <!-- Flying Toggle -->
+        <div class="setting-item">
+            <div class="toggle-container">
+                <label class="setting-label" style="margin-bottom: 0;">Enable Flying</label>
+                <div class="toggle-switch" id="flyingToggle">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VR Section -->
+    <div class="settings-section">
+        <h2>VR</h2>
+        <div class="empty-section">
+            None yet.
+        </div>
+    </div>
+
+    <script>
+        // Settings state
+        const settings = {
+            cameraMode: 'firstPerson',
+            movementSpeed: 1.0,
+            lookSpeed: 1.0,
+            flying: false
+        };
+
+        // Load settings from localStorage
+        function loadSettings() {
+            const saved = localStorage.getItem('myworlds-ui-settings');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    Object.assign(settings, parsed);
+                } catch (error) {
+                    console.error('Failed to load settings:', error);
+                }
+            }
+        }
+
+        // Save settings to localStorage
+        function saveSettings() {
+            try {
+                localStorage.setItem('myworlds-ui-settings', JSON.stringify(settings));
+                // Send settings to parent window
+                if (window.parent !== window) {
+                    window.parent.postMessage({
+                        source: 'myworlds-iframe-tab',
+                        tabId: getTabId(),
+                        type: 'settings-changed',
+                        data: { ...settings }
+                    }, '*');
+                }
+            } catch (error) {
+                console.error('Failed to save settings:', error);
+            }
+        }
+
+        // Get tab ID from iframe data attribute (if available)
+        function getTabId() {
+            try {
+                const iframe = window.frameElement;
+                return iframe ? iframe.getAttribute('data-tab-id') : 'ui-settings';
+            } catch {
+                return 'ui-settings';
+            }
+        }
+
+        // Update camera mode
+        function updateCameraMode(mode) {
+            settings.cameraMode = mode;
+            saveSettings();
+            console.log('Camera mode changed to:', mode);
+        }
+
+        // Update movement speed
+        function updateMovementSpeed(speed) {
+            settings.movementSpeed = parseFloat(speed);
+            document.getElementById('movementSpeedValue').textContent = speed + 'x';
+            saveSettings();
+            console.log('Movement speed changed to:', speed);
+        }
+
+        // Update look speed
+        function updateLookSpeed(speed) {
+            settings.lookSpeed = parseFloat(speed);
+            document.getElementById('lookSpeedValue').textContent = speed + 'x';
+            saveSettings();
+            console.log('Look speed changed to:', speed);
+        }
+
+        // Toggle flying
+        function toggleFlying() {
+            settings.flying = !settings.flying;
+            const toggle = document.getElementById('flyingToggle');
+            if (settings.flying) {
+                toggle.classList.add('active');
+            } else {
+                toggle.classList.remove('active');
+            }
+            saveSettings();
+            console.log('Flying toggled to:', settings.flying);
+        }
+
+        // Apply loaded settings to UI
+        function applySettingsToUI() {
+            // Camera mode
+            const cameraModeInputs = document.querySelectorAll('input[name="cameraMode"]');
+            cameraModeInputs.forEach(input => {
+                input.checked = input.value === settings.cameraMode;
+            });
+
+            // Movement speed
+            const movementSpeedSlider = document.getElementById('movementSpeed');
+            movementSpeedSlider.value = settings.movementSpeed;
+            updateMovementSpeed(settings.movementSpeed);
+
+            // Look speed
+            const lookSpeedSlider = document.getElementById('lookSpeed');
+            lookSpeedSlider.value = settings.lookSpeed;
+            updateLookSpeed(settings.lookSpeed);
+
+            // Flying
+            const flyingToggle = document.getElementById('flyingToggle');
+            if (settings.flying) {
+                flyingToggle.classList.add('active');
+            } else {
+                flyingToggle.classList.remove('active');
+            }
+        }
+
+        // Initialize event listeners
+        function initializeEventListeners() {
+            // Camera mode radio buttons
+            const cameraModeInputs = document.querySelectorAll('input[name="cameraMode"]');
+            cameraModeInputs.forEach(input => {
+                input.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        updateCameraMode(e.target.value);
+                    }
+                });
+            });
+
+            // Movement speed slider
+            const movementSpeedSlider = document.getElementById('movementSpeed');
+            movementSpeedSlider.addEventListener('input', (e) => {
+                updateMovementSpeed(e.target.value);
+            });
+
+            // Look speed slider
+            const lookSpeedSlider = document.getElementById('lookSpeed');
+            lookSpeedSlider.addEventListener('input', (e) => {
+                updateLookSpeed(e.target.value);
+            });
+
+            // Flying toggle
+            const flyingToggle = document.getElementById('flyingToggle');
+            flyingToggle.addEventListener('click', toggleFlying);
+        }
+
+        // Handle messages from parent window
+        function handleParentMessage(event) {
+            if (event.data && event.data.source === 'myworlds-popup-menu') {
+                const { type, data } = event.data;
+                
+                switch (type) {
+                    case 'get-settings':
+                        // Send current settings back to parent
+                        if (window.parent !== window) {
+                            window.parent.postMessage({
+                                source: 'myworlds-iframe-tab',
+                                tabId: getTabId(),
+                                type: 'settings-response',
+                                data: { ...settings }
+                            }, '*');
+                        }
+                        break;
+                    
+                    case 'update-settings':
+                        // Update settings from parent
+                        if (data) {
+                            Object.assign(settings, data);
+                            applySettingsToUI();
+                            saveSettings();
+                        }
+                        break;
+                }
+            }
+        }
+
+        // Initialize the page
+        function initialize() {
+            loadSettings();
+            applySettingsToUI();
+            initializeEventListeners();
+            
+            // Listen for messages from parent
+            window.addEventListener('message', handleParentMessage);
+            
+            // Notify parent that we're ready
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    source: 'myworlds-iframe-tab',
+                    tabId: getTabId(),
+                    type: 'iframe-ready',
+                    data: { settings: { ...settings } }
+                }, '*');
+            }
+
+            console.log('UI Settings page initialized with settings:', settings);
+        }
+
+        // Start when DOM is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initialize);
+        } else {
+            initialize();
+        }
+
+        // Expose settings API for debugging
+        window.uiSettings = {
+            getSettings: () => ({ ...settings }),
+            updateSettings: (newSettings) => {
+                Object.assign(settings, newSettings);
+                applySettingsToUI();
+                saveSettings();
+            },
+            resetSettings: () => {
+                settings.cameraMode = 'firstPerson';
+                settings.movementSpeed = 1.0;
+                settings.lookSpeed = 1.0;
+                settings.flying = false;
+                applySettingsToUI();
+                saveSettings();
+            }
+        };
+    </script>
+</body>
+</html>

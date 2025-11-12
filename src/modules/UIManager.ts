@@ -20,10 +20,14 @@ export class DockButtonInfo {
 }
 
 export class UIManager {
+  private static instance: UIManager | null = null;
+  
   private editToolbar?: HTMLElement;
   private isInitialized: boolean = false;
 
   constructor() {
+    // Set the singleton instance
+    UIManager.instance = this;
     this.setupGlobalCallbacks();
   }
 
@@ -153,10 +157,94 @@ export class UIManager {
         case 'POPUP_MENU.CLOSED()':
           (globalThis as any).unpauseForUI();
           break;
+        default:
+          // Handle UI Settings messages
+          if (msg.startsWith('UI_SETTINGS.')) {
+            this.handleUISettingsMessage(msg);
+            return;
+          }
       }
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       Logging.LogError('❌ UIManager: Error handling toolbar message: ' + errorMessage);
+    }
+  }
+
+  /**
+   * Handle UI Settings related messages from the UI space
+   */
+  private handleUISettingsMessage(msg: string): void {
+    try {
+      Logging.Log('🎛️ UIManager: Processing UI Settings message: ' + msg);
+
+      if (msg.startsWith('UI_SETTINGS.APPLY(') && msg.endsWith(')')) {
+        // Extract JSON data from message
+        const jsonStart = msg.indexOf('(') + 1;
+        const jsonEnd = msg.lastIndexOf(')');
+        const jsonData = msg.substring(jsonStart, jsonEnd);
+        
+        try {
+          const settings = JSON.parse(jsonData);
+          this.applyUISettings(settings);
+        } catch (parseError) {
+          Logging.LogError('❌ UIManager: Failed to parse UI Settings JSON: ' + parseError);
+        }
+      } else {
+        Logging.LogWarning('🎛️ UIManager: Unknown UI Settings message format: ' + msg);
+      }
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      Logging.LogError('❌ UIManager: Error handling UI Settings message: ' + errorMessage);
+    }
+  }
+
+  /**
+   * Apply UI settings to the world/player systems
+   */
+  private applyUISettings(settings: any): void {
+    try {
+      Logging.Log('🎛️ UIManager: Applying UI Settings to world systems: ' + JSON.stringify(settings));
+
+      // Apply camera mode
+      if (settings.cameraMode && (globalThis as any).playerController) {
+        const playerController = (globalThis as any).playerController;
+        if (typeof playerController.setCameraMode === 'function') {
+          playerController.setCameraMode(settings.cameraMode);
+          Logging.Log('📷 UIManager: Applied camera mode: ' + settings.cameraMode);
+        }
+      }
+
+      // Apply movement speed
+      if (settings.movementSpeed && (globalThis as any).playerController) {
+        const playerController = (globalThis as any).playerController;
+        if (typeof playerController.setMovementSpeed === 'function') {
+          playerController.setMovementSpeed(settings.movementSpeed);
+          Logging.Log('🏃 UIManager: Applied movement speed: ' + settings.movementSpeed);
+        }
+      }
+
+      // Apply look speed
+      if (settings.lookSpeed && (globalThis as any).playerController) {
+        const playerController = (globalThis as any).playerController;
+        if (typeof playerController.setLookSpeed === 'function') {
+          playerController.setLookSpeed(settings.lookSpeed);
+          Logging.Log('👀 UIManager: Applied look speed: ' + settings.lookSpeed);
+        }
+      }
+
+      // Apply flying mode
+      if (settings.hasOwnProperty('flying') && (globalThis as any).playerController) {
+        const playerController = (globalThis as any).playerController;
+        if (typeof playerController.setFlyingMode === 'function') {
+          playerController.setFlyingMode(settings.flying);
+          Logging.Log('✈️ UIManager: Applied flying mode: ' + settings.flying);
+        }
+      }
+
+      Logging.Log('✅ UIManager: UI Settings applied successfully');
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      Logging.LogError('❌ UIManager: Error applying UI Settings: ' + errorMessage);
     }
   }
 
@@ -321,11 +409,49 @@ export class UIManager {
   }*/
 
   /**
-   * Trigger UI updates from sync
+   * Initialize UI Settings for supported world types
+   * Called from myworld.ts when world type is determined
    */
-  triggerUIUpdates(data: UIUpdateData): void {
-    Logging.Log('UI updates triggered: ' + JSON.stringify(data));
-    // Update UI elements based on sync data
+  initializeUISettingsForWorldType(worldType: string): void {
+    try {
+      Logging.Log('🎛️ UIManager: Initializing UI Settings for world type: ' + worldType);
+
+      const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+      if (!mainToolbarId) {
+        Logging.Log('⚠️ UIManager: MAIN-TOOLBAR-ID not found, UI may not be ready yet');
+        // Retry after a delay
+        setTimeout(() => {
+          this.initializeUISettingsForWorldType(worldType);
+        }, 1000);
+        return;
+      }
+
+      const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+      if (!mainToolbar) {
+        Logging.Log('⚠️ UIManager: Main toolbar entity not found, UI may not be ready yet');
+        // Retry after a delay
+        setTimeout(() => {
+          this.initializeUISettingsForWorldType(worldType);
+        }, 1000);
+        return;
+      }
+
+      // Call the initialization function in the UI space
+      const jsCommand = `
+        if (typeof window.initializeUISettings === 'function') {
+          window.initializeUISettings('${worldType}');
+        } else {
+          console.warn('initializeUISettings function not available in UI space');
+        }
+      `;
+      
+      mainToolbar.ExecuteJavaScript(jsCommand, '');
+      Logging.Log('✅ UIManager: Sent UI Settings initialization command to UI space');
+
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      Logging.LogError('❌ UIManager: Error initializing UI Settings: ' + errorMessage);
+    }
   }
 
   /**
@@ -346,5 +472,20 @@ export class UIManager {
       this.editToolbar = undefined;
     }
     this.isInitialized = false;
+  }
+
+  /**
+   * Static methods for external access
+   */
+  
+  /**
+   * Public method to initialize UI Settings for a specific world type
+   */
+  static initializeUISettingsForWorldType(worldType: string): void {
+    if (UIManager.instance) {
+      UIManager.instance.initializeUISettingsForWorldType(worldType);
+    } else {
+      Logging.Log('⚠️ UIManager: Cannot initialize UI Settings - UIManager not initialized');
+    }
   }
 }

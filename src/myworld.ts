@@ -6,6 +6,7 @@
 import { ClientContext } from './modules/ClientContext';
 import { ProcessQueryParams } from './utils/ProcessQueryParams';
 import { StaticSurfaceRenderer, TiledSurfaceRenderer } from './modules/WorldRendererFactory';
+import { UIManager } from './modules/UIManager';
 
 export class MyWorld {
   private context: ClientContext;
@@ -104,10 +105,14 @@ export class MyWorld {
       case 'mini-world':
         Logging.Log('🏠 World Type: mini-world - Initializing for small-scale world rendering');
         await this.setupStaticSurfaceRenderer();
+        // Initialize UI Settings for mini-world
+        this.initializeUISettingsForWorldType('mini-world');
         break;
       case 'planet':
         Logging.Log('🌍 World Type: planet - Initializing for planetary-scale world rendering');
         await this.setupPlanetRenderer();
+        // Initialize UI Settings for planet
+        this.initializeUISettingsForWorldType('planet');
         break;
       case 'galaxy':
         Logging.Log('🌌 World Type: galaxy - Initializing for galactic-scale world rendering');
@@ -119,6 +124,40 @@ export class MyWorld {
         } else {
           throw new Error('🌐 World Type: not specified');
         }
+    }
+  }
+
+  /**
+   * Initialize UI Settings for supported world types
+   */
+  private initializeUISettingsForWorldType(worldType: string): void {
+    try {
+      Logging.Log('🎛️ Initializing UI Settings for world type: ' + worldType);
+      
+      // Call the UIManager static method to initialize UI Settings in the ui/ space
+      Logging.Log('🎛️ Calling UIManager.initializeUISettingsForWorldType...');
+      UIManager.initializeUISettingsForWorldType(worldType);
+      
+      // Also call the global UI Settings initialization function if available (fallback)
+      if (typeof (globalThis as any).initializeUISettings === 'function') {
+        const success = (globalThis as any).initializeUISettings(worldType);
+        if (success) {
+          Logging.Log('✅ UI Settings initialized successfully for world type: ' + worldType);
+        } else {
+          Logging.Log('ℹ️ UI Settings not initialized (world type not supported): ' + worldType);
+        }
+      } else {
+        Logging.Log('⚠️ UI Settings initialization function not available yet');
+        // Retry after a short delay in case the UI hasn't loaded yet
+        setTimeout(() => {
+          if (typeof (globalThis as any).initializeUISettings === 'function') {
+            (globalThis as any).initializeUISettings(worldType);
+          }
+        }, 1000);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ Error initializing UI Settings: ' + errorMessage);
     }
   }
 
