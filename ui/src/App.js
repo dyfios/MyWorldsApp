@@ -93,6 +93,8 @@ function App() {
 
   // Expose APIs globally
   React.useEffect(() => {
+    console.log('🚀 React App: Setting up global APIs...');
+    
     window.buttonDockAPI = {
       addButton,
       removeButton,
@@ -118,6 +120,30 @@ function App() {
 
     // Expose the initializeUISettings function globally for WebVerse
     window.initializeUISettings = uiSettings.initializeUISettings;
+
+    // Log successful setup for debugging
+    console.log('✅ React App: Global APIs set up successfully!');
+    console.log('📊 Available APIs:', {
+      buttonDockAPI: typeof window.buttonDockAPI,
+      UISettingsAPI: typeof window.UISettingsAPI,
+      initializeUISettings: typeof window.initializeUISettings
+    });
+
+    // Mark the app as fully loaded for external systems
+    window.myWorldsUIReady = true;
+    console.log('🎉 React App: MyWorlds UI is ready for external communication');
+
+    // Check for any pending UI Settings initialization requests
+    if (window.pendingUISettingsInit) {
+      console.log('🔄 Processing pending UI Settings initialization:', window.pendingUISettingsInit);
+      try {
+        const result = window.initializeUISettings(window.pendingUISettingsInit);
+        console.log('✅ Processed pending UI Settings initialization, result:', result);
+        delete window.pendingUISettingsInit;
+      } catch (error) {
+        console.error('❌ Error processing pending UI Settings initialization:', error);
+      }
+    }
 
   }, [addButton, removeButton, reorderButtons, selectButton, selectPrevious, selectNext, selectByNumber, buttons, selectedButtonId, uiSettings]);
 
