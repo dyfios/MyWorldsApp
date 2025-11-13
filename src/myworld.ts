@@ -106,13 +106,13 @@ export class MyWorld {
         Logging.Log('🏠 World Type: mini-world - Initializing for small-scale world rendering');
         await this.setupStaticSurfaceRenderer();
         // Initialize UI Settings for mini-world
-        this.initializeUISettingsForWorldType('mini-world');
+        Time.SetTimeout("this.initializeUISettingsForWorldType('mini-world')", 3000);
         break;
       case 'planet':
         Logging.Log('🌍 World Type: planet - Initializing for planetary-scale world rendering');
         await this.setupPlanetRenderer();
         // Initialize UI Settings for planet
-        this.initializeUISettingsForWorldType('planet');
+        Time.SetTimeout("this.initializeUISettingsForWorldType('planet')", 3000);
         break;
       case 'galaxy':
         Logging.Log('🌌 World Type: galaxy - Initializing for galactic-scale world rendering');
