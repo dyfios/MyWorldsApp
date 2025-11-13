@@ -4,12 +4,16 @@ import './App.css';
 import ButtonDock from './components/ButtonDock';
 import ChatConsole from './components/ChatConsole';
 import PopupMenu from './components/PopupMenu';
+import { useUISettings } from './hooks/useUISettings';
 
 function App() {
   const [buttons, setButtons] = useState([]);
 
   const [selectedButtonId, setSelectedButtonId] = useState(null);
   const [isChatActive, setIsChatActive] = useState(false);
+
+  // UI Settings hook
+  const uiSettings = useUISettings();
 
   // API: Add a button
   const addButton = useCallback((name, thumbnail, onClick = null) => {
@@ -100,7 +104,22 @@ function App() {
       getButtons: () => buttons,
       getSelectedButton: () => selectedButtonId
     };
-  }, [addButton, removeButton, reorderButtons, selectButton, selectPrevious, selectNext, selectByNumber, buttons, selectedButtonId]);
+
+    // Expose UI Settings API globally
+    window.UISettingsAPI = {
+      isWorldTypeSupported: uiSettings.isWorldTypeSupported,
+      addTab: uiSettings.addUISettingsTab,
+      getSettings: uiSettings.getSettings,
+      updateSettings: uiSettings.updateSettings,
+      requestSettings: uiSettings.requestSettings,
+      onSettingsChange: uiSettings.onSettingsChange,
+      resetSettings: uiSettings.resetSettings
+    };
+
+    // Expose the initializeUISettings function globally for WebVerse
+    window.initializeUISettings = uiSettings.initializeUISettings;
+
+  }, [addButton, removeButton, reorderButtons, selectButton, selectPrevious, selectNext, selectByNumber, buttons, selectedButtonId, uiSettings]);
 
   // Chat event handlers
   const handleChatInputOpen = useCallback(() => {
@@ -173,7 +192,12 @@ function App() {
         window.chatConsoleAPI.addMessage('Press \\ to toggle chat, | to open history', 'System');
       }
     }, 1000);
-  }, []);
+
+    // Initialize UI Settings when the app loads
+    setTimeout(() => {
+      uiSettings.initialize();
+    }, 500);
+  }, [uiSettings]);
 
   return (
     <div className="App">
