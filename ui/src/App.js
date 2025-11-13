@@ -5,6 +5,187 @@ import ButtonDock from './components/ButtonDock';
 import ChatConsole from './components/ChatConsole';
 import PopupMenu from './components/PopupMenu';
 
+// UI Settings initialization - ensure it's always available
+const initializeUISettingsIntegration = () => {
+  // Configuration
+  const UI_SETTINGS_CONFIG = {
+    tabName: 'UI Settings',
+    tabUrl: './ui-settings.html',
+    position: 0,
+    autoLoad: true,
+    supportedWorldTypes: ['mini-world', 'planet']
+  };
+
+  // Settings state management
+  let currentSettings = {
+    cameraMode: 'firstPerson',
+    movementSpeed: 1.0,
+    lookSpeed: 1.0,
+    flying: false
+  };
+
+  let settingsChangeCallbacks = [];
+
+  // Check if current world type supports UI settings
+  const isWorldTypeSupported = () => {
+    try {
+      if (window.tempWorldType) {
+        return UI_SETTINGS_CONFIG.supportedWorldTypes.includes(window.tempWorldType);
+      }
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      const worldType = urlParams.get('worldType');
+      
+      let worldTypeFromAPI = null;
+      if (typeof World !== 'undefined' && World.GetQueryParam) {
+        worldTypeFromAPI = World.GetQueryParam('worldType');
+      }
+      
+      const currentWorldType = worldTypeFromAPI || worldType;
+      
+      if (!currentWorldType) {
+        return false;
+      }
+      
+      return UI_SETTINGS_CONFIG.supportedWorldTypes.includes(currentWorldType);
+    } catch (error) {
+      console.error('Error checking world type:', error);
+      return false;
+    }
+  };
+
+  // Add the UI Settings tab
+  const addUISettingsTab = () => {
+    if (window.popupMenuAPI) {
+      const tabId = window.popupMenuAPI.addTab(
+        UI_SETTINGS_CONFIG.tabName,
+        UI_SETTINGS_CONFIG.tabUrl,
+        UI_SETTINGS_CONFIG.position
+      );
+      console.log('UI Settings tab added with ID:', tabId);
+      return tabId;
+    } else {
+      console.warn('PopupMenu API not available yet, retrying...');
+      setTimeout(addUISettingsTab, 100);
+    }
+  };
+
+  // Handle messages from the UI Settings iframe
+  const handleUISettingsMessage = ({ tabId, tabName, type, data }) => {
+    if (tabName !== UI_SETTINGS_CONFIG.tabName) return;
+
+    switch (type) {
+      case 'iframe-ready':
+        console.log('UI Settings iframe is ready');
+        if (data && data.settings) {
+          currentSettings = { ...data.settings };
+        }
+        break;
+
+      case 'settings-changed':
+        console.log('UI Settings changed:', data);
+        currentSettings = { ...data };
+        
+        // Apply settings to the world
+        if (typeof postWorldMessage === 'function') {
+          postWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(currentSettings)})`);
+        }
+        break;
+
+      default:
+        console.log('Unknown message type from UI Settings:', type, data);
+    }
+  };
+
+  // Initialize function
+  const initialize = () => {
+    if (!isWorldTypeSupported()) {
+      console.log('UI Settings not initialized - world type not supported');
+      return;
+    }
+    
+    if (window.popupMenuAPI) {
+      window.popupMenuAPI.onTabMessage(handleUISettingsMessage);
+      
+      if (UI_SETTINGS_CONFIG.autoLoad) {
+        addUISettingsTab();
+      }
+      
+      console.log('UI Settings integration initialized');
+      window.UISettingsAPI._initialized = true;
+    } else {
+      setTimeout(initialize, 100);
+    }
+  };
+
+  // Create UISettingsAPI
+  window.UISettingsAPI = {
+    isWorldTypeSupported: () => isWorldTypeSupported(),
+    _initialized: false,
+    
+    initializeForWorldType: (worldType) => {
+      console.log('UISettingsAPI.initializeForWorldType called with:', worldType);
+      
+      if (!worldType || !UI_SETTINGS_CONFIG.supportedWorldTypes.includes(worldType)) {
+        console.log('UI Settings not initialized - world type not supported:', worldType);
+        return false;
+      }
+      
+      window.tempWorldType = worldType;
+      
+      try {
+        if (!window.UISettingsAPI._initialized) {
+          initialize();
+          window.UISettingsAPI._initialized = true;
+        } else {
+          if (window.popupMenuAPI && UI_SETTINGS_CONFIG.autoLoad) {
+            addUISettingsTab();
+          }
+        }
+        
+        console.log('UI Settings initialized successfully for world type:', worldType);
+        return true;
+      } catch (error) {
+        console.error('Error initializing UI Settings:', error);
+        return false;
+      } finally {
+        delete window.tempWorldType;
+      }
+    },
+
+    getSettings: () => ({ ...currentSettings }),
+    
+    updateSettings: (newSettings) => {
+      currentSettings = { ...currentSettings, ...newSettings };
+      if (typeof postWorldMessage === 'function') {
+        postWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(currentSettings)})`);
+      }
+    }
+  };
+
+  // Global function that can be called from main application
+  window.initializeUISettings = function(worldType) {
+    console.log('initializeUISettings called with worldType:', worldType);
+    
+    if (!window.UISettingsAPI) {
+      console.log('UISettings API not yet loaded, retrying in 100ms...');
+      setTimeout(() => window.initializeUISettings(worldType), 100);
+      return false;
+    }
+    
+    try {
+      const result = window.UISettingsAPI.initializeForWorldType(worldType);
+      console.log('UI Settings initialization result:', result);
+      return result;
+    } catch (error) {
+      console.error('Error calling UISettingsAPI.initializeForWorldType:', error);
+      return false;
+    }
+  };
+
+  console.log('UI Settings integration loaded in App.js. initializeUISettings function available:', typeof window.initializeUISettings);
+};
+
 function App() {
   const [buttons, setButtons] = useState([]);
 
@@ -164,6 +345,12 @@ function App() {
       window.popupMenuAPI.closeMenu();
     }
     console.log('Chat history closed');
+  }, []);
+
+  // Initialize UI Settings integration when component mounts
+  React.useEffect(() => {
+    console.log('App component mounted, initializing UI Settings integration...');
+    initializeUISettingsIntegration();
   }, []);
 
   // Add a welcome message when the app loads

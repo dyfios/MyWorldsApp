@@ -450,7 +450,7 @@ export class UIManager {
           console.log('UIManager: Attempting to initialize UI Settings for ${worldType}');
           
           function tryInitialize(attempt = 1) {
-            const maxAttempts = 10;
+            const maxAttempts = 3; // Reduced from 10 since function is now in main bundle
             
             if (typeof window.initializeUISettings === 'function') {
               console.log('UIManager: initializeUISettings function found, calling...');
@@ -466,9 +466,10 @@ export class UIManager {
               console.warn('UIManager: initializeUISettings function not available (attempt ' + attempt + '/' + maxAttempts + ')');
               
               if (attempt < maxAttempts) {
-                setTimeout(() => tryInitialize(attempt + 1), 200);
+                setTimeout(() => tryInitialize(attempt + 1), 500); // Increased delay
               } else {
                 console.error('UIManager: initializeUISettings function not available after ' + maxAttempts + ' attempts');
+                console.error('UIManager: Available global functions:', Object.keys(window).filter(key => typeof window[key] === 'function'));
               }
               return false;
             }
