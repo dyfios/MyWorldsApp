@@ -8,35 +8,6 @@
  * - Main application calls this during world type initialization
  */
 
-// IMMEDIATELY define the global function to ensure availability
-window.initializeUISettings = function(worldType) {
-    console.log('initializeUISettings called with worldType:', worldType);
-    
-    // Check if the main script has loaded
-    if (!window.UISettingsAPI) {
-        console.log('UISettings main script not yet loaded, retrying in 100ms...');
-        setTimeout(() => window.initializeUISettings(worldType), 100);
-        return false;
-    }
-    
-    const supportedWorldTypes = ['mini-world', 'planet'];
-    
-    if (!worldType || !supportedWorldTypes.includes(worldType)) {
-        console.log('UI Settings not initialized - world type not supported:', worldType);
-        return false;
-    }
-    
-    // Call the main initialization function
-    try {
-        const result = window.UISettingsAPI.initializeForWorldType(worldType);
-        console.log('UI Settings initialization result:', result);
-        return result;
-    } catch (error) {
-        console.error('Error calling UISettingsAPI.initializeForWorldType:', error);
-        return false;
-    }
-};
-
 (function() {
     'use strict';
 
@@ -202,41 +173,6 @@ window.initializeUISettings = function(worldType) {
         // Check if world type is supported
         isWorldTypeSupported: () => isWorldTypeSupported(),
         
-        // Initialize for a specific world type (called by main app)
-        initializeForWorldType: (worldType) => {
-            console.log('UISettingsAPI.initializeForWorldType called with:', worldType);
-            
-            if (!worldType || !UI_SETTINGS_CONFIG.supportedWorldTypes.includes(worldType)) {
-                console.log('UI Settings not initialized - world type not supported:', worldType);
-                return false;
-            }
-            
-            // Override the URL parameter check with the provided world type
-            window.tempWorldType = worldType;
-            
-            try {
-                // Initialize if not already done
-                if (!window.UISettingsAPI._initialized) {
-                    initialize();
-                    window.UISettingsAPI._initialized = true;
-                } else {
-                    // If already initialized but tab wasn't added, add it now
-                    if (window.popupMenuAPI && UI_SETTINGS_CONFIG.autoLoad) {
-                        addUISettingsTab();
-                    }
-                }
-                
-                console.log('UI Settings initialized successfully for world type:', worldType);
-                return true;
-            } catch (error) {
-                console.error('Error initializing UI Settings:', error);
-                return false;
-            } finally {
-                // Clean up temp world type
-                delete window.tempWorldType;
-            }
-        },
-        
         // Manually add UI Settings tab (if supported)
         addTab: () => {
             if (!isWorldTypeSupported()) {
@@ -338,16 +274,46 @@ window.initializeUISettings = function(worldType) {
         }
     }
 
-    // Start initialization when DOM is ready (for auto-initialization)
+    // Global function that can be called from main application
+    window.initializeUISettings = function(worldType) {
+        console.log('initializeUISettings called with worldType:', worldType);
+        
+        if (!worldType || !UI_SETTINGS_CONFIG.supportedWorldTypes.includes(worldType)) {
+            console.log('UI Settings not initialized - world type not supported:', worldType);
+            return false;
+        }
+        
+        // Override the URL parameter check with the provided world type
+        const originalIsSupported = isWorldTypeSupported;
+        window.tempWorldType = worldType;
+        
+        // Temporarily override the function
+        isWorldTypeSupported = () => UI_SETTINGS_CONFIG.supportedWorldTypes.includes(worldType);
+        
+        // Initialize if not already done
+        if (!window.UISettingsAPI._initialized) {
+            initialize();
+            window.UISettingsAPI._initialized = true;
+        } else {
+            // If already initialized but tab wasn't added, add it now
+            if (window.popupMenuAPI && UI_SETTINGS_CONFIG.autoLoad) {
+                addUISettingsTab();
+            }
+        }
+        
+        // Restore original function
+        isWorldTypeSupported = originalIsSupported;
+        delete window.tempWorldType;
+        
+        return true;
+    };
+
+    // Start initialization when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initialize);
     } else {
-        // Don't auto-initialize, wait for explicit call
-        // initialize();
+        initialize();
     }
-
-    // Debug: Verify the function is available
-    console.log('UI Settings integration script loaded. initializeUISettings function available:', typeof window.initializeUISettings);
 
     // Example usage and testing (only show if world type is supported)
     if (isWorldTypeSupported()) {
