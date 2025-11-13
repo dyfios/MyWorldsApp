@@ -15,6 +15,8 @@ export class MyWorld {
 
   constructor() {
     try {
+      (globalThis as any).initializeUISettingsForWorldType = this.initializeUISettingsForWorldType.bind(this);
+
       Logging.Log('🚀 Step 0b1: Creating ClientContext...');
       this.context = new ClientContext();
       Logging.Log('🚀 Step 0b2: Creating ProcessQueryParams...');
@@ -106,13 +108,13 @@ export class MyWorld {
         Logging.Log('🏠 World Type: mini-world - Initializing for small-scale world rendering');
         await this.setupStaticSurfaceRenderer();
         // Initialize UI Settings for mini-world
-        Time.SetTimeout("this.initializeUISettingsForWorldType('mini-world')", 3000);
+        Time.SetTimeout("globalThis.initializeUISettingsForWorldType('mini-world')", 3000);
         break;
       case 'planet':
         Logging.Log('🌍 World Type: planet - Initializing for planetary-scale world rendering');
         await this.setupPlanetRenderer();
         // Initialize UI Settings for planet
-        Time.SetTimeout("this.initializeUISettingsForWorldType('planet')", 3000);
+        Time.SetTimeout("globalThis.initializeUISettingsForWorldType('planet')", 3000);
         break;
       case 'galaxy':
         Logging.Log('🌌 World Type: galaxy - Initializing for galactic-scale world rendering');
