@@ -420,9 +420,11 @@ export class UIManager {
       if (!mainToolbarId) {
         Logging.Log('⚠️ UIManager: MAIN-TOOLBAR-ID not found, UI may not be ready yet');
         // Retry after a delay
-        setTimeout(() => {
-          this.initializeUISettingsForWorldType(worldType);
-        }, 1000);
+        Time.SetTimeout(`
+          if (window.uiManager) {
+            window.uiManager.initializeUISettingsForWorldType('${worldType}');
+          }
+        `, 1000);
         return;
       }
 
@@ -430,9 +432,11 @@ export class UIManager {
       if (!mainToolbar) {
         Logging.Log('⚠️ UIManager: Main toolbar entity not found, UI may not be ready yet');
         // Retry after a delay
-        setTimeout(() => {
-          this.initializeUISettingsForWorldType(worldType);
-        }, 1000);
+        Time.SetTimeout(`
+          if (window.uiManager) {
+            window.uiManager.initializeUISettingsForWorldType('${worldType}');
+          }
+        `, 1000);
         return;
       }
 

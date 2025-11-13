@@ -149,11 +149,11 @@ export class MyWorld {
       } else {
         Logging.Log('⚠️ UI Settings initialization function not available yet');
         // Retry after a short delay in case the UI hasn't loaded yet
-        setTimeout(() => {
+        Time.SetTimeout(`
           if (typeof (globalThis as any).initializeUISettings === 'function') {
-            (globalThis as any).initializeUISettings(worldType);
+            (globalThis as any).initializeUISettings('${worldType}');
           }
-        }, 1000);
+        `, 1000);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
