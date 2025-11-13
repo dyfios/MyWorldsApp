@@ -129,42 +129,32 @@ export class MyWorld {
 
   /**
    * Initialize UI Settings for supported world types
-   * Delayed to allow React app to fully mount and expose global functions
    */
   private initializeUISettingsForWorldType(worldType: string): void {
     try {
-      Logging.Log('🎛️ Scheduling UI Settings initialization for world type: ' + worldType);
+      Logging.Log('🎛️ Initializing UI Settings for world type: ' + worldType);
       
-      // Delay initial call to allow React app to mount and expose global functions
-      // React typically needs 3-5 seconds to fully mount and set up global APIs
-      setTimeout(() => {
-        Logging.Log('🎛️ Starting delayed UI Settings initialization...');
-        
-        // Call the UIManager static method to initialize UI Settings in the ui/ space
-        Logging.Log('🎛️ Calling UIManager.initializeUISettingsForWorldType...');
-        UIManager.initializeUISettingsForWorldType(worldType);
-        
-        // Also call the global UI Settings initialization function if available (fallback)
-        if (typeof (globalThis as any).initializeUISettings === 'function') {
-          const success = (globalThis as any).initializeUISettings(worldType);
-          if (success) {
-            Logging.Log('✅ UI Settings initialized successfully for world type: ' + worldType);
-          } else {
-            Logging.Log('ℹ️ UI Settings not initialized (world type not supported): ' + worldType);
-          }
+      // Call the UIManager static method to initialize UI Settings in the ui/ space
+      Logging.Log('🎛️ Calling UIManager.initializeUISettingsForWorldType...');
+      UIManager.initializeUISettingsForWorldType(worldType);
+      
+      // Also call the global UI Settings initialization function if available (fallback)
+      if (typeof (globalThis as any).initializeUISettings === 'function') {
+        const success = (globalThis as any).initializeUISettings(worldType);
+        if (success) {
+          Logging.Log('✅ UI Settings initialized successfully for world type: ' + worldType);
         } else {
-          Logging.Log('⚠️ UI Settings initialization function not available yet');
-          // Retry after a longer delay if React hasn't loaded yet
-          setTimeout(() => {
-            if (typeof (globalThis as any).initializeUISettings === 'function') {
-              (globalThis as any).initializeUISettings(worldType);
-            } else {
-              Logging.LogError('❌ UI Settings function still not available after extended delay');
-            }
-          }, 3000);
+          Logging.Log('ℹ️ UI Settings not initialized (world type not supported): ' + worldType);
         }
-      }, 5000); // Wait 5 seconds for React app to fully mount
-      
+      } else {
+        Logging.Log('⚠️ UI Settings initialization function not available yet');
+        // Retry after a short delay in case the UI hasn't loaded yet
+        setTimeout(() => {
+          if (typeof (globalThis as any).initializeUISettings === 'function') {
+            (globalThis as any).initializeUISettings(worldType);
+          }
+        }, 1000);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ Error initializing UI Settings: ' + errorMessage);
