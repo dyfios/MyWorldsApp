@@ -150,8 +150,8 @@ export class MyWorld {
         Logging.Log('⚠️ UI Settings initialization function not available yet');
         // Retry after a short delay in case the UI hasn't loaded yet
         Time.SetTimeout(`
-          if (typeof (globalThis as any).initializeUISettings === 'function') {
-            (globalThis as any).initializeUISettings('${worldType}');
+          if (typeof initializeUISettings === 'function') {
+            initializeUISettings('${worldType}');
           }
         `, 1000);
       }
