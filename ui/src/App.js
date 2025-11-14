@@ -198,6 +198,58 @@ function App() {
     }, 500);
   }, [uiSettings]);
 
+  // Register handler for UI Settings messages
+  React.useEffect(() => {
+    let handlerId = null;
+    
+    const registerHandler = () => {
+      if (window.popupMenuAPI && window.popupMenuAPI.onTabMessage) {
+        handlerId = window.popupMenuAPI.onTabMessage((message) => {
+          console.log('UI Settings message received:', message);
+          
+          // Handle UI Settings specific messages
+          if (message.tabName === 'UI Settings') {
+            switch (message.type) {
+              case 'settings-changed':
+                console.log('UI Settings changed:', message.data);
+                // Send settings changes to the world via postWorldMessage
+                if (typeof postWorldMessage === 'function') {
+                  postWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(message.data)})`);
+                } else {
+                  console.warn('postWorldMessage not available');
+                }
+                break;
+              
+              case 'iframe-ready':
+                console.log('UI Settings iframe is ready');
+                break;
+              
+              default:
+                console.log('Unknown UI Settings message type:', message.type);
+            }
+          }
+        });
+        console.log('UI Settings message handler registered with ID:', handlerId);
+      }
+    };
+
+    // Try to register immediately, or wait a bit if popupMenuAPI isn't ready yet
+    if (window.popupMenuAPI) {
+      registerHandler();
+    } else {
+      const timeout = setTimeout(registerHandler, 1000);
+      return () => clearTimeout(timeout);
+    }
+
+    // Cleanup function to unregister the handler
+    return () => {
+      if (handlerId && window.popupMenuAPI && window.popupMenuAPI.offTabMessage) {
+        window.popupMenuAPI.offTabMessage(handlerId);
+        console.log('UI Settings message handler unregistered');
+      }
+    };
+  }, []);
+
   return (
     <div className="App">
       <ButtonDock
