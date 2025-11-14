@@ -440,17 +440,39 @@ export class UIManager {
         return;
       }
 
-      // Call the initialization function in the UI space
+      // Call the initialization function in the UI space with readiness check
       const jsCommand = `
-        if (typeof window.initializeUISettings === 'function') {
+        if (typeof window.isUISettingsReady === 'function' && window.isUISettingsReady()) {
+          console.log('UIManager: UI Settings is ready, calling initializeUISettings...');
           window.initializeUISettings('${worldType}');
         } else {
-          console.warn('initializeUISettings function not available in UI space');
+          console.warn('UIManager: initializeUISettings function not available in UI space yet');
         }
       `;
       
       mainToolbar.ExecuteJavaScript(jsCommand, '');
       Logging.Log('✅ UIManager: Sent UI Settings initialization command to UI space');
+
+      // If the UI Settings wasn't ready, schedule a retry from the src/ side
+      Time.SetTimeout(`
+        if (window.uiManager) {
+          const retryCommand = \`
+            if (typeof window.isUISettingsReady === 'function' && window.isUISettingsReady()) {
+              console.log('UIManager retry: UI Settings is ready, calling initializeUISettings...');
+              window.initializeUISettings('${worldType}');
+            } else {
+              console.warn('UIManager retry: initializeUISettings function still not available in UI space');
+            }
+          \`;
+          const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+          if (mainToolbarId) {
+            const mainToolbar = Entity.Get(mainToolbarId);
+            if (mainToolbar) {
+              mainToolbar.ExecuteJavaScript(retryCommand, '');
+            }
+          }
+        }
+      `, 1000);
 
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
