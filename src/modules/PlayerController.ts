@@ -97,6 +97,31 @@ export class PlayerController {
     (globalThis as any).unpauseForUI = () => {
       this.unpauseForUI();
     };
+
+    // Define global callback for setting camera mode to first person
+    (globalThis as any).setCameraModeFirstPerson = () => {
+      this.setCameraModeFirstPerson();
+    };
+
+    // Define global callback for setting camera mode to third person
+    (globalThis as any).setCameraModeThirdPerson = () => {
+      this.setCameraModeThirdPerson();
+    };
+
+    // Define global callback for setting motion speed
+    (globalThis as any).setMotionSpeed = (speed: number) => {
+      this.setMotionSpeed(speed);
+    };
+
+    // Define global callback for setting look speed
+    (globalThis as any).setLookSpeed = (sensitivity: number) => {
+      this.setLookSpeed(sensitivity);
+    };
+
+    // Define global callback for setting flying mode
+    (globalThis as any).setFlyingMode = (enabled: boolean) => {
+      this.setFlyingMode(enabled);
+    };
   }
 
   /**
@@ -149,8 +174,30 @@ export class PlayerController {
     (globalThis as any).playerController.motionMode = MotionMode.Physical;
   }
 
+  setCameraModeFirstPerson(): void {
+    Camera.SetPosition(new Vector3(0, 0.1, 0), true);
+    this.internalCharacterEntity.SetVisibility(false, false);
+  }
+
+  setCameraModeThirdPerson(): void {
+    Camera.SetPosition(new Vector3(0, 1.5, -2.75), true);
+    this.internalCharacterEntity.SetVisibility(true, false);
+  }
+
   enterVRMode(): void {
     Input.AddRigFollower((globalThis as any).playerController.internalCharacterEntity);
+  }
+
+  setMotionSpeed(speed: number): void {
+    Input.movementSpeed = speed;
+  }
+
+  setLookSpeed(sensitivity: number): void {
+    Input.lookSpeed = sensitivity;
+  }
+
+  setFlyingMode(enabled: boolean): void {
+    Input.gravityEnabled = !enabled;
   }
 
   enterNonVRMode(): void {

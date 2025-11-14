@@ -211,17 +211,24 @@ export class UIManager {
       // Apply camera mode
       if (settings.cameraMode && (globalThis as any).playerController) {
         const playerController = (globalThis as any).playerController;
-        if (typeof playerController.setCameraMode === 'function') {
-          playerController.setCameraMode(settings.cameraMode);
-          Logging.Log('📷 UIManager: Applied camera mode: ' + settings.cameraMode);
+        if (settings.cameraMode === 'firstPerson') {
+          if (typeof playerController.setCameraModeFirstPerson === 'function') {
+            playerController.setCameraModeFirstPerson();
+            Logging.Log('📷 UIManager: Applied camera mode: first person');
+          }
+        } else if (settings.cameraMode === 'thirdPerson') {
+          if (typeof playerController.setCameraModeThirdPerson === 'function') {
+            playerController.setCameraModeThirdPerson();
+            Logging.Log('📷 UIManager: Applied camera mode: third person');
+          }
         }
       }
 
       // Apply movement speed
       if (settings.movementSpeed && (globalThis as any).playerController) {
         const playerController = (globalThis as any).playerController;
-        if (typeof playerController.setMovementSpeed === 'function') {
-          playerController.setMovementSpeed(settings.movementSpeed);
+        if (typeof playerController.setMotionSpeed === 'function') {
+          playerController.setMotionSpeed(settings.movementSpeed);
           Logging.Log('🏃 UIManager: Applied movement speed: ' + settings.movementSpeed);
         }
       }
