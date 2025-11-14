@@ -433,7 +433,7 @@ export class UIManager {
       if (!mainToolbarId) {
         if (attemptNumber < maxAttempts - 1) {
           Logging.Log('⚠️ UIManager: MAIN-TOOLBAR-ID not found, retrying...');
-          Time.SetTimeout(`globalThis.uiManager.tryInitializeUISettings('${worldType}', ${attemptNumber + 1})`, retryDelayMs);
+          Time.SetTimeout(`this.uiManager.tryInitializeUISettings('${worldType}', ${attemptNumber + 1})`, retryDelayMs);
         } else {
           Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found after maximum retries');
         }
@@ -444,7 +444,7 @@ export class UIManager {
       if (!mainToolbar) {
         if (attemptNumber < maxAttempts - 1) {
           Logging.Log('⚠️ UIManager: Main toolbar entity not found, retrying...');
-          Time.SetTimeout(`globalThis.uiManager.tryInitializeUISettings('${worldType}', ${attemptNumber + 1})`, retryDelayMs);
+          Time.SetTimeout(`this.uiManager.tryInitializeUISettings('${worldType}', ${attemptNumber + 1})`, retryDelayMs);
         } else {
           Logging.LogError('❌ UIManager: Main toolbar entity not found after maximum retries');
         }
@@ -468,7 +468,7 @@ export class UIManager {
 
       // Schedule a retry check in case the function wasn't available
       if (attemptNumber < maxAttempts - 1) {
-        Time.SetTimeout(`globalThis.uiManager.tryInitializeUISettings('${worldType}', ${attemptNumber + 1})`, retryDelayMs);
+        Time.SetTimeout(`this.uiManager.tryInitializeUISettings('${worldType}', ${attemptNumber + 1})`, retryDelayMs);
       }
 
     } catch (error: any) {
@@ -476,7 +476,7 @@ export class UIManager {
       Logging.LogError(`❌ UIManager: Error initializing UI Settings (attempt ${attemptNumber + 1}): ${errorMessage}`);
       
       if (attemptNumber < maxAttempts - 1) {
-        Time.SetTimeout(`globalThis.uiManager.tryInitializeUISettings('${worldType}', ${attemptNumber + 1})`, retryDelayMs);
+        Time.SetTimeout(`this.uiManager.tryInitializeUISettings('${worldType}', ${attemptNumber + 1})`, retryDelayMs);
       }
     }
   }
