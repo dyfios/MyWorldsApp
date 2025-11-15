@@ -175,7 +175,7 @@ export class PlayerController {
   }
 
   setCameraModeFirstPerson(): void {
-    Camera.SetPosition(new Vector3(0, 0.1, 0), true);
+    Camera.SetPosition(new Vector3(0, 0.79, 0), true);
     this.internalCharacterEntity.SetVisibility(false, false);
   }
 
@@ -189,11 +189,11 @@ export class PlayerController {
   }
 
   setMotionSpeed(speed: number): void {
-    Input.movementSpeed = speed;
+    Input.movementSpeed = speed * 4;
   }
 
   setLookSpeed(sensitivity: number): void {
-    Input.lookSpeed = sensitivity;
+    Input.lookSpeed = sensitivity / 10;
   }
 
   setFlyingMode(enabled: boolean): void {

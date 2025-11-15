@@ -138,6 +138,9 @@ export class MyWorld {
       Logging.Log('🎛️ Calling UIManager.initializeUISettingsForWorldType...');
       UIManager.initializeUISettingsForWorldType(worldType);
       
+      // Initialize default tools for this world type
+      this.initializeDefaultTools(worldType);
+      
       // Also call the global UI Settings initialization function if available (fallback)
       if (typeof (globalThis as any).initializeUISettings === 'function') {
         const success = (globalThis as any).initializeUISettings(worldType);
@@ -158,6 +161,45 @@ export class MyWorld {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ Error initializing UI Settings: ' + errorMessage);
+    }
+  }
+
+  /**
+   * Initialize default tools for supported world types
+   */
+  private initializeDefaultTools(worldType: string): void {
+    try {
+      Logging.Log('🔧 Initializing default tools for world type: ' + worldType);
+      
+      // Add a delay to ensure UI is loaded before adding tools
+      Time.SetTimeout(`
+        try {
+          // Add default tools based on world type
+          if ('${worldType}' === 'mini-world') {
+            // Mini-world tools
+            UIManager.addTool('Build Tool', '🔨', 'TOOL.BUILD()');
+            UIManager.addTool('Paint Tool', '🎨', 'TOOL.PAINT()');
+            UIManager.addTool('Move Tool', '📦', 'TOOL.MOVE()');
+            UIManager.addTool('Delete Tool', '🗑️', 'TOOL.DELETE()');
+            console.log('Mini-world tools added successfully');
+          } else if ('${worldType}' === 'planet') {
+            // Planet tools
+            UIManager.addTool('Terrain Tool', '🏔️', 'TOOL.TERRAIN()');
+            UIManager.addTool('Water Tool', '🌊', 'TOOL.WATER()');
+            UIManager.addTool('Forest Tool', '🌲', 'TOOL.FOREST()');
+            UIManager.addTool('City Tool', '🏙️', 'TOOL.CITY()');
+            UIManager.addTool('Weather Tool', '⛈️', 'TOOL.WEATHER()');
+            console.log('Planet tools added successfully');
+          }
+        } catch (error) {
+          console.error('Error adding default tools:', error);
+        }
+      `, 6000);
+      
+      Logging.Log('✅ Default tools initialization scheduled for world type: ' + worldType);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ Error initializing default tools: ' + errorMessage);
     }
   }
 

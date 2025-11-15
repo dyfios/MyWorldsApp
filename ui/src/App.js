@@ -108,12 +108,16 @@ function App() {
     // Expose UI Settings API globally
     window.UISettingsAPI = {
       isWorldTypeSupported: uiSettings.isWorldTypeSupported,
-      addTab: uiSettings.addUISettingsTab,
       getSettings: uiSettings.getSettings,
       updateSettings: uiSettings.updateSettings,
-      requestSettings: uiSettings.requestSettings,
-      onSettingsChange: uiSettings.onSettingsChange,
-      resetSettings: uiSettings.resetSettings
+      initialize: uiSettings.initialize
+    };
+
+    // Expose Tools API globally
+    window.ToolsAPI = {
+      addTool: uiSettings.addTool,
+      removeTool: uiSettings.removeTool,
+      clearTools: uiSettings.clearTools
     };
 
     // Expose initializeUISettings directly to window for WebVerse access
@@ -205,7 +209,7 @@ function App() {
     const registerHandler = () => {
       if (window.popupMenuAPI && window.popupMenuAPI.onTabMessage) {
         handlerId = window.popupMenuAPI.onTabMessage((message) => {
-          console.log('UI Settings message received:', message);
+          console.log('Tab message received:', message);
           
           // Handle UI Settings specific messages
           if (message.tabName === 'UI Settings') {
@@ -228,8 +232,30 @@ function App() {
                 console.log('Unknown UI Settings message type:', message.type);
             }
           }
+          
+          // Handle Tools specific messages
+          else if (message.tabName === 'Tools') {
+            switch (message.type) {
+              case 'tool-clicked':
+                console.log('Tool clicked:', message.data);
+                // Send tool click event to the world via postWorldMessage
+                if (typeof postWorldMessage === 'function' && message.data.onClick) {
+                  postWorldMessage(message.data.onClick);
+                } else {
+                  console.warn('postWorldMessage not available or no onClick defined');
+                }
+                break;
+              
+              case 'iframe-ready':
+                console.log('Tools iframe is ready');
+                break;
+              
+              default:
+                console.log('Unknown Tools message type:', message.type);
+            }
+          }
         });
-        console.log('UI Settings message handler registered with ID:', handlerId);
+        console.log('Tab message handler registered with ID:', handlerId);
       }
     };
 

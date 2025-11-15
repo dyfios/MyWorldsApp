@@ -64,6 +64,19 @@ export class UIManager {
       this.addEditToolbarButton(name, thumbnail, onClick);
     };
 
+    // Tools API global callbacks
+    (globalThis as any).addTool = (name: string, thumbnail: string, onClick: string) => {
+      this.addTool(name, thumbnail, onClick);
+    };
+
+    (globalThis as any).removeTool = (toolId: string) => {
+      this.removeTool(toolId);
+    };
+
+    (globalThis as any).clearTools = () => {
+      this.clearTools();
+    };
+
     // Expose the UI manager instance and retry method globally for Time.SetTimeout callbacks
     (globalThis as any).uiManager = this;
   }
@@ -255,6 +268,120 @@ export class UIManager {
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       Logging.LogError('❌ UIManager: Error applying UI Settings: ' + errorMessage);
+    }
+  }
+
+  /**
+   * Add a tool to the Tools tab
+   */
+  addTool(name: string, thumbnail: string, onClick: string): void {
+    try {
+      Logging.Log('🔧 UIManager: Adding tool to Tools tab: ' + name);
+
+      const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+      if (!mainToolbarId) {
+        Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found, cannot add tool');
+        return;
+      }
+
+      const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+      if (!mainToolbar) {
+        Logging.LogError('❌ UIManager: Main toolbar entity not found, cannot add tool');
+        return;
+      }
+
+      // Call the Tools API to add the tool
+      const jsCommand = `
+        if (window.ToolsAPI && typeof window.ToolsAPI.addTool === 'function') {
+          console.log('UIManager: Adding tool via ToolsAPI:', '${name}');
+          window.ToolsAPI.addTool('${name}', '${thumbnail}', '${onClick}');
+        } else {
+          console.warn('UIManager: ToolsAPI not available for adding tool');
+        }
+      `;
+      
+      mainToolbar.ExecuteJavaScript(jsCommand, '');
+      Logging.Log('✅ UIManager: Tool add command sent to UI space: ' + name);
+
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      Logging.LogError('❌ UIManager: Error adding tool: ' + errorMessage);
+    }
+  }
+
+  /**
+   * Remove a tool from the Tools tab
+   */
+  removeTool(toolId: string): void {
+    try {
+      Logging.Log('🔧 UIManager: Removing tool from Tools tab: ' + toolId);
+
+      const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+      if (!mainToolbarId) {
+        Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found, cannot remove tool');
+        return;
+      }
+
+      const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+      if (!mainToolbar) {
+        Logging.LogError('❌ UIManager: Main toolbar entity not found, cannot remove tool');
+        return;
+      }
+
+      // Call the Tools API to remove the tool
+      const jsCommand = `
+        if (window.ToolsAPI && typeof window.ToolsAPI.removeTool === 'function') {
+          console.log('UIManager: Removing tool via ToolsAPI:', '${toolId}');
+          window.ToolsAPI.removeTool('${toolId}');
+        } else {
+          console.warn('UIManager: ToolsAPI not available for removing tool');
+        }
+      `;
+      
+      mainToolbar.ExecuteJavaScript(jsCommand, '');
+      Logging.Log('✅ UIManager: Tool remove command sent to UI space: ' + toolId);
+
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      Logging.LogError('❌ UIManager: Error removing tool: ' + errorMessage);
+    }
+  }
+
+  /**
+   * Clear all tools from the Tools tab
+   */
+  clearTools(): void {
+    try {
+      Logging.Log('🔧 UIManager: Clearing all tools from Tools tab');
+
+      const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+      if (!mainToolbarId) {
+        Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found, cannot clear tools');
+        return;
+      }
+
+      const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+      if (!mainToolbar) {
+        Logging.LogError('❌ UIManager: Main toolbar entity not found, cannot clear tools');
+        return;
+      }
+
+      // Call the Tools API to clear all tools
+      const jsCommand = `
+        if (window.ToolsAPI && typeof window.ToolsAPI.clearTools === 'function') {
+          console.log('UIManager: Clearing all tools via ToolsAPI');
+          window.ToolsAPI.clearTools();
+        } else {
+          console.warn('UIManager: ToolsAPI not available for clearing tools');
+        }
+      `;
+      
+      mainToolbar.ExecuteJavaScript(jsCommand, '');
+      Logging.Log('✅ UIManager: Clear tools command sent to UI space');
+
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      Logging.LogError('❌ UIManager: Error clearing tools: ' + errorMessage);
     }
   }
 
@@ -497,6 +624,39 @@ export class UIManager {
       UIManager.instance.initializeUISettingsForWorldType(worldType);
     } else {
       Logging.Log('⚠️ UIManager: Cannot initialize UI Settings - UIManager not initialized');
+    }
+  }
+
+  /**
+   * Public method to add a tool to the Tools tab
+   */
+  static addTool(name: string, thumbnail: string, onClick: string): void {
+    if (UIManager.instance) {
+      UIManager.instance.addTool(name, thumbnail, onClick);
+    } else {
+      Logging.Log('⚠️ UIManager: Cannot add tool - UIManager not initialized');
+    }
+  }
+
+  /**
+   * Public method to remove a tool from the Tools tab
+   */
+  static removeTool(toolId: string): void {
+    if (UIManager.instance) {
+      UIManager.instance.removeTool(toolId);
+    } else {
+      Logging.Log('⚠️ UIManager: Cannot remove tool - UIManager not initialized');
+    }
+  }
+
+  /**
+   * Public method to clear all tools from the Tools tab
+   */
+  static clearTools(): void {
+    if (UIManager.instance) {
+      UIManager.instance.clearTools();
+    } else {
+      Logging.Log('⚠️ UIManager: Cannot clear tools - UIManager not initialized');
     }
   }
 }

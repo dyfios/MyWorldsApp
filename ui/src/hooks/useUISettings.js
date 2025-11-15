@@ -17,15 +17,22 @@ export const useUISettings = () => {
       return false;
     }
     
+    let success = true;
+    
     // Add the UI Settings tab to the popup menu
     if (window.popupMenuAPI && typeof window.popupMenuAPI.addTab === 'function') {
-      const tabId = window.popupMenuAPI.addTab('UI Settings', 'ui-settings.html', 0);
-      console.log('UI Settings tab added to popup menu with ID:', tabId);
-      return true;
+      const uiSettingsTabId = window.popupMenuAPI.addTab('UI Settings', 'ui-settings.html', 0);
+      console.log('UI Settings tab added to popup menu with ID:', uiSettingsTabId);
+      
+      // Add the Tools tab to the popup menu
+      const toolsTabId = window.popupMenuAPI.addTab('Tools', 'tools.html', 1);
+      console.log('Tools tab added to popup menu with ID:', toolsTabId);
     } else {
-      console.warn('PopupMenu API not available, cannot add UI Settings tab');
-      return false;
+      console.warn('PopupMenu API not available, cannot add tabs');
+      success = false;
     }
+    
+    return success;
   }, []);
 
   const isWorldTypeSupported = useCallback((worldType) => {
@@ -48,12 +55,80 @@ export const useUISettings = () => {
     console.log('UI Settings initialized');
   }, []);
 
+  // Tools API functions
+  const addTool = useCallback((name, thumbnail, onClick) => {
+    console.log('addTool called:', { name, thumbnail, onClick });
+    
+    // Send message to the Tools iframe if it exists
+    if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+      const toolsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'Tools');
+      if (toolsTabs.length > 0) {
+        const success = window.popupMenuAPI.sendMessageToTab(toolsTabs[0].id, {
+          type: 'add-tool',
+          data: { name, thumbnail, onClick }
+        });
+        if (success) {
+          console.log('Tool add message sent successfully');
+          return true;
+        }
+      }
+    }
+    console.warn('Could not send tool add message - Tools tab not found or API not available');
+    return false;
+  }, []);
+
+  const removeTool = useCallback((toolId) => {
+    console.log('removeTool called with ID:', toolId);
+    
+    // Send message to the Tools iframe if it exists
+    if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+      const toolsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'Tools');
+      if (toolsTabs.length > 0) {
+        const success = window.popupMenuAPI.sendMessageToTab(toolsTabs[0].id, {
+          type: 'remove-tool',
+          data: { toolId }
+        });
+        if (success) {
+          console.log('Tool remove message sent successfully');
+          return true;
+        }
+      }
+    }
+    console.warn('Could not send tool remove message - Tools tab not found or API not available');
+    return false;
+  }, []);
+
+  const clearTools = useCallback(() => {
+    console.log('clearTools called');
+    
+    // Send message to the Tools iframe if it exists
+    if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+      const toolsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'Tools');
+      if (toolsTabs.length > 0) {
+        const success = window.popupMenuAPI.sendMessageToTab(toolsTabs[0].id, {
+          type: 'clear-tools',
+          data: {}
+        });
+        if (success) {
+          console.log('Clear tools message sent successfully');
+          return true;
+        }
+      }
+    }
+    console.warn('Could not send clear tools message - Tools tab not found or API not available');
+    return false;
+  }, []);
+
   return {
     currentSettings,
     initializeUISettings,
     isWorldTypeSupported,
     getSettings,
     updateSettings,
-    initialize
+    initialize,
+    // Tools API
+    addTool,
+    removeTool,
+    clearTools
   };
 };
