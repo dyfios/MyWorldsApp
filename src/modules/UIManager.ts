@@ -558,29 +558,29 @@ export class UIManager {
         try {
           const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
           if (!mainToolbarId) {
-            console.warn('UIManager: MAIN-TOOLBAR-ID not found after delay');
+            Logging.LogWarning('UIManager: MAIN-TOOLBAR-ID not found after delay');
             return;
           }
 
           const mainToolbar = Entity.Get(mainToolbarId);
           if (!mainToolbar) {
-            console.warn('UIManager: Main toolbar entity not found after delay');
+            Logging.LogWarning('UIManager: Main toolbar entity not found after delay');
             return;
           }
 
           const jsCommand = \`
             if (typeof window.initializeUISettings === 'function') {
-              console.log('UIManager: UI Settings function found, calling initializeUISettings...');
+              Logging.Log('UIManager: UI Settings function found, calling initializeUISettings...');
               window.initializeUISettings('${worldType}');
             } else {
-              console.warn('UIManager: initializeUISettings function not available in UI space');
+              Logging.LogWarning('UIManager: initializeUISettings function not available in UI space');
             }
           \`;
           
           mainToolbar.ExecuteJavaScript(jsCommand, '');
-          console.log('UIManager: Sent UI Settings initialization command to UI space');
+          Logging.Log('UIManager: Sent UI Settings initialization command to UI space');
         } catch (error) {
-          console.error('UIManager: Error in delayed UI Settings initialization:', error);
+          Logging.LogError('UIManager: Error in delayed UI Settings initialization: ' + (error instanceof Error ? error.message : String(error)));
         }
       `, 5000);
       
