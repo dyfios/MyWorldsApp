@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tools</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        h1 {
+            margin: 0 0 30px 0;
+            font-size: 24px;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .search-container {
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 16px;
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            color: #ffffff;
+            outline: none;
+        }
+
+        .search-input:focus {
+            border-color: #4CAF50;
+        }
+
+        .search-input::placeholder {
+            color: #666666;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 16px;
+            padding: 0;
+        }
+
+        .tool-button {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 12px;
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            color: inherit;
+            min-height: 140px;
+        }
+
+        .tool-button:hover {
+            background: #333333;
+            border-color: #4CAF50;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .tool-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .tool-thumbnail {
+            width: 64px;
+            height: 64px;
+            background: #3a3a3a;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #666666;
+            overflow: hidden;
+        }
+
+        .tool-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+
+        .tool-name {
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+            line-height: 1.2;
+            color: #ffffff;
+            word-break: break-word;
+        }
+
+        .no-tools {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666666;
+            font-style: italic;
+            grid-column: 1 / -1;
+        }
+
+        .tools-count {
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #888888;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 15px;
+            }
+            
+            .tools-grid {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                gap: 12px;
+            }
+
+            .tool-button {
+                min-height: 120px;
+                padding: 12px 8px;
+            }
+
+            .tool-thumbnail {
+                width: 48px;
+                height: 48px;
+                font-size: 20px;
+            }
+
+            .tool-name {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Tools</h1>
+
+    <div class="search-container">
+        <input 
+            type="text" 
+            class="search-input" 
+            id="toolSearch" 
+            placeholder="Search tools..."
+        >
+    </div>
+
+    <div class="tools-count" id="toolsCount">0 tools available</div>
+
+    <div class="tools-grid" id="toolsGrid">
+        <div class="no-tools">
+            No tools available yet.
+        </div>
+    </div>
+
+    <script>
+        // Tools state
+        let tools = [];
+        let filteredTools = [];
+
+        // Get tab ID from iframe data attribute (if available)
+        function getTabId() {
+            try {
+                const iframe = window.frameElement;
+                return iframe ? iframe.getAttribute('data-tab-id') : 'tools';
+            } catch {
+                return 'tools';
+            }
+        }
+
+        // Send message to parent window
+        function sendMessageToParent(type, data) {
+            if (window.parent !== window) {
+                window.parent.postMessage({
+                    source: 'myworlds-iframe-tab',
+                    tabId: getTabId(),
+                    type: type,
+                    data: data
+                }, '*');
+            }
+        }
+
+        // Add a tool to the grid
+        function addTool(name, thumbnail, onClick) {
+            const tool = {
+                id: Date.now() + Math.random(),
+                name: name,
+                thumbnail: thumbnail,
+                onClick: onClick
+            };
+            
+            tools.push(tool);
+            applyFilter();
+            renderTools();
+            updateToolsCount();
+            
+            console.log('Tool added:', tool);
+            return tool.id;
+        }
+
+        // Remove a tool by ID
+        function removeTool(toolId) {
+            const index = tools.findIndex(tool => tool.id === toolId);
+            if (index !== -1) {
+                const removedTool = tools.splice(index, 1)[0];
+                applyFilter();
+                renderTools();
+                updateToolsCount();
+                console.log('Tool removed:', removedTool);
+                return true;
+            }
+            return false;
+        }
+
+        // Get all tools
+        function getTools() {
+            return [...tools];
+        }
+
+        // Clear all tools
+        function clearTools() {
+            tools = [];
+            filteredTools = [];
+            renderTools();
+            updateToolsCount();
+            console.log('All tools cleared');
+        }
+
+        // Apply search filter
+        function applyFilter() {
+            const searchTerm = document.getElementById('toolSearch').value.toLowerCase();
+            
+            if (!searchTerm) {
+                filteredTools = [...tools];
+            } else {
+                filteredTools = tools.filter(tool => 
+                    tool.name.toLowerCase().includes(searchTerm)
+                );
+            }
+        }
+
+        // Render tools in the grid
+        function renderTools() {
+            const grid = document.getElementById('toolsGrid');
+            
+            if (filteredTools.length === 0) {
+                if (tools.length === 0) {
+                    grid.innerHTML = '<div class="no-tools">No tools available yet.</div>';
+                } else {
+                    grid.innerHTML = '<div class="no-tools">No tools match your search.</div>';
+                }
+                return;
+            }
+
+            grid.innerHTML = filteredTools.map(tool => {
+                const thumbnailContent = tool.thumbnail.startsWith('http') || tool.thumbnail.startsWith('data:') 
+                    ? `<img src="${tool.thumbnail}" alt="${tool.name}">`
+                    : tool.thumbnail;
+                
+                return `
+                    <div class="tool-button" onclick="handleToolClick('${tool.id}')">
+                        <div class="tool-thumbnail">${thumbnailContent}</div>
+                        <div class="tool-name">${tool.name}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Handle tool click
+        function handleToolClick(toolId) {
+            const tool = tools.find(t => t.id == toolId);
+            if (tool && tool.onClick) {
+                console.log('Tool clicked:', tool.name);
+                
+                // Send tool click message to parent
+                sendMessageToParent('tool-clicked', {
+                    toolId: tool.id,
+                    toolName: tool.name,
+                    onClick: tool.onClick
+                });
+            }
+        }
+
+        // Update tools count display
+        function updateToolsCount() {
+            const countElement = document.getElementById('toolsCount');
+            const totalTools = tools.length;
+            const shownTools = filteredTools.length;
+            
+            if (totalTools === shownTools) {
+                countElement.textContent = `${totalTools} tool${totalTools !== 1 ? 's' : ''} available`;
+            } else {
+                countElement.textContent = `${shownTools} of ${totalTools} tools shown`;
+            }
+        }
+
+        // Initialize search functionality
+        function initializeSearch() {
+            const searchInput = document.getElementById('toolSearch');
+            searchInput.addEventListener('input', () => {
+                applyFilter();
+                renderTools();
+                updateToolsCount();
+            });
+        }
+
+        // Handle messages from parent window
+        function handleParentMessage(event) {
+            if (event.data && event.data.source === 'myworlds-popup-menu') {
+                const { type, data } = event.data;
+                
+                switch (type) {
+                    case 'add-tool':
+                        if (data && data.name && data.thumbnail !== undefined && data.onClick) {
+                            addTool(data.name, data.thumbnail, data.onClick);
+                        }
+                        break;
+                    
+                    case 'remove-tool':
+                        if (data && data.toolId) {
+                            removeTool(data.toolId);
+                        }
+                        break;
+                    
+                    case 'clear-tools':
+                        clearTools();
+                        break;
+                    
+                    case 'get-tools':
+                        sendMessageToParent('tools-response', { tools: getTools() });
+                        break;
+                }
+            }
+        }
+
+        // Initialize the page
+        function initialize() {
+            initializeSearch();
+            applyFilter();
+            renderTools();
+            updateToolsCount();
+            
+            // Listen for messages from parent
+            window.addEventListener('message', handleParentMessage);
+            
+            // Notify parent that we're ready
+            sendMessageToParent('iframe-ready', { 
+                type: 'tools',
+                toolsCount: tools.length 
+            });
+            
+            console.log('Tools page initialized');
+        }
+
+        // Start when DOM is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initialize);
+        } else {
+            initialize();
+        }
+
+        // Expose tools API for debugging and external access
+        window.toolsAPI = {
+            addTool,
+            removeTool,
+            getTools,
+            clearTools,
+            renderTools
+        };
+    </script>
+</body>
+</html>

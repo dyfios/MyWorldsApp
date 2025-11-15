@@ -19,14 +19,23 @@ export const useUISettings = () => {
     
     let success = true;
     
-    // Add the UI Settings tab to the popup menu
+    // Add tabs to the popup menu
     if (window.popupMenuAPI && typeof window.popupMenuAPI.addTab === 'function') {
-      const uiSettingsTabId = window.popupMenuAPI.addTab('UI Settings', 'ui-settings.html', 0);
+      // Add the UI Settings tab first
+      const uiSettingsTabId = window.popupMenuAPI.addTab('UI Settings', 'ui-settings.html');
       console.log('UI Settings tab added to popup menu with ID:', uiSettingsTabId);
+      console.log('Added tab URL: ui-settings.html');
       
-      // Add the Tools tab to the popup menu
-      const toolsTabId = window.popupMenuAPI.addTab('Tools', 'tools.html', 1);
-      console.log('Tools tab added to popup menu with ID:', toolsTabId);
+      // Add the Tools tab with a small delay and without specifying position
+      setTimeout(() => {
+        const toolsTabId = window.popupMenuAPI.addTab('Tools', 'tools.html');
+        console.log('Tools tab added to popup menu with ID:', toolsTabId);
+        console.log('Added tab URL: tools.html');
+        
+        // Debug: Check all tabs
+        const allTabs = window.popupMenuAPI.getTabs();
+        console.log('All tabs after adding:', allTabs.map(tab => ({ name: tab.name, url: tab.url })));
+      }, 100);
     } else {
       console.warn('PopupMenu API not available, cannot add tabs');
       success = false;
