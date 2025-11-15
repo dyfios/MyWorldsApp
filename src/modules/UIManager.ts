@@ -570,10 +570,10 @@ export class UIManager {
 
           const jsCommand = \`
             if (typeof window.initializeUISettings === 'function') {
-              Logging.Log('UIManager: UI Settings function found, calling initializeUISettings...');
+              console.log('UIManager: UI Settings function found, calling initializeUISettings...');
               window.initializeUISettings('${worldType}');
             } else {
-              Logging.LogWarning('UIManager: initializeUISettings function not available in UI space');
+              console.warn('UIManager: initializeUISettings function not available in UI space');
             }
           \`;
           
