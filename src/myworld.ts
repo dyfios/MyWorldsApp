@@ -181,7 +181,7 @@ export class MyWorld {
             UIManager.addTool('Paint Tool', '🎨', 'TOOL.PAINT()');
             UIManager.addTool('Move Tool', '📦', 'TOOL.MOVE()');
             UIManager.addTool('Delete Tool', '🗑️', 'TOOL.DELETE()');
-            console.log('Mini-world tools added successfully');
+            Logging.Log('Mini-world tools added successfully');
           } else if ('${worldType}' === 'planet') {
             // Planet tools
             UIManager.addTool('Terrain Tool', '🏔️', 'TOOL.TERRAIN()');
@@ -189,10 +189,10 @@ export class MyWorld {
             UIManager.addTool('Forest Tool', '🌲', 'TOOL.FOREST()');
             UIManager.addTool('City Tool', '🏙️', 'TOOL.CITY()');
             UIManager.addTool('Weather Tool', '⛈️', 'TOOL.WEATHER()');
-            console.log('Planet tools added successfully');
+            Logging.Log('Planet tools added successfully');
           }
         } catch (error) {
-          console.error('Error adding default tools:', error);
+          Logging.LogError('Error adding default tools: ' + error);
         }
       `, 6000);
       
