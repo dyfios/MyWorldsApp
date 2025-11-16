@@ -290,13 +290,16 @@ export class UIManager {
         return;
       }
 
-      // Call the Tools API to add the tool
+      // Call the Tools iframe directly via popupMenuAPI
       const jsCommand = `
-        if (window.ToolsAPI && typeof window.ToolsAPI.addTool === 'function') {
-          console.log('UIManager: Adding tool via ToolsAPI:', '${name}');
-          window.ToolsAPI.addTool('${name}', '${thumbnail}', '${onClick}');
-        } else {
-          console.warn('UIManager: ToolsAPI not available for adding tool');
+        if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+          const toolsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'Tools');
+          if (toolsTabs.length > 0) {
+            window.popupMenuAPI.sendMessageToTab(toolsTabs[0].id, {
+              type: 'add-tool',
+              data: { name: '${name}', thumbnail: '${thumbnail}', onClick: '${onClick}' }
+            });
+          }
         }
       `;
       
@@ -328,13 +331,16 @@ export class UIManager {
         return;
       }
 
-      // Call the Tools API to remove the tool
+      // Call the Tools iframe directly via popupMenuAPI
       const jsCommand = `
-        if (window.ToolsAPI && typeof window.ToolsAPI.removeTool === 'function') {
-          console.log('UIManager: Removing tool via ToolsAPI:', '${toolId}');
-          window.ToolsAPI.removeTool('${toolId}');
-        } else {
-          console.warn('UIManager: ToolsAPI not available for removing tool');
+        if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+          const toolsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'Tools');
+          if (toolsTabs.length > 0) {
+            window.popupMenuAPI.sendMessageToTab(toolsTabs[0].id, {
+              type: 'remove-tool',
+              data: { toolId: '${toolId}' }
+            });
+          }
         }
       `;
       
@@ -366,13 +372,16 @@ export class UIManager {
         return;
       }
 
-      // Call the Tools API to clear all tools
+      // Call the Tools iframe directly via popupMenuAPI
       const jsCommand = `
-        if (window.ToolsAPI && typeof window.ToolsAPI.clearTools === 'function') {
-          console.log('UIManager: Clearing all tools via ToolsAPI');
-          window.ToolsAPI.clearTools();
-        } else {
-          console.warn('UIManager: ToolsAPI not available for clearing tools');
+        if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+          const toolsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'Tools');
+          if (toolsTabs.length > 0) {
+            window.popupMenuAPI.sendMessageToTab(toolsTabs[0].id, {
+              type: 'clear-tools',
+              data: {}
+            });
+          }
         }
       `;
       
