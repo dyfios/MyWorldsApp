@@ -177,18 +177,18 @@ export class MyWorld {
           // Add default tools based on world type
           if ('${worldType}' === 'mini-world') {
             // Mini-world tools
-            UIManager.addTool('Build Tool', '🔨', 'TOOL.BUILD()');
-            UIManager.addTool('Paint Tool', '🎨', 'TOOL.PAINT()');
-            UIManager.addTool('Move Tool', '📦', 'TOOL.MOVE()');
-            UIManager.addTool('Delete Tool', '🗑️', 'TOOL.DELETE()');
+            addTool('Build Tool', '🔨', 'TOOL.BUILD()');
+            addTool('Paint Tool', '🎨', 'TOOL.PAINT()');
+            addTool('Move Tool', '📦', 'TOOL.MOVE()');
+            addTool('Delete Tool', '🗑️', 'TOOL.DELETE()');
             Logging.Log('Mini-world tools added successfully');
           } else if ('${worldType}' === 'planet') {
             // Planet tools
-            UIManager.addTool('Terrain Tool', '🏔️', 'TOOL.TERRAIN()');
-            UIManager.addTool('Water Tool', '🌊', 'TOOL.WATER()');
-            UIManager.addTool('Forest Tool', '🌲', 'TOOL.FOREST()');
-            UIManager.addTool('City Tool', '🏙️', 'TOOL.CITY()');
-            UIManager.addTool('Weather Tool', '⛈️', 'TOOL.WEATHER()');
+            addTool('Terrain Tool', '🏔️', 'TOOL.TERRAIN()');
+            addTool('Water Tool', '🌊', 'TOOL.WATER()');
+            addTool('Forest Tool', '🌲', 'TOOL.FOREST()');
+            addTool('City Tool', '🏙️', 'TOOL.CITY()');
+            addTool('Weather Tool', '⛈️', 'TOOL.WEATHER()');
             Logging.Log('Planet tools added successfully');
           }
         } catch (error) {
