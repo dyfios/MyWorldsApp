@@ -177,18 +177,16 @@ export class MyWorld {
           // Add default tools based on world type
           if ('${worldType}' === 'mini-world') {
             // Mini-world tools
-            addTool('Build Tool', '🔨', 'TOOL.BUILD()');
-            addTool('Paint Tool', '🎨', 'TOOL.PAINT()');
-            addTool('Move Tool', '📦', 'TOOL.MOVE()');
-            addTool('Delete Tool', '🗑️', 'TOOL.DELETE()');
+            addTool('Hand', '🔨', 'TOOL.ADD_DOCK_BUTTON(HAND)');
             Logging.Log('Mini-world tools added successfully');
           } else if ('${worldType}' === 'planet') {
             // Planet tools
-            addTool('Terrain Tool', '🏔️', 'TOOL.TERRAIN()');
-            addTool('Water Tool', '🌊', 'TOOL.WATER()');
-            addTool('Forest Tool', '🌲', 'TOOL.FOREST()');
-            addTool('City Tool', '🏙️', 'TOOL.CITY()');
-            addTool('Weather Tool', '⛈️', 'TOOL.WEATHER()');
+            addTool('Hand', '🏔️', 'TOOL.ADD_DOCK_BUTTON(HAND)');
+            addTool('Square Shovel', '🌊', 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_1)');
+            addTool('Square Shovel (2x)', '🌲', 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_2)');
+            addTool('Square Shovel (4x)', '🏙️', 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_4)');
+            addTool('Square Shovel (8x)', '⛈️', 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_8)');
+            addTool('Sledge Hammer', '⛏️', 'TOOL.ADD_DOCK_BUTTON(SLEDGE_HAMMER)');
             Logging.Log('Planet tools added successfully');
           }
         } catch (error) {
