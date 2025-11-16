@@ -178,6 +178,27 @@ export class UIManager {
           if (msg.startsWith('UI_SETTINGS.')) {
             this.handleUISettingsMessage(msg);
             return;
+          } else if (msg.startsWith('TOOL.ADD_DOCK_BUTTON(')) {
+            // Extract parameters from TOOL.ADD_DOCK_BUTTON(type, tag, icon)
+            const paramStart = msg.indexOf('(') + 1;
+            const paramEnd = msg.lastIndexOf(')');
+            
+            if (paramStart > 0 && paramEnd > paramStart) {
+              const paramString = msg.substring(paramStart, paramEnd);
+              const params = paramString.split(',').map(param => param.trim().replace(/['"]/g, ''));
+              
+              if (params.length === 3) {
+                const [type, tag, icon] = params;
+                Logging.Log('🔧 UIManager: Adding dock button - type: ' + type + ', tag: ' + tag + ', icon: ' + icon);
+                
+                // Add button to ButtonDock using the existing method
+                this.addEditToolbarButton(tag, icon, 'TOOL.DOCK_BUTTON_CLICKED(' + type + ')');
+              } else {
+                Logging.LogError('❌ UIManager: Invalid TOOL.ADD_DOCK_BUTTON parameters count: ' + params.length);
+              }
+            } else {
+              Logging.LogError('❌ UIManager: Invalid TOOL.ADD_DOCK_BUTTON message format: ' + msg);
+            }
           }
       }
     } catch (error: any) {
