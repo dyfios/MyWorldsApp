@@ -119,11 +119,21 @@ const PopupMenu = ({
       // Try multiple approaches to send the message
       if (iframe.contentWindow) {
         try {
-          iframe.contentWindow.postMessage({
-            source: 'myworlds-popup-menu',
-            type: 'message',
-            data: message
-          }, '*');
+          // If message already has the correct structure, send it directly
+          if (message.type && message.data) {
+            iframe.contentWindow.postMessage({
+              source: 'myworlds-popup-menu',
+              type: message.type,
+              data: message.data
+            }, '*');
+          } else {
+            // Fallback for other message types
+            iframe.contentWindow.postMessage({
+              source: 'myworlds-popup-menu',
+              type: 'message',
+              data: message
+            }, '*');
+          }
           console.log('Message sent successfully via contentWindow');
           return true;
         } catch (error) {
@@ -137,11 +147,21 @@ const PopupMenu = ({
         
         const sendWhenReady = () => {
           try {
-            iframe.contentWindow.postMessage({
-              source: 'myworlds-popup-menu',
-              type: 'message',
-              data: message
-            }, '*');
+            // If message already has the correct structure, send it directly
+            if (message.type && message.data) {
+              iframe.contentWindow.postMessage({
+                source: 'myworlds-popup-menu',
+                type: message.type,
+                data: message.data
+              }, '*');
+            } else {
+              // Fallback for other message types
+              iframe.contentWindow.postMessage({
+                source: 'myworlds-popup-menu',
+                type: 'message',
+                data: message
+              }, '*');
+            }
             console.log('Message sent successfully after load');
             return true;
           } catch (error) {
@@ -174,11 +194,21 @@ const PopupMenu = ({
         const retryIframe = document.querySelector(`iframe[data-tab-id="${tabId}"]`);
         if (retryIframe && retryIframe.contentWindow) {
           try {
-            retryIframe.contentWindow.postMessage({
-              source: 'myworlds-popup-menu',
-              type: 'message',
-              data: message
-            }, '*');
+            // If message already has the correct structure, send it directly
+            if (message.type && message.data) {
+              retryIframe.contentWindow.postMessage({
+                source: 'myworlds-popup-menu',
+                type: message.type,
+                data: message.data
+              }, '*');
+            } else {
+              // Fallback for other message types
+              retryIframe.contentWindow.postMessage({
+                source: 'myworlds-popup-menu',
+                type: 'message',
+                data: message
+              }, '*');
+            }
             console.log('Message sent successfully on retry');
           } catch (error) {
             console.warn('Error sending message on retry:', error);
