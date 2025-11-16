@@ -360,21 +360,27 @@ const PopupMenu = ({
   const activeTab = tabs.find(tab => tab.id === activeTabId);
 
   return (
-    <>
-      {/* Always render hidden iframes for message handling */}
-      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
-        {tabs.filter(tab => tab.type === 'iframe').map(tab => (
-          <iframe
-            key={`hidden-${tab.id}`}
-            data-tab-id={tab.id}
-            src={tab.url}
-            className="popup-menu-iframe"
-            title={tab.name}
-            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            style={{ width: '100px', height: '100px' }}
-          />
-        ))}
-      </div>
+    <div>
+      {/* Always render iframes (hidden when popup is closed) */}
+      {tabs.filter(tab => tab.type === 'iframe').map(tab => (
+        <iframe
+          key={tab.id}
+          data-tab-id={tab.id}
+          src={tab.url}
+          className="popup-menu-iframe"
+          title={tab.name}
+          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+          style={{ 
+            position: isOpen ? 'static' : 'absolute',
+            left: isOpen ? 'auto' : '-9999px',
+            top: isOpen ? 'auto' : '-9999px',
+            display: isOpen && activeTab && activeTab.id === tab.id ? 'block' : 'none',
+            width: isOpen ? '100%' : '100px',
+            height: isOpen ? '100%' : '100px',
+            border: 'none'
+          }}
+        />
+      ))}
 
       {/* Main popup menu (only when open) */}
       {isOpen && (
@@ -406,17 +412,7 @@ const PopupMenu = ({
             </div>
 
             <div className="popup-menu-content">
-              {/* Show visible iframe content */}
-              {activeTab && activeTab.type === 'iframe' && (
-                <iframe
-                  key={`visible-${activeTab.id}`}
-                  src={activeTab.url}
-                  className="popup-menu-iframe"
-                  title={activeTab.name}
-                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                />
-              )}
-              
+              {/* Settings content */}
               {activeTab && activeTab.type === 'settings' && (
             <div className="popup-menu-settings">
               <h2>Settings</h2>
@@ -505,7 +501,7 @@ const PopupMenu = ({
       </div>
     </div>
     )}
-    </>
+    </div>
   );
 };
 
