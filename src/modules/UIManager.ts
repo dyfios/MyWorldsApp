@@ -233,21 +233,29 @@ export class UIManager {
       // You can add specific logic for different button types as needed
       
       switch (buttonType) {
-        case 'build':
-          Logging.Log('🔨 UIManager: Build button clicked');
-          // Add build-specific logic here
+        case 'HAND':
+          Logging.Log('🔨 UIManager: Hand button clicked');
+          (globalThis as any).environmentModifier.setInteractionMode('HAND');
           break;
-        case 'paint':
-          Logging.Log('🎨 UIManager: Paint button clicked');
-          // Add paint-specific logic here
+        case 'SQUARE_SHOVEL_1':
+          Logging.Log('🎨 UIManager: Square Shovel 1 button clicked');
+          (globalThis as any).environmentModifier.setInteractionMode('SQUARE-SHOVEL-1');
           break;
-        case 'move':
-          Logging.Log('📦 UIManager: Move button clicked');
-          // Add move-specific logic here
+        case 'SQUARE_SHOVEL_2':
+          Logging.Log('📦 UIManager: Square Shovel 2 button clicked');
+          (globalThis as any).environmentModifier.setInteractionMode('SQUARE-SHOVEL-2');
           break;
-        case 'delete':
-          Logging.Log('🗑️ UIManager: Delete button clicked');
-          // Add delete-specific logic here
+        case 'SQUARE_SHOVEL_4':
+          Logging.Log('🗑️ UIManager: Square Shovel 4 button clicked');
+          (globalThis as any).environmentModifier.setInteractionMode('SQUARE-SHOVEL-4');
+          break;
+        case 'SQUARE_SHOVEL_8':
+          Logging.Log('🗑️ UIManager: Square Shovel 8 button clicked');
+          (globalThis as any).environmentModifier.setInteractionMode('SQUARE-SHOVEL-8');
+          break;
+        case 'SLEDGEHAMMER':
+          Logging.Log('🔨 UIManager: Sledgehammer button clicked');
+          (globalThis as any).environmentModifier.setInteractionMode('SLEDGE-HAMMER');
           break;
         default:
           Logging.Log('🔧 UIManager: Unknown button type clicked: ' + buttonType);

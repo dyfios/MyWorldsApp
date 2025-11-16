@@ -3,6 +3,8 @@
  */
 
 export class EnvironmentModifier {
+  private interactionMode: string = "HAND";
+
   constructor() {
     this.setupGlobalCallbacks();
   }
@@ -30,19 +32,27 @@ export class EnvironmentModifier {
     (globalThis as any).processGripPress = () => {
       this.processGripPress();
     };
+
+    // Define global callback for setting interaction mode
+    (globalThis as any).setInteractionMode = (mode: string) => {
+      this.setInteractionMode(mode);
+    };
+  }
+
+  /**
+   * Set the current interaction mode
+   */
+  setInteractionMode(mode: string): void {
+    this.interactionMode = mode;
   }
 
   /**
    * Handle left mouse button press
    */
   private handleLeftPress(): void {
-    var entityModule = Context.GetContext("ENTITY_MODULE");
-    //var digMode = WorldStorage.GetItem("DIG-MODE");
-    var interactionMode = WorldStorage.GetItem("INTERACTION-MODE");
-
     var hitInfo = Input.GetPointerRaycast(Vector3.forward);
 
-    if (interactionMode == "HAND") {
+    if (this.interactionMode == "HAND") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo instanceof AutomobileEntity) {
@@ -54,7 +64,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "SQUARE-SHOVEL-1") {
+    else if (this.interactionMode == "SQUARE-SHOVEL-1") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -63,7 +73,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "SQUARE-SHOVEL-2") {
+    else if (this.interactionMode == "SQUARE-SHOVEL-2") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -72,7 +82,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "SQUARE-SHOVEL-4") {
+    else if (this.interactionMode == "SQUARE-SHOVEL-4") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -81,7 +91,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "SQUARE-SHOVEL-8") {
+    else if (this.interactionMode == "SQUARE-SHOVEL-8") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -90,7 +100,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "SLEDGE-HAMMER") {
+    else if (this.interactionMode == "SLEDGE-HAMMER") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof MeshEntity ||
@@ -100,7 +110,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-0") {
+    else if (this.interactionMode == "TERRAIN-LAYER-0") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -109,7 +119,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-1") {
+    else if (this.interactionMode == "TERRAIN-LAYER-1") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -118,7 +128,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-2") {
+    else if (this.interactionMode == "TERRAIN-LAYER-2") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -127,7 +137,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-3") {
+    else if (this.interactionMode == "TERRAIN-LAYER-3") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -136,7 +146,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-4") {
+    else if (this.interactionMode == "TERRAIN-LAYER-4") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -145,7 +155,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-5") {
+    else if (this.interactionMode == "TERRAIN-LAYER-5") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -154,7 +164,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-6") {
+    else if (this.interactionMode == "TERRAIN-LAYER-6") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -163,7 +173,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-7") {
+    else if (this.interactionMode == "TERRAIN-LAYER-7") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -172,12 +182,12 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "ENTITY-PLACING") {
+    else if (this.interactionMode == "ENTITY-PLACING") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity || hitInfo.entity instanceof MeshEntity) {
                     WorldStorage.SetItem("ENTITY-KEEP-SPAWNING", "TRUE");
-                    entityModule.entityPlacement.StopPlacing();
+                    (globalThis as any).StopPlacing();
                 }
             }
         }
@@ -211,13 +221,9 @@ export class EnvironmentModifier {
    * Process grip press events
    */
   processGripPress(): void {
-    var entityModule = Context.GetContext("ENTITY_MODULE");
-
-    var interactionMode = WorldStorage.GetItem("INTERACTION-MODE");
-
     var hitInfo = Input.GetPointerRaycast(Vector3.forward, 1);
 
-    if (interactionMode == "HAND") {
+    if (this.interactionMode == "HAND") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo instanceof AutomobileEntity) {
@@ -229,7 +235,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "SQUARE-SHOVEL-1") {
+    else if (this.interactionMode == "SQUARE-SHOVEL-1") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -238,7 +244,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "SQUARE-SHOVEL-2") {
+    else if (this.interactionMode == "SQUARE-SHOVEL-2") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -247,7 +253,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "SQUARE-SHOVEL-4") {
+    else if (this.interactionMode == "SQUARE-SHOVEL-4") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -256,7 +262,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "SQUARE-SHOVEL-8") {
+    else if (this.interactionMode == "SQUARE-SHOVEL-8") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -265,7 +271,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "SLEDGE-HAMMER") {
+    else if (this.interactionMode == "SLEDGE-HAMMER") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof MeshEntity) {
@@ -274,7 +280,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-0") {
+    else if (this.interactionMode == "TERRAIN-LAYER-0") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -283,7 +289,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-1") {
+    else if (this.interactionMode == "TERRAIN-LAYER-1") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -292,7 +298,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-2") {
+    else if (this.interactionMode == "TERRAIN-LAYER-2") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -301,7 +307,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-3") {
+    else if (this.interactionMode == "TERRAIN-LAYER-3") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -310,7 +316,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-4") {
+    else if (this.interactionMode == "TERRAIN-LAYER-4") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -319,7 +325,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-5") {
+    else if (this.interactionMode == "TERRAIN-LAYER-5") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -328,7 +334,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-6") {
+    else if (this.interactionMode == "TERRAIN-LAYER-6") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -337,7 +343,7 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "TERRAIN-LAYER-7") {
+    else if (this.interactionMode == "TERRAIN-LAYER-7") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity) {
@@ -346,11 +352,11 @@ export class EnvironmentModifier {
             }
         }
     }
-    else if (interactionMode == "ENTITY-PLACING") {
+    else if (this.interactionMode == "ENTITY-PLACING") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity || hitInfo.entity instanceof MeshEntity) {
-                    entityModule.entityPlacement.CancelPlacing();
+                    (globalThis as any).CancelPlacing();
                 }
             }
         }
