@@ -361,16 +361,17 @@ const PopupMenu = ({
 
   return (
     <>
-      {/* Always render iframes (hidden) so they can receive messages */}
-      <div style={{ display: 'none' }}>
+      {/* Always render hidden iframes for message handling */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}>
         {tabs.filter(tab => tab.type === 'iframe').map(tab => (
           <iframe
-            key={tab.id}
+            key={`hidden-${tab.id}`}
             data-tab-id={tab.id}
             src={tab.url}
             className="popup-menu-iframe"
             title={tab.name}
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+            style={{ width: '100px', height: '100px' }}
           />
         ))}
       </div>
@@ -405,17 +406,15 @@ const PopupMenu = ({
             </div>
 
             <div className="popup-menu-content">
-              {/* Show active iframe content */}
+              {/* Show visible iframe content */}
               {activeTab && activeTab.type === 'iframe' && (
-                <div className="popup-menu-iframe-container">
-                  <iframe
-                    key={`visible-${activeTab.id}`}
-                    src={activeTab.url}
-                    className="popup-menu-iframe"
-                    title={activeTab.name}
-                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                  />
-                </div>
+                <iframe
+                  key={`visible-${activeTab.id}`}
+                  src={activeTab.url}
+                  className="popup-menu-iframe"
+                  title={activeTab.name}
+                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                />
               )}
               
               {activeTab && activeTab.type === 'settings' && (

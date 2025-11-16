@@ -203,6 +203,9 @@
 
         // Add a tool to the grid
         function addTool(name, thumbnail, onClick) {
+            console.log('addTool called with:', { name, thumbnail, onClick });
+            console.log('Before - tools.length:', tools.length, 'filteredTools.length:', filteredTools.length);
+            
             const tool = {
                 id: Date.now() + Math.random(),
                 name: name,
@@ -215,6 +218,7 @@
             renderTools();
             updateToolsCount();
             
+            console.log('After - tools.length:', tools.length, 'filteredTools.length:', filteredTools.length);
             console.log('Tool added:', tool);
             return tool.id;
         }
@@ -263,6 +267,12 @@
         // Render tools in the grid
         function renderTools() {
             const grid = document.getElementById('toolsGrid');
+            console.log('renderTools called - grid:', !!grid, 'filteredTools.length:', filteredTools.length);
+            
+            if (!grid) {
+                console.error('toolsGrid element not found!');
+                return;
+            }
             
             if (filteredTools.length === 0) {
                 if (tools.length === 0) {
@@ -270,10 +280,11 @@
                 } else {
                     grid.innerHTML = '<div class="no-tools">No tools match your search.</div>';
                 }
+                console.log('No tools to render');
                 return;
             }
 
-            grid.innerHTML = filteredTools.map(tool => {
+            const toolsHtml = filteredTools.map(tool => {
                 const thumbnailContent = tool.thumbnail.startsWith('http') || tool.thumbnail.startsWith('data:') 
                     ? `<img src="${tool.thumbnail}" alt="${tool.name}">`
                     : tool.thumbnail;
@@ -285,6 +296,10 @@
                     </div>
                 `;
             }).join('');
+            
+            console.log('Setting grid innerHTML with', filteredTools.length, 'tools');
+            console.log('Generated HTML:', toolsHtml.substring(0, 200) + '...');
+            grid.innerHTML = toolsHtml;
         }
 
         // Handle tool click
