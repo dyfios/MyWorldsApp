@@ -329,55 +329,66 @@ const PopupMenu = ({
 
   const activeTab = tabs.find(tab => tab.id === activeTabId);
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="popup-menu-overlay" onClick={closeMenu}>
-      <div 
-        className="popup-menu-container" 
-        ref={menuRef}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="popup-menu-header">
-          <div className="popup-menu-tabs">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                className={`popup-menu-tab ${activeTabId === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTabId(tab.id)}
-              >
-                {tab.name}
-              </button>
-            ))}
-          </div>
-          <button 
-            className="popup-menu-close"
-            onClick={closeMenu}
-            aria-label="Close menu"
-          >
-            ✕
-          </button>
-        </div>
+    <>
+      {/* Always render iframes (hidden) so they can receive messages */}
+      <div style={{ display: 'none' }}>
+        {tabs.filter(tab => tab.type === 'iframe').map(tab => (
+          <iframe
+            key={tab.id}
+            data-tab-id={tab.id}
+            src={tab.url}
+            className="popup-menu-iframe"
+            title={tab.name}
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+          />
+        ))}
+      </div>
 
-        <div className="popup-menu-content">
-          {/* Render all iframe tabs (hidden when not active) */}
-          {tabs.filter(tab => tab.type === 'iframe').map(tab => (
-            <iframe
-              key={tab.id}
-              data-tab-id={tab.id}
-              src={tab.url}
-              className="popup-menu-iframe"
-              title={tab.name}
-              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-              style={{ 
-                display: activeTab && activeTab.id === tab.id ? 'block' : 'none' 
-              }}
-            />
-          ))}
-          
-          {activeTab && activeTab.type === 'settings' && (
+      {/* Main popup menu (only when open) */}
+      {isOpen && (
+        <div className="popup-menu-overlay" onClick={closeMenu}>
+          <div 
+            className="popup-menu-container" 
+            ref={menuRef}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="popup-menu-header">
+              <div className="popup-menu-tabs">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    className={`popup-menu-tab ${activeTabId === tab.id ? 'active' : ''}`}
+                    onClick={() => setActiveTabId(tab.id)}
+                  >
+                    {tab.name}
+                  </button>
+                ))}
+              </div>
+              <button 
+                className="popup-menu-close"
+                onClick={closeMenu}
+                aria-label="Close menu"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="popup-menu-content">
+              {/* Show active iframe content */}
+              {activeTab && activeTab.type === 'iframe' && (
+                <div className="popup-menu-iframe-container">
+                  <iframe
+                    key={`visible-${activeTab.id}`}
+                    src={activeTab.url}
+                    className="popup-menu-iframe"
+                    title={activeTab.name}
+                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                  />
+                </div>
+              )}
+              
+              {activeTab && activeTab.type === 'settings' && (
             <div className="popup-menu-settings">
               <h2>Settings</h2>
               
@@ -464,6 +475,8 @@ const PopupMenu = ({
         </div>
       </div>
     </div>
+    )}
+    </>
   );
 };
 
