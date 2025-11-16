@@ -257,6 +257,25 @@ const PopupMenu = ({
     return () => window.removeEventListener('message', handleMessage);
   }, [tabs, onMessage]);
 
+  // Debug: Log when tabs change
+  useEffect(() => {
+    console.log('PopupMenu tabs changed: ' + JSON.stringify(tabs.map(t => ({ id: t.id, name: t.name, type: t.type }))));
+    
+    // Also log if popup menu is open
+    console.log('PopupMenu isOpen: ' + isOpen);
+    
+    // Check if iframes exist in DOM after tabs change
+    setTimeout(() => {
+      const allIframes = Array.from(document.querySelectorAll('iframe'));
+      console.log('All iframes in DOM after tabs update: ' + JSON.stringify(allIframes.map(iframe => ({
+        dataTabId: iframe.getAttribute('data-tab-id'),
+        src: iframe.src,
+        title: iframe.title,
+        display: iframe.style.display
+      }))));
+    }, 10);
+  }, [tabs, isOpen]);
+
   // Expose API globally
   useEffect(() => {
     window.popupMenuAPI = {
