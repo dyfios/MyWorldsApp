@@ -97,23 +97,23 @@ const PopupMenu = ({
 
   // API: Send message to active iframe
   const sendMessageToTab = useCallback((tabId, message) => {
-    console.log('sendMessageToTab called with:', { tabId, messageType: message.type });
-    console.log('Available tabs:', tabs.map(t => ({ id: t.id, name: t.name, type: t.type })));
+    console.log('sendMessageToTab called with: ' + JSON.stringify({ tabId, messageType: message.type }));
+    console.log('Available tabs: ' + JSON.stringify(tabs.map(t => ({ id: t.id, name: t.name, type: t.type }))));
     
     const tab = tabs.find(t => t.id === tabId);
     if (!tab || tab.type !== 'iframe') {
-      console.warn('Cannot send message: tab not found or not an iframe', { tabId, tab });
+      console.warn('Cannot send message: tab not found or not an iframe ' + JSON.stringify({ tabId, tab }));
       return false;
     }
 
     const iframe = document.querySelector(`iframe[data-tab-id="${tabId}"]`);
-    console.log('sendMessageToTab debug:', { 
+    console.log('sendMessageToTab debug: ' + JSON.stringify({ 
       tabId, 
       iframe: !!iframe, 
       contentWindow: iframe ? !!iframe.contentWindow : false,
       readyState: iframe ? iframe.readyState : 'no-iframe',
       src: iframe ? iframe.src : 'no-iframe'
-    });
+    }));
     
     if (iframe) {
       // Try multiple approaches to send the message
@@ -162,11 +162,11 @@ const PopupMenu = ({
       }
     } else {
       console.warn('Iframe not found in DOM for tabId:', tabId);
-      console.log('All iframes in DOM:', Array.from(document.querySelectorAll('iframe')).map(iframe => ({
+      console.log('All iframes in DOM: ' + JSON.stringify(Array.from(document.querySelectorAll('iframe')).map(iframe => ({
         dataTabId: iframe.getAttribute('data-tab-id'),
         src: iframe.src,
         title: iframe.title
-      })));
+      }))));
       
       // Retry after a short delay to allow React to render the iframe
       setTimeout(() => {
