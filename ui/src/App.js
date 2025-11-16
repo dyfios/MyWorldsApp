@@ -48,15 +48,20 @@ function App() {
 
   // API: Select button
   const selectButton = useCallback((buttonId) => {
+    console.log('ButtonDock: selectButton called with buttonId:', buttonId);
     setSelectedButtonId(buttonId);
     console.log('Button selected:', buttonId);
     
     // Find the button and invoke its onClick if it exists
     const button = buttons.find(btn => btn.id === buttonId);
+    console.log('ButtonDock: Button found:', button ? button.name : 'none', 'onClick:', button ? button.onClick : 'none');
+    
     if (button && button.onClick) {
       // Call postWorldMessage if it exists
       if (typeof window.postWorldMessage === 'function') {
+        console.log('ButtonDock: Executing onClick via postWorldMessage:', button.onClick);
         window.postWorldMessage(button.onClick);
+        console.log('ButtonDock: postWorldMessage called successfully');
       } else {
         console.warn('postWorldMessage is not defined');
       }

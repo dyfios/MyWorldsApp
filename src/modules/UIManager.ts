@@ -199,11 +199,64 @@ export class UIManager {
             } else {
               Logging.LogError('❌ UIManager: Invalid TOOL.ADD_DOCK_BUTTON message format: ' + msg);
             }
+          } else if (msg.startsWith('TOOL.DOCK_BUTTON_CLICKED(')) {
+            // Handle dock button click - extract type parameter
+            const paramStart = msg.indexOf('(') + 1;
+            const paramEnd = msg.lastIndexOf(')');
+            
+            if (paramStart > 0 && paramEnd > paramStart) {
+              const buttonType = msg.substring(paramStart, paramEnd).trim().replace(/['"]/g, '');
+              Logging.Log('🔧 UIManager: Dock button clicked - type: ' + buttonType);
+              
+              // Handle the button click based on type
+              this.handleDockButtonClick(buttonType);
+            } else {
+              Logging.LogError('❌ UIManager: Invalid TOOL.DOCK_BUTTON_CLICKED message format: ' + msg);
+            }
           }
       }
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       Logging.LogError('❌ UIManager: Error handling toolbar message: ' + errorMessage);
+    }
+  }
+
+  /**
+   * Handle dock button click events
+   */
+  private handleDockButtonClick(buttonType: string): void {
+    try {
+      Logging.Log('🔧 UIManager: Processing dock button click for type: ' + buttonType);
+      
+      // TODO: Implement specific button type handling here
+      // For now, just log the button type that was clicked
+      // You can add specific logic for different button types as needed
+      
+      switch (buttonType) {
+        case 'build':
+          Logging.Log('🔨 UIManager: Build button clicked');
+          // Add build-specific logic here
+          break;
+        case 'paint':
+          Logging.Log('🎨 UIManager: Paint button clicked');
+          // Add paint-specific logic here
+          break;
+        case 'move':
+          Logging.Log('📦 UIManager: Move button clicked');
+          // Add move-specific logic here
+          break;
+        case 'delete':
+          Logging.Log('🗑️ UIManager: Delete button clicked');
+          // Add delete-specific logic here
+          break;
+        default:
+          Logging.Log('🔧 UIManager: Unknown button type clicked: ' + buttonType);
+          // Handle unknown button types
+          break;
+      }
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      Logging.LogError('❌ UIManager: Error handling dock button click: ' + errorMessage);
     }
   }
 
@@ -480,6 +533,8 @@ export class UIManager {
    */
   private addEditToolbarButton(name: string, thumbnail: string, onClick: string): void {
     Logging.Log('🎨 UIManager: Setting up edit toolbar buttons...');
+    Logging.Log('🎨 UIManager: Button details - name: ' + name + ', thumbnail: ' + thumbnail + ', onClick: ' + onClick);
+    
     const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
       if (!mainToolbarId) {
         Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found in storage');
@@ -492,8 +547,17 @@ export class UIManager {
         return;
       }
 
-      const jsCommand = `window.buttonDockAPI.addButton('${name}', '${thumbnail}', '${onClick}');`;
+      const jsCommand = `
+        console.log('UIManager: Adding button to ButtonDock - name: ${name}, onClick: ${onClick}');
+        if (window.buttonDockAPI && typeof window.buttonDockAPI.addButton === 'function') {
+          window.buttonDockAPI.addButton('${name}', '${thumbnail}', '${onClick}');
+          console.log('UIManager: Button added successfully');
+        } else {
+          console.warn('UIManager: buttonDockAPI not available');
+        }
+      `;
       mainToolbar.ExecuteJavaScript(jsCommand, '');
+      Logging.Log('✅ UIManager: Button add command sent to UI space');
   }
 
   /**
