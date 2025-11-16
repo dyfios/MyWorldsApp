@@ -74,8 +74,22 @@ function App() {
     
     const currentIndex = buttons.findIndex(btn => btn.id === selectedButtonId);
     const prevIndex = currentIndex <= 0 ? buttons.length - 1 : currentIndex - 1;
-    setSelectedButtonId(buttons[prevIndex].id);
-    postWorldMessage(`BUTTON.SELECTED(${buttons[prevIndex].name})`);
+    const button = buttons[prevIndex];
+    
+    console.log('ButtonDock: selectPrevious called, button:', button.name);
+    setSelectedButtonId(button.id);
+    postWorldMessage(`BUTTON.SELECTED(${button.name})`);
+    
+    // Execute the button's onClick action
+    if (button.onClick) {
+      console.log('ButtonDock: Executing onClick via selectPrevious:', button.onClick);
+      if (typeof postWorldMessage === 'function') {
+        postWorldMessage(button.onClick);
+        console.log('ButtonDock: onClick executed via postWorldMessage');
+      } else {
+        console.warn('postWorldMessage is not defined');
+      }
+    }
   }, [buttons, selectedButtonId]);
 
   // API: Select next button
@@ -84,15 +98,43 @@ function App() {
     
     const currentIndex = buttons.findIndex(btn => btn.id === selectedButtonId);
     const nextIndex = currentIndex >= buttons.length - 1 ? 0 : currentIndex + 1;
-    setSelectedButtonId(buttons[nextIndex].id);
-    postWorldMessage(`BUTTON.SELECTED(${buttons[nextIndex].name})`);
+    const button = buttons[nextIndex];
+    
+    console.log('ButtonDock: selectNext called, button:', button.name);
+    setSelectedButtonId(button.id);
+    postWorldMessage(`BUTTON.SELECTED(${button.name})`);
+    
+    // Execute the button's onClick action
+    if (button.onClick) {
+      console.log('ButtonDock: Executing onClick via selectNext:', button.onClick);
+      if (typeof postWorldMessage === 'function') {
+        postWorldMessage(button.onClick);
+        console.log('ButtonDock: onClick executed via postWorldMessage');
+      } else {
+        console.warn('postWorldMessage is not defined');
+      }
+    }
   }, [buttons, selectedButtonId]);
 
   // API: Select by number key
   const selectByNumber = useCallback((number) => {
     if (number > 0 && number <= buttons.length) {
-      setSelectedButtonId(buttons[number - 1].id);
-      postWorldMessage(`BUTTON.SELECTED(${buttons[number - 1].name})`);
+      const button = buttons[number - 1];
+      console.log('ButtonDock: selectByNumber called with number:', number, 'button:', button.name);
+      
+      setSelectedButtonId(button.id);
+      postWorldMessage(`BUTTON.SELECTED(${button.name})`);
+      
+      // Execute the button's onClick action, just like selectButton does
+      if (button.onClick) {
+        console.log('ButtonDock: Executing onClick via selectByNumber:', button.onClick);
+        if (typeof postWorldMessage === 'function') {
+          postWorldMessage(button.onClick);
+          console.log('ButtonDock: onClick executed via postWorldMessage');
+        } else {
+          console.warn('postWorldMessage is not defined');
+        }
+      }
     }
   }, [buttons]);
 
