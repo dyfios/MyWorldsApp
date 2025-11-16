@@ -97,6 +97,9 @@ const PopupMenu = ({
 
   // API: Send message to active iframe
   const sendMessageToTab = useCallback((tabId, message) => {
+    console.log('sendMessageToTab called with:', { tabId, messageType: message.type });
+    console.log('Available tabs:', tabs.map(t => ({ id: t.id, name: t.name, type: t.type })));
+    
     const tab = tabs.find(t => t.id === tabId);
     if (!tab || tab.type !== 'iframe') {
       console.warn('Cannot send message: tab not found or not an iframe', { tabId, tab });
@@ -159,6 +162,33 @@ const PopupMenu = ({
       }
     } else {
       console.warn('Iframe not found in DOM for tabId:', tabId);
+      console.log('All iframes in DOM:', Array.from(document.querySelectorAll('iframe')).map(iframe => ({
+        dataTabId: iframe.getAttribute('data-tab-id'),
+        src: iframe.src,
+        title: iframe.title
+      })));
+      
+      // Retry after a short delay to allow React to render the iframe
+      setTimeout(() => {
+        console.log('Retrying sendMessageToTab after render delay...');
+        const retryIframe = document.querySelector(`iframe[data-tab-id="${tabId}"]`);
+        if (retryIframe && retryIframe.contentWindow) {
+          try {
+            retryIframe.contentWindow.postMessage({
+              source: 'myworlds-popup-menu',
+              type: 'message',
+              data: message
+            }, '*');
+            console.log('Message sent successfully on retry');
+          } catch (error) {
+            console.warn('Error sending message on retry:', error);
+          }
+        } else {
+          console.warn('Retry failed - iframe still not found or ready');
+        }
+      }, 500);
+      
+      return true; // Return true since we're attempting a retry
     }
     
     return false;
