@@ -193,7 +193,7 @@ const PopupMenu = ({
       getActiveTab: () => activeTabId,
       onTabMessage,
       offTabMessage,
-      sendMessageToTab,
+      sendMessageToTab: (tabId, msg) => sendMessageToTab(tabId, msg),
       // Settings APIs
       setQuality: (value) => {
         if (['Low', 'Med', 'High'].includes(value)) {
@@ -264,16 +264,20 @@ const PopupMenu = ({
         </div>
 
         <div className="popup-menu-content">
-          {activeTab && activeTab.type === 'iframe' && (
+          {/* Render all iframe tabs (hidden when not active) */}
+          {tabs.filter(tab => tab.type === 'iframe').map(tab => (
             <iframe
-              key={activeTab.id}
-              data-tab-id={activeTab.id}
-              src={activeTab.url}
+              key={tab.id}
+              data-tab-id={tab.id}
+              src={tab.url}
               className="popup-menu-iframe"
-              title={activeTab.name}
+              title={tab.name}
               sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+              style={{ 
+                display: activeTab && activeTab.id === tab.id ? 'block' : 'none' 
+              }}
             />
-          )}
+          ))}
           
           {activeTab && activeTab.type === 'settings' && (
             <div className="popup-menu-settings">
