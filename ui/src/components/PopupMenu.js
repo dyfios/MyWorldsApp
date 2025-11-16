@@ -99,19 +99,68 @@ const PopupMenu = ({
   const sendMessageToTab = useCallback((tabId, message) => {
     const tab = tabs.find(t => t.id === tabId);
     if (!tab || tab.type !== 'iframe') {
-      console.warn('Cannot send message: tab not found or not an iframe');
+      console.warn('Cannot send message: tab not found or not an iframe', { tabId, tab });
       return false;
     }
 
     const iframe = document.querySelector(`iframe[data-tab-id="${tabId}"]`);
-    if (iframe && iframe.contentWindow) {
-      iframe.contentWindow.postMessage({
-        source: 'myworlds-popup-menu',
-        type: 'message',
-        data: message
-      }, '*');
-      return true;
+    console.log('sendMessageToTab debug:', { 
+      tabId, 
+      iframe: !!iframe, 
+      contentWindow: iframe ? !!iframe.contentWindow : false,
+      readyState: iframe ? iframe.readyState : 'no-iframe',
+      src: iframe ? iframe.src : 'no-iframe'
+    });
+    
+    if (iframe) {
+      // Try multiple approaches to send the message
+      if (iframe.contentWindow) {
+        try {
+          iframe.contentWindow.postMessage({
+            source: 'myworlds-popup-menu',
+            type: 'message',
+            data: message
+          }, '*');
+          console.log('Message sent successfully via contentWindow');
+          return true;
+        } catch (error) {
+          console.warn('Error sending message via contentWindow:', error);
+        }
+      }
+      
+      // Fallback: wait for iframe to load if it's not ready
+      if (!iframe.contentWindow || iframe.readyState !== 'complete') {
+        console.log('Iframe not ready, waiting for load...');
+        
+        const sendWhenReady = () => {
+          try {
+            iframe.contentWindow.postMessage({
+              source: 'myworlds-popup-menu',
+              type: 'message',
+              data: message
+            }, '*');
+            console.log('Message sent successfully after load');
+            return true;
+          } catch (error) {
+            console.warn('Error sending message after load:', error);
+            return false;
+          }
+        };
+        
+        // If iframe has a contentWindow but document might not be ready
+        if (iframe.contentWindow) {
+          setTimeout(sendWhenReady, 100);
+          return true;
+        }
+        
+        // If no contentWindow, wait for iframe load event
+        iframe.addEventListener('load', sendWhenReady, { once: true });
+        return true;
+      }
+    } else {
+      console.warn('Iframe not found in DOM for tabId:', tabId);
     }
+    
     return false;
   }, [tabs]);
 
