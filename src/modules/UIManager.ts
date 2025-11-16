@@ -235,27 +235,27 @@ export class UIManager {
       switch (buttonType) {
         case 'HAND':
           Logging.Log('🔨 UIManager: Hand button clicked');
-          (globalThis as any).environmentModifier.setInteractionMode('HAND');
+          (globalThis as any).setInteractionMode('HAND');
           break;
         case 'SQUARE_SHOVEL_1':
           Logging.Log('🎨 UIManager: Square Shovel 1 button clicked');
-          (globalThis as any).environmentModifier.setInteractionMode('SQUARE-SHOVEL-1');
+          (globalThis as any).setInteractionMode('SQUARE-SHOVEL-1');
           break;
         case 'SQUARE_SHOVEL_2':
           Logging.Log('📦 UIManager: Square Shovel 2 button clicked');
-          (globalThis as any).environmentModifier.setInteractionMode('SQUARE-SHOVEL-2');
+          (globalThis as any).setInteractionMode('SQUARE-SHOVEL-2');
           break;
         case 'SQUARE_SHOVEL_4':
           Logging.Log('🗑️ UIManager: Square Shovel 4 button clicked');
-          (globalThis as any).environmentModifier.setInteractionMode('SQUARE-SHOVEL-4');
+          (globalThis as any).setInteractionMode('SQUARE-SHOVEL-4');
           break;
         case 'SQUARE_SHOVEL_8':
           Logging.Log('🗑️ UIManager: Square Shovel 8 button clicked');
-          (globalThis as any).environmentModifier.setInteractionMode('SQUARE-SHOVEL-8');
+          (globalThis as any).setInteractionMode('SQUARE-SHOVEL-8');
           break;
         case 'SLEDGEHAMMER':
           Logging.Log('🔨 UIManager: Sledgehammer button clicked');
-          (globalThis as any).environmentModifier.setInteractionMode('SLEDGE-HAMMER');
+          (globalThis as any).setInteractionMode('SLEDGE-HAMMER');
           break;
         default:
           Logging.Log('🔧 UIManager: Unknown button type clicked: ' + buttonType);
