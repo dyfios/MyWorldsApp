@@ -1614,10 +1614,8 @@ declare enum UIElementAlignment {
  * Terrain entity brush type enum.
  */
 declare enum TerrainEntityBrushType {
-    RaiseLower = 0,
-    Flatten = 1,
-    Smooth = 2,
-    Paint = 3
+    sphere = 0,
+    roundedCube = 1
 }
 
 /**

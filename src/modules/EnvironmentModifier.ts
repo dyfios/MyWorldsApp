@@ -197,17 +197,84 @@ export class EnvironmentModifier {
   /**
    * Perform digging action on a terrain entity
    */
-  performDig(terrainEntity: TerrainEntity, hitInfo: RaycastHitInfo, layer: number): void {
-    Logging.Log('Digging on terrain entity "' + terrainEntity.id +
-      '" at layer ' + layer + ' at position ' + hitInfo.hitPoint.toString());
+  performDig(terrainEntity: TerrainEntity, hitInfo: RaycastHitInfo, brushSize: number): void {
+    Logging.Log('Performing dig operation on terrain entity "' + terrainEntity.id +
+      '" with brush size ' + brushSize + ' at position ' + hitInfo.hitPoint.toString());
+
+    try {
+      var brushMinHeight: number = 0;
+      var gridSize: number = 1;
+
+    var terrainIndex = (globalThis as any).tiledsurfacerenderer_getIndexForTerrainTile(terrainEntity);
+
+      // Align the hit point to the grid
+      var alignedHitPoint = new Vector3(
+        Math.round(hitInfo.hitPoint.x / gridSize) * gridSize,
+        Math.round(hitInfo.hitPoint.y / gridSize) * gridSize,
+        Math.round(hitInfo.hitPoint.z / gridSize) * gridSize);
+
+      // Check if the dig position is above minimum height
+      if (alignedHitPoint.y >= brushMinHeight) {
+        var layerToUse = (globalThis as any).tiledsurfacerenderer_getMaterialForDigging(terrainIndex, alignedHitPoint.y);
+        
+        Logging.Log("Executing dig at aligned position: " + alignedHitPoint.toString() + 
+                    " with brush size: " + brushSize + " and layer: " + layerToUse);
+        
+        // Perform the dig operation using roundedCube brush type
+        var digSuccess = terrainEntity.Dig(alignedHitPoint,
+        TerrainEntityBrushType.roundedCube, layerToUse, brushSize, true);
+        
+        if (digSuccess) {
+            Logging.Log("Dig operation completed successfully");
+        } else {
+            Logging.LogError("Dig operation failed");
+        }
+      } else {
+        Logging.Log("Dig position below minimum height (" + brushMinHeight + "), operation cancelled");
+      }
+    } catch (error) {
+      Logging.LogError("Error during dig operation: " + error);
+    }
   }
 
   /**
    * Perform building action on a terrain entity
    */
   performBuild(terrainEntity: TerrainEntity, hitInfo: RaycastHitInfo, layer: number): void {
-    Logging.Log('Building on terrain entity "' + terrainEntity.id +
-      '" at layer ' + layer + ' at position ' + hitInfo.hitPoint.toString());
+    var brushSize: number = 1;
+    Logging.Log('Performing build operation on terrain entity "' + terrainEntity.id +
+      '" with brush size ' + brushSize + ' at position ' + hitInfo.hitPoint.toString());
+
+    try {
+      var brushMinHeight: number = 0;
+      var gridSize: number = 1;
+
+      // Align the hit point to the grid
+      var alignedHitPoint = new Vector3(
+        Math.round(hitInfo.hitPoint.x / gridSize) * gridSize,
+        Math.round(hitInfo.hitPoint.y / gridSize) * gridSize,
+        Math.round(hitInfo.hitPoint.z / gridSize) * gridSize);
+
+      // Check if the build position is above minimum height
+      if (alignedHitPoint.y >= brushMinHeight) {
+        Logging.Log("Executing build at aligned position: " + alignedHitPoint.toString() + 
+                    " with brush size: " + brushSize + " and layer: " + layer);
+        
+        // Perform the build operation using roundedCube brush type
+        var buildSuccess = terrainEntity.Build(alignedHitPoint,
+        TerrainEntityBrushType.roundedCube, layer, brushSize, true);
+        
+        if (buildSuccess) {
+            Logging.Log("Build operation completed successfully");
+        } else {
+            Logging.LogError("Build operation failed");
+        }
+      } else {
+        Logging.Log("Build position below minimum height (" + brushMinHeight + "), operation cancelled");
+      }
+    } catch (error) {
+      Logging.LogError("Error during build operation: " + error);
+    }
   }
 
   /**

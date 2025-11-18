@@ -1499,6 +1499,18 @@ export class TiledSurfaceRenderer extends WorldRendering {
     (globalThis as any).tiledsurfacerenderer_updateTimeOfDay = (timeInfo: string) => {
       this.updateTimeOfDay(timeInfo);
     };
+
+    (globalThis as any).tiledsurfacerenderer_getTerrainTileForIndex = (index: Vector2Int) => {
+      return this.getTerrainTileForIndex(index);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getTerrainTileIndexForEntity = (entity: TerrainEntity) => {
+      return this.getTerrainTileIndexForEntity(entity);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getMaterialForDigging = (regionIdx: Vector2Int, height: number) => {
+      return this.getMaterialForDigging(regionIdx, height);
+    };
   }
 
   async initialize(): Promise<void> {

@@ -228,10 +228,6 @@ export class UIManager {
     try {
       Logging.Log('🔧 UIManager: Processing dock button click for type: ' + buttonType);
       
-      // TODO: Implement specific button type handling here
-      // For now, just log the button type that was clicked
-      // You can add specific logic for different button types as needed
-      
       switch (buttonType) {
         case 'HAND':
           Logging.Log('🔨 UIManager: Hand button clicked');
