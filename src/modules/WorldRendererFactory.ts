@@ -1508,6 +1508,10 @@ export class TiledSurfaceRenderer extends WorldRendering {
       return this.getTerrainTileIndexForEntity(entity);
     };
 
+    (globalThis as any).tiledsurfacerenderer_getIndexForTerrainTile = (terrainTile: TerrainEntity) => {
+      return this.getIndexForTerrainTile(terrainTile);
+    };
+
     (globalThis as any).tiledsurfacerenderer_getMaterialForDigging = (regionIdx: Vector2Int, height: number) => {
       return this.getMaterialForDigging(regionIdx, height);
     };
