@@ -285,8 +285,24 @@
             }
 
             const toolsHtml = filteredTools.map(tool => {
-                const thumbnailContent = tool.thumbnail.startsWith('http') || tool.thumbnail.startsWith('data:') 
-                    ? `<img src="${tool.thumbnail}" alt="${tool.name}">`
+                // Check if thumbnail is a URL (more comprehensive check)
+                const isUrl = tool.thumbnail.startsWith('http') || 
+                             tool.thumbnail.startsWith('https') ||
+                             tool.thumbnail.startsWith('data:') ||
+                             tool.thumbnail.startsWith('file:') ||
+                             tool.thumbnail.startsWith('./') ||
+                             tool.thumbnail.startsWith('../') ||
+                             tool.thumbnail.includes('.') && (
+                                 tool.thumbnail.endsWith('.png') ||
+                                 tool.thumbnail.endsWith('.jpg') ||
+                                 tool.thumbnail.endsWith('.jpeg') ||
+                                 tool.thumbnail.endsWith('.gif') ||
+                                 tool.thumbnail.endsWith('.svg') ||
+                                 tool.thumbnail.endsWith('.webp')
+                             );
+                
+                const thumbnailContent = isUrl
+                    ? `<img src="${tool.thumbnail}" alt="${tool.name}" onerror="this.style.display='none'; this.parentElement.innerHTML='📷'">`
                     : tool.thumbnail;
                 
                 return `
