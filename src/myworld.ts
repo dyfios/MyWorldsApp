@@ -181,12 +181,12 @@ export class MyWorld {
             Logging.Log('Mini-world tools added successfully');
           } else if ('${worldType}' === 'planet') {
             // Planet tools
-            addTool('Hand', this.uiManager.handPath, 'TOOL.ADD_DOCK_BUTTON(HAND, Hand, 🏔️)');
-            addTool('Square Shovel', this.uiManager.squareShovelx1Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_1, Square Shovel, 🌊)');
-            addTool('Square Shovel (2x)', this.uiManager.squareShovelx2Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_2, Square Shovel (2x), 🌲)');
-            addTool('Square Shovel (4x)', this.uiManager.squareShovelx4Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_4, Square Shovel (4x), 🏙️)');
-            addTool('Square Shovel (8x)', this.uiManager.squareShovelx8Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_8, Square Shovel (8x), ⛈️)');
-            addTool('Sledge Hammer', this.uiManager.sledgeHammerPath, 'TOOL.ADD_DOCK_BUTTON(SLEDGE_HAMMER, Sledge Hammer, ⛏️)');
+            addTool('Hand', this.uiManager.handPath, 'TOOL.ADD_DOCK_BUTTON(HAND, Hand, this.uiManager.handPath)');
+            addTool('Square Shovel', this.uiManager.squareShovelx1Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_1, Square Shovel, this.uiManager.squareShovelx1Path)');
+            addTool('Square Shovel (2x)', this.uiManager.squareShovelx2Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_2, Square Shovel (2x), this.uiManager.squareShovelx2Path)');
+            addTool('Square Shovel (4x)', this.uiManager.squareShovelx4Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_4, Square Shovel (4x), this.uiManager.squareShovelx4Path)');
+            addTool('Square Shovel (8x)', this.uiManager.squareShovelx8Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_8, Square Shovel (8x), this.uiManager.squareShovelx8Path)');
+            addTool('Sledge Hammer', this.uiManager.sledgeHammerPath, 'TOOL.ADD_DOCK_BUTTON(SLEDGE_HAMMER, Sledge Hammer, this.uiManager.sledgeHammerPath)');
             Logging.Log('Planet tools added successfully');
           }
         } catch (error) {
