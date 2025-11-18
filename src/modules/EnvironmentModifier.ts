@@ -205,7 +205,7 @@ export class EnvironmentModifier {
       var brushMinHeight: number = 0;
       var gridSize: number = 1;
 
-    var terrainIndex = (globalThis as any).tiledsurfacerenderer_getIndexForTerrainTile(terrainEntity);
+      var terrainIndex = (globalThis as any).tiledsurfacerenderer_getIndexForTerrainTile(terrainEntity);
 
       // Align the hit point to the grid
       var alignedHitPoint = new Vector3(
@@ -222,7 +222,7 @@ export class EnvironmentModifier {
         
         // Perform the dig operation using roundedCube brush type
         var digSuccess = terrainEntity.Dig(alignedHitPoint,
-        TerrainEntityBrushType.roundedCube, layerToUse, brushSize, true);
+            TerrainEntityBrushType.roundedCube, layerToUse, brushSize, true);
         
         if (digSuccess) {
             Logging.Log("Dig operation completed successfully");
@@ -262,7 +262,7 @@ export class EnvironmentModifier {
         
         // Perform the build operation using roundedCube brush type
         var buildSuccess = terrainEntity.Build(alignedHitPoint,
-        TerrainEntityBrushType.roundedCube, layer, brushSize, true);
+            TerrainEntityBrushType.roundedCube, layer, brushSize, true);
         
         if (buildSuccess) {
             Logging.Log("Build operation completed successfully");

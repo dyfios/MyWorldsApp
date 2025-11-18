@@ -25,6 +25,16 @@ export class UIManager {
   private editToolbar?: HTMLElement;
   private isInitialized: boolean = false;
 
+  public defaultToolPath: string = "assets/images/tool-default.png";
+  public defaultEntityPath: string = "assets/images/entity-default.png";
+  public defaultTerrainPath: string = "assets/images/terrain-default.png";
+  public handPath: string = "assets/images/hand.png";
+  public squareShovelx1Path: string = "assets/images/square-shovel.png";
+  public squareShovelx2Path: string = "assets/images/square-shovel-x2.png";
+  public squareShovelx4Path: string = "assets/images/square-shovel-x4.png";
+  public squareShovelx8Path: string = "assets/images/square-shovel-x8.png";
+  public sledgeHammerPath: string = "assets/images/sledgehammer.png";
+
   constructor() {
     // Set the singleton instance
     UIManager.instance = this;
