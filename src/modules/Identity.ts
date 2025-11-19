@@ -190,6 +190,7 @@ export class Identity {
       Logging.Log('🔄 Showing main UI after login...');
       (globalThis as any).uiManager.initializeEditToolbar();
       (globalThis as any).enableEditToolbar();
+      (globalThis as any).startRenderLoop();
       if (this.loginCallbackFunction) {
           this.loginCallbackFunction();
       }

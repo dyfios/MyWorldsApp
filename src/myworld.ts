@@ -15,6 +15,7 @@ export class MyWorld {
 
   constructor() {
     try {
+      (globalThis as any).startRenderLoop = this.startRenderLoop.bind(this);
       Logging.Log('🚀 Step 0b1: Creating ClientContext...');
       this.context = new ClientContext();
       Logging.Log('🚀 Step 0b2: Creating ProcessQueryParams...');
@@ -83,7 +84,7 @@ export class MyWorld {
 
       // Start render loop
       Logging.Log('🔄 Starting render loop...');
-      await this.startRenderLoop();
+      //await this.startRenderLoop();
       Logging.Log('✓ Render loop started successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
