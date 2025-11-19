@@ -948,11 +948,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
             + this.entitiesConfig[entity].variants[variant].thumbnail;
           Time.SetTimeout(`
             try {
-              addTool('${this.entitiesConfig[entity].variants[variant].display_name}', 
-                '${this.entitiesConfig[entity].variants[variant].thumbnail}',
-                'TOOL.ADD_DOCK_BUTTON(ENTITY.${entity}.${variant},
-                ${this.entitiesConfig[entity].variants[variant].display_name},
-                ${this.entitiesConfig[entity].variants[variant].thumbnail})');
+              addTool('${this.entitiesConfig[entity].variants[variant].display_name}', '${this.entitiesConfig[entity].variants[variant].thumbnail}', 'TOOL.ADD_DOCK_BUTTON(ENTITY.${entity}.${variant}, ${this.entitiesConfig[entity].variants[variant].display_name}, ${this.entitiesConfig[entity].variants[variant].thumbnail})');
           }
         } catch (error) {
           Logging.LogError('Error adding entity: ' + error);
