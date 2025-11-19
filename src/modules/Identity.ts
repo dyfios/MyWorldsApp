@@ -188,6 +188,7 @@ export class Identity {
       
       // Now that login is complete, trigger entity template loading and show main UI
       Logging.Log('🔄 Showing main UI after login...');
+      (globalThis as any).uiManager.initializeEditToolbar();
       (globalThis as any).enableEditToolbar();
       if (this.loginCallbackFunction) {
           this.loginCallbackFunction();
