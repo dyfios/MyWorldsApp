@@ -48,6 +48,15 @@ export class MyWorld {
       await this.context.initializeModules();
       Logging.Log('✓ Modules initialized successfully');
 
+      // 2a. Start login process after modules are initialized
+      Logging.Log('🔐 Step 2a: Initiating login with Identity module...');
+      if (this.context.modules.identity) {
+        this.context.modules.identity.StartLogin();
+        Logging.Log('✓ Login process started');
+      } else {
+        Logging.LogError('❌ Identity module not available for login');
+      }
+
       // 4. Load world configuration
       Logging.Log('🌍 Step 4: Loading world configuration...');
       const worldUri = params.worldUri as string | undefined;
@@ -243,9 +252,18 @@ export class MyWorld {
       Logging.Log('🏗️ Step 2: Initializing static surface renderer...');
       await staticRenderer.initialize();
       
-      // Request entity templates
-      Logging.Log('🏗️ Step 3: Requesting entity templates...');
-      staticRenderer.requestEntityTemplates();
+      // Check if user is already logged in
+      const identityModule = this.context.modules.identity;
+      if (identityModule && identityModule.isLoggedIn()) {
+        // User is already logged in, request entity templates immediately
+        Logging.Log('🏗️ Step 3: User already logged in, requesting entity templates...');
+        staticRenderer.requestEntityTemplates();
+      } else {
+        // User not logged in, store reference for later template request
+        Logging.Log('🏗️ Step 3: User not logged in, deferring entity templates request...');
+        (globalThis as any).pendingEntityTemplateRequest = staticRenderer;
+        Logging.Log('⏳ Entity templates will be loaded after user login completes');
+      }
       
       // Register for entity instances trigger after templates complete
       Logging.Log('🏗️ Step 3a: Registering for entity instances trigger...');

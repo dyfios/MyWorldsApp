@@ -194,12 +194,19 @@ export class Identity {
       if (this.loginCallbackFunction) {
           this.loginCallbackFunction();
       }
-      /*Logging.Log('🔄 Triggering entity templates request after successful login...');
+      
+      // Trigger entity templates request after successful login
+      Logging.Log('🔄 Triggering entity templates request after successful login...');
       if (typeof (globalThis as any).triggerEntityTemplatesAfterLogin === 'function') {
         (globalThis as any).triggerEntityTemplatesAfterLogin();
+      } else if ((globalThis as any).pendingEntityTemplateRequest && 
+                 typeof (globalThis as any).pendingEntityTemplateRequest.loadEntityTemplates === 'function') {
+        Logging.Log('🔄 Executing pending entity templates request directly...');
+        (globalThis as any).pendingEntityTemplateRequest.loadEntityTemplates();
+        (globalThis as any).pendingEntityTemplateRequest = null;
       } else {
-        Logging.LogError('triggerEntityTemplatesAfterLogin function not available');
-      }*/
+        Logging.Log('⚠️ No entity template loading mechanism found - templates may need to be requested manually');
+      }
       
     } catch (error: any) {
       Logging.LogError('❌ Error in handleUserLoginMessage: ' + (error.message || error));
