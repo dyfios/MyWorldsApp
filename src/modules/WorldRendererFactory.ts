@@ -946,6 +946,18 @@ export class TiledSurfaceRenderer extends WorldRendering {
           this.entitiesConfig[entity].variants[variant].thumbnail =
             this.worldAddress + "/" + this.worldConfig["entities-directory"] + "/"
             + this.entitiesConfig[entity].variants[variant].thumbnail;
+          Time.SetTimeout(`
+            try {
+              addTool(${this.entitiesConfig[entity].variants[variant].display_name}, 
+                ${this.entitiesConfig[entity].variants[variant].thumbnail},
+                'TOOL.ADD_DOCK_BUTTON(ENTITY.${entity}.${variant},
+                ${this.entitiesConfig[entity].variants[variant].display_name},
+                ${this.entitiesConfig[entity].variants[variant].thumbnail})');
+          }
+        } catch (error) {
+          Logging.LogError('Error adding entity: ' + error);
+        }
+      `, 6000);
         }
 
         for (var valid_orientation in this.entitiesConfig[entity].variants[variant].valid_orientations) {
