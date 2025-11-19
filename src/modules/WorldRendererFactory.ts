@@ -963,10 +963,10 @@ export class TiledSurfaceRenderer extends WorldRendering {
             this.worldAddress + "/" + this.worldConfig["entities-directory"] + "/"
             + this.entitiesConfig[entity].variants[variant].thumbnail;
           Time.SetTimeout(`
-            try {
+            try {Logging.Log("qwertya1");
               addTool('${this.entitiesConfig[entity].variants[variant].display_name}', '${this.entitiesConfig[entity].variants[variant].thumbnail}', 'TOOL.ADD_DOCK_BUTTON(ENTITY.${entity}.${variant}, ${this.entitiesConfig[entity].variants[variant].display_name}, ${this.entitiesConfig[entity].variants[variant].thumbnail})');
-              var numEntityButtons = parseInt(WorldStorage.GetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS"));
-              if (numEntityButtons < 3) {
+              var numEntityButtons = parseInt(WorldStorage.GetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS"));Logging.Log("qwertya2");
+              if (numEntityButtons < 3) {Logging.Log("qwertya3");
                 this.addEditToolbarButton('${this.entitiesConfig[entity].variants[variant].display_name}', '${this.entitiesConfig[entity].variants[variant].thumbnail}', 'TOOL.DOCK_BUTTON_CLICKED(ENTITY.${entity}.${variant}, ${this.entitiesConfig[entity].variants[variant].display_name}, ${this.entitiesConfig[entity].variants[variant].thumbnail})');
                 WorldStorage.SetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS", (numEntityButtons + 1).toString());
               }
@@ -1058,6 +1058,8 @@ export class TiledSurfaceRenderer extends WorldRendering {
           this.terrainConfig.layers[terrainLayer].normal_texture = "file://"
             + this.terrainConfig.layers[terrainLayer].normal_texture;
         }
+
+        
       }
     }
 
