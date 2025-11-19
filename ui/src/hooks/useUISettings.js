@@ -1,3 +1,4 @@
+/* global postWorldMessage */
 import { useState, useCallback } from 'react';
 
 export const useUISettings = () => {
@@ -128,6 +129,43 @@ export const useUISettings = () => {
     return false;
   }, []);
 
+  // Flying toggle function for double-tap space
+  const toggleFlying = useCallback(() => {
+    console.log('toggleFlying called - current flying state:', currentSettings.flying);
+    
+    const newFlyingState = !currentSettings.flying;
+    
+    // Update local state
+    setCurrentSettings(prev => ({
+      ...prev,
+      flying: newFlyingState
+    }));
+    
+    // Send message to UI Settings iframe if it exists
+    if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+      const uiSettingsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'UI Settings');
+      if (uiSettingsTabs.length > 0) {
+        window.popupMenuAPI.sendMessageToTab(uiSettingsTabs[0].id, {
+          type: 'update-settings',
+          data: { flying: newFlyingState }
+        });
+        console.log('Flying state update sent to UI Settings tab');
+      }
+    }
+    
+    // Send flying state change to the world via postWorldMessage
+    if (typeof postWorldMessage === 'function') {
+      const newSettings = { ...currentSettings, flying: newFlyingState };
+      postWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(newSettings)})`);
+      console.log('Flying toggle sent to world:', newFlyingState);
+    } else {
+      console.warn('postWorldMessage not available for flying toggle');
+    }
+    
+    console.log('Flying toggled to:', newFlyingState);
+    return newFlyingState;
+  }, [currentSettings]);
+
   return {
     currentSettings,
     initializeUISettings,
@@ -138,6 +176,8 @@ export const useUISettings = () => {
     // Tools API
     addTool,
     removeTool,
-    clearTools
+    clearTools,
+    // Flying toggle
+    toggleFlying
   };
 };

@@ -388,6 +388,46 @@ function App() {
     };
   }, []);
 
+  // Double-tap space key to toggle flying mode
+  React.useEffect(() => {
+    let lastSpacePress = 0;
+    const doubleTapThreshold = 300; // milliseconds
+
+    const handleKeyDown = (event) => {
+      // Only handle space key when chat is not active
+      if ((event.code === 'Space' || event.key === ' ') && !isChatActive) {
+        // Don't prevent default here as it might interfere with other functionality
+        
+        const now = Date.now();
+        const timeSinceLastPress = now - lastSpacePress;
+        
+        if (timeSinceLastPress < doubleTapThreshold) {
+          // Double-tap detected - toggle flying via UI Settings
+          console.log('Double-tap space detected - toggling flying via UI Settings');
+          
+          if (uiSettings && typeof uiSettings.toggleFlying === 'function') {
+            uiSettings.toggleFlying();
+          } else {
+            console.warn('UI Settings flying toggle not available');
+          }
+          
+          lastSpacePress = 0; // Reset to prevent triple-tap issues
+        } else {
+          // First tap or too much time passed
+          lastSpacePress = now;
+        }
+      }
+    };
+
+    // Add event listener to document
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup function
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isChatActive, uiSettings]);
+
   return (
     <div className="App">
       <ButtonDock
