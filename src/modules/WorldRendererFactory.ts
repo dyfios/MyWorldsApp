@@ -852,6 +852,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
     Logging.Log('✅ TiledSurfaceRenderer: User authenticated, loading world manifests...');
     
     try {
+      this.restClient.sendWorldManifestRequest('onWorldManifestReceived');
       this.restClient.sendWorldEntitiesManifestRequest('onEntitiesManifestReceived');
       this.restClient.sendWorldTerrainManifestRequest('onTerrainManifestReceived');
       this.stateServiceClient.sendBiomeManifestRequest('onBiomeManifestReceived');
