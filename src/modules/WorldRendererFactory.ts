@@ -847,6 +847,20 @@ export class TiledSurfaceRenderer extends WorldRendering {
       this.startLoginProcess();
       return;
     }
+
+    // User is authenticated, proceed with manifest loading
+    Logging.Log('✅ TiledSurfaceRenderer: User authenticated, loading world manifests...');
+    
+    try {
+      this.restClient.sendWorldEntitiesManifestRequest('onEntitiesManifestReceived');
+      this.restClient.sendWorldTerrainManifestRequest('onTerrainManifestReceived');
+      this.stateServiceClient.sendBiomeManifestRequest('onBiomeManifestReceived');
+      
+      Logging.Log('📤 TiledSurfaceRenderer: World manifest requests sent');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ TiledSurfaceRenderer: Failed to send manifest requests: ' + errorMessage);
+    }
   }
 
   loadRegion(regionIdx: Vector2Int): void {
@@ -1583,12 +1597,12 @@ export class TiledSurfaceRenderer extends WorldRendering {
    */
   private registerForPostLoginLoading(): void {
     try {
-      Logging.Log('📝 TiledSurfaceRenderer: Registering for post-login entity template loading...');
+      Logging.Log('📝 TiledSurfaceRenderer: Registering for post-login world manifest loading...');
 
-      // Set the global pending request variable
-      (globalThis as any).pendingEntityTemplateRequest = this;
+      // Set the global pending request variable for world manifest loading
+      (globalThis as any).pendingWorldManifestRequest = this;
 
-      Logging.Log('✓ TiledSurfaceRenderer: Registered for post-login loading');
+      Logging.Log('✓ TiledSurfaceRenderer: Registered for post-login world manifest loading');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ TiledSurfaceRenderer: Failed to register for post-login loading: ' + errorMessage);

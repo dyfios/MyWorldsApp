@@ -207,6 +207,17 @@ export class Identity {
       } else {
         Logging.Log('⚠️ No entity template loading mechanism found - templates may need to be requested manually');
       }
+
+      // Trigger world manifest loading for planet renderer after successful login
+      Logging.Log('🔄 Triggering world manifest loading after successful login...');
+      if ((globalThis as any).pendingWorldManifestRequest && 
+          typeof (globalThis as any).pendingWorldManifestRequest.loadWorldManifest === 'function') {
+        Logging.Log('🔄 Executing pending world manifest request for planet renderer...');
+        (globalThis as any).pendingWorldManifestRequest.loadWorldManifest();
+        (globalThis as any).pendingWorldManifestRequest = null;
+      } else {
+        Logging.Log('⚠️ No pending world manifest request found - may not be using planet renderer');
+      }
       
     } catch (error: any) {
       Logging.LogError('❌ Error in handleUserLoginMessage: ' + (error.message || error));
