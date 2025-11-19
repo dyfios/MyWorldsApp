@@ -69,32 +69,28 @@ export class MyWorld {
       await this.context.modules.sync.connectToSynchronizers();
       Logging.Log('✓ Connected to synchronizers successfully');
 
-      // 6. Instantiate and load world renderers
-      Logging.Log('🎨 Step 6: Creating and loading world renderers...');
-      await this.context.modules.worldRendering.createAndLoadRenderers();
-      // Ensure WorldRendererFactory is available in context after renderers are loaded
-      Logging.Log('🔍 Storing WorldRendererFactory in context. Type: ' + typeof this.context.modules.worldRendering);
-      Logging.Log('🔍 Available methods: ' + Object.getOwnPropertyNames(Object.getPrototypeOf(this.context.modules.worldRendering)));
+      // 6. Prepare world rendering context (but don't load world data yet)
+      Logging.Log('🎨 Step 6: Preparing world rendering context...');
+      // Note: World renderers will be created after login via startRenderLoop()
       
-      // Store a wrapper object to preserve method bindings
+      // Store a wrapper object to preserve method bindings for when renderers are created
       const worldRendererFactoryWrapper = {
         factory: this.context.modules.worldRendering,
         getStaticSurfaceRenderer: () => this.context.modules.worldRendering.getStaticSurfaceRenderer()
       };
       Context.DefineContext('WorldRendererFactory', worldRendererFactoryWrapper);
-      Logging.Log('✓ World renderers loaded successfully');
+      Logging.Log('✓ World rendering context prepared');
 
-      // 7. Activate UI editing tools
+      // 7. Activate UI editing tools  
       Logging.Log('🖼️ Step 7: Activating UI editing tools...');
-      //this.context.modules.ui.initializeEditToolbar();
+      this.context.modules.ui.initializeEditToolbar();
       Logging.Log('✓ UI editing tools activated successfully');
 
       Logging.Log('🎉 MyWorld Client launched successfully!');
 
-      // Start render loop
-      Logging.Log('🔄 Starting render loop...');
-      //await this.startRenderLoop();
-      Logging.Log('✓ Render loop started successfully');
+      // Note: World loading and render loop will start after login completes via Identity module
+      Logging.Log('🔄 World loading and render loop will start after user authentication completes...');
+      Logging.Log('✓ Startup sequence completed - waiting for authentication');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorDetails = error instanceof Error ? error.stack || error.message : String(error);
@@ -302,6 +298,11 @@ export class MyWorld {
    * Start the render loop
    */
   private async startRenderLoop(): Promise<void> {
+    // Create and load world renderers now that user is authenticated
+    Logging.Log('🎨 Creating and loading world renderers after authentication...');
+    await this.context.modules.worldRendering.createAndLoadRenderers();
+    Logging.Log('✓ World renderers loaded successfully');
+
     // Initialize world type specific settings
     await this.initializeWorldTypeSettings();
     

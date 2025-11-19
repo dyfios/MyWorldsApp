@@ -186,11 +186,7 @@ export class Identity {
       Logging.Log('User ID: ' + mwTopLevelContext.userID);
       Logging.Log('User Tag: ' + mwTopLevelContext.userTag);
       
-      // Now that login is complete, trigger entity template loading and show main UI
-      Logging.Log('🔄 Showing main UI after login...');
-      (globalThis as any).uiManager.initializeEditToolbar();
-      (globalThis as any).enableEditToolbar();
-      (globalThis as any).startRenderLoop();
+      // Execute login callback if provided
       if (this.loginCallbackFunction) {
           this.loginCallbackFunction();
       }
@@ -217,6 +213,14 @@ export class Identity {
         (globalThis as any).pendingWorldManifestRequest = null;
       } else {
         Logging.Log('⚠️ No pending world manifest request found - may not be using planet renderer');
+      }
+
+      // Start the main UI and render loop after login and world loading setup is complete
+      Logging.Log('🔄 Starting main UI and render loop after login...');
+      if (typeof (globalThis as any).startRenderLoop === 'function') {
+        (globalThis as any).startRenderLoop();
+      } else {
+        Logging.LogError('❌ startRenderLoop function not available');
       }
       
     } catch (error: any) {
