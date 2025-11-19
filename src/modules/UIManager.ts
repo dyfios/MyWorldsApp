@@ -264,7 +264,27 @@ export class UIManager {
           (globalThis as any).setInteractionMode('SLEDGE-HAMMER');
           break;
         default:
-          Logging.Log('🔧 UIManager: Unknown button type clicked: ' + buttonType);
+          if (buttonType.startsWith('ENTITY.')) {
+            // Parse ENTITY.<entityID>.<variantID> format
+            const parts = buttonType.split('.');
+            if (parts.length >= 3) {
+              const entityID = parts[1];
+              const variantID = parts[2];
+              
+              Logging.Log('🏗️ UIManager: Entity button clicked - entityID: ' + entityID + ', variantID: ' + variantID);
+              
+              //(globalThis as any).cancelPlacing();
+              //(globalThis as any).loadEntity()
+
+              // TODO: Handle entity placement logic here
+              // Example: (globalThis as any).startEntityPlacement(entityID, variantID);
+              
+            } else {
+              Logging.LogError('❌ UIManager: Invalid ENTITY button format: ' + buttonType + ' (expected ENTITY.<entityID>.<variantID>)');
+            }
+          } else {
+            Logging.Log('🔧 UIManager: Unknown button type clicked: ' + buttonType);
+          }
           // Handle unknown button types
           break;
       }

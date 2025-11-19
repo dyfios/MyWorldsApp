@@ -274,6 +274,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
 
   triggerEntityTemplatesAfterLogin(): void {
     Logging.Log('🎯 triggerEntityTemplatesAfterLogin: Called after successful authentication');
+    (globalThis as any).uiManager.initializeEditToolbar();
     if ((globalThis as any).pendingEntityTemplateRequest &&
       typeof (globalThis as any).pendingEntityTemplateRequest.loadEntityTemplates === 'function') {
       Logging.Log('🔄 Executing pending entity templates request...');

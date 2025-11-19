@@ -76,7 +76,7 @@ export class MyWorld {
 
       // 7. Activate UI editing tools
       Logging.Log('🖼️ Step 7: Activating UI editing tools...');
-      this.context.modules.ui.initializeEditToolbar();
+      //this.context.modules.ui.initializeEditToolbar();
       Logging.Log('✓ UI editing tools activated successfully');
 
       Logging.Log('🎉 MyWorld Client launched successfully!');

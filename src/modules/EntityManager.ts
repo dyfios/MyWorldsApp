@@ -374,6 +374,42 @@ export class EntityManager {
     (globalThis as any).triggerEntityInstancesAfterTemplates = () => {
       this.triggerEntityInstancesAfterTemplates();
     };
+
+    (globalThis as any).loadEntity = (
+      instanceId: string,
+      instanceTag: string | undefined,
+      entityId: string,
+      variantId: string,
+      entityParent: string | undefined,
+      type: string,
+      position: Vector3,
+      rotation: Quaternion,
+      scale: Vector3,
+      meshObject: string,
+      meshResources: string[],
+      wheels: AutomobileEntityWheel[] | undefined,
+      mass: number | undefined,
+      autoType: AutomobileType | undefined,
+      scripts: string | undefined
+    ): string => {
+      return this.loadEntity(
+        instanceId,
+        instanceTag,
+        entityId,
+        variantId,
+        entityParent,
+        type,
+        position,
+        rotation,
+        scale,
+        meshObject,
+        meshResources,
+        wheels,
+        mass,
+        autoType,
+        scripts
+      );
+    };
   }
 
   /**
