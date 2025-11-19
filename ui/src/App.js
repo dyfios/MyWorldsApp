@@ -8,6 +8,9 @@ import { useUISettings } from './hooks/useUISettings';
 
 function App() {
   const [buttons, setButtons] = useState([]);
+  
+  // Configuration: Maximum number of buttons in dock (configurable limit)
+  const [maxDockButtons, setMaxDockButtons] = useState(10);
 
   const [selectedButtonId, setSelectedButtonId] = useState(null);
   const [isChatActive, setIsChatActive] = useState(false);
@@ -23,9 +26,30 @@ function App() {
       thumbnail,
       onClick
     };
-    setButtons(prev => [...prev, newButton]);
+    
+    setButtons(prev => {
+      const updatedButtons = [...prev, newButton];
+      
+      // If we exceed the maximum number of buttons, remove the first button
+      if (updatedButtons.length > maxDockButtons) {
+        const removedButton = updatedButtons.shift(); // Remove first button
+        console.log(`ButtonDock: Removed oldest button "${removedButton.name}" due to dock limit (${maxDockButtons})`);
+        
+        // If the removed button was selected, clear selection
+        if (selectedButtonId === removedButton.id) {
+          setSelectedButtonId(null);
+          if (typeof postWorldMessage === 'function') {
+            postWorldMessage(`BUTTON.UNSELECTED(NONE)`);
+          }
+        }
+      }
+      
+      console.log(`ButtonDock: Added button "${name}". Dock now has ${updatedButtons.length}/${maxDockButtons} buttons`);
+      return updatedButtons;
+    });
+    
     return newButton.id;
-  }, []);
+  }, [maxDockButtons, selectedButtonId]);
 
   // API: Remove a button
   const removeButton = useCallback((buttonId) => {
@@ -149,7 +173,48 @@ function App() {
       selectNext,
       selectByNumber,
       getButtons: () => buttons,
-      getSelectedButton: () => selectedButtonId
+      getSelectedButton: () => selectedButtonId,
+      // Configuration APIs
+      getMaxButtons: () => maxDockButtons,
+      setMaxButtons: (newMax) => {
+        if (newMax > 0 && newMax <= 50) { // Reasonable limits
+          setMaxDockButtons(newMax);
+          console.log(`ButtonDock: Maximum buttons set to ${newMax}`);
+          
+          // If current buttons exceed new limit, remove excess buttons from the beginning
+          setButtons(prev => {
+            if (prev.length > newMax) {
+              const excess = prev.length - newMax;
+              const removed = prev.slice(0, excess);
+              const remaining = prev.slice(excess);
+              
+              console.log(`ButtonDock: Removed ${excess} buttons due to new limit: ${removed.map(b => b.name).join(', ')}`);
+              
+              // If selected button was removed, clear selection
+              if (removed.some(btn => btn.id === selectedButtonId)) {
+                setSelectedButtonId(null);
+                if (typeof postWorldMessage === 'function') {
+                  postWorldMessage(`BUTTON.UNSELECTED(NONE)`);
+                }
+              }
+              
+              return remaining;
+            }
+            return prev;
+          });
+          
+          return true;
+        } else {
+          console.warn(`ButtonDock: Invalid max buttons value: ${newMax}. Must be between 1 and 50.`);
+          return false;
+        }
+      },
+      getCurrentButtonCount: () => buttons.length,
+      getDockStatus: () => ({
+        current: buttons.length,
+        max: maxDockButtons,
+        isFull: buttons.length >= maxDockButtons
+      })
     };
 
     // Expose UI Settings API globally
@@ -169,7 +234,7 @@ function App() {
 
     // Expose initializeUISettings directly to window for WebVerse access
     window.initializeUISettings = uiSettings.initializeUISettings;
-  }, [addButton, removeButton, reorderButtons, selectButton, selectPrevious, selectNext, selectByNumber, buttons, selectedButtonId, uiSettings]);
+  }, [addButton, removeButton, reorderButtons, selectButton, selectPrevious, selectNext, selectByNumber, buttons, selectedButtonId, maxDockButtons, uiSettings]);
 
   // Chat event handlers
   const handleChatInputOpen = useCallback(() => {
