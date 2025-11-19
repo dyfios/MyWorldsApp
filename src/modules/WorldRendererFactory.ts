@@ -919,6 +919,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
 
   applyEntitiesConfig(): void {
     Logging.Log("Applying Entities Config...");
+    WorldStorage.SetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS", "0");
 
     for (var entity in this.entitiesConfig) {
       if (this.entitiesConfig[entity].id == null) {
@@ -964,6 +965,11 @@ export class TiledSurfaceRenderer extends WorldRendering {
           Time.SetTimeout(`
             try {
               addTool('${this.entitiesConfig[entity].variants[variant].display_name}', '${this.entitiesConfig[entity].variants[variant].thumbnail}', 'TOOL.ADD_DOCK_BUTTON(ENTITY.${entity}.${variant}, ${this.entitiesConfig[entity].variants[variant].display_name}, ${this.entitiesConfig[entity].variants[variant].thumbnail})');
+              var numEntityButtons = parseInt(WorldStorage.GetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS"));
+              if (numEntityButtons < 3) {
+                this.addEditToolbarButton('${this.entitiesConfig[entity].variants[variant].display_name}', '${this.entitiesConfig[entity].variants[variant].thumbnail}', 'TOOL.DOCK_BUTTON_CLICKED(ENTITY.${entity}.${variant}, ${this.entitiesConfig[entity].variants[variant].display_name}, ${this.entitiesConfig[entity].variants[variant].thumbnail})');
+                WorldStorage.SetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS", (numEntityButtons + 1).toString());
+              }
             }
             catch (error) {
               Logging.LogError('Error adding entity: ' + error);
