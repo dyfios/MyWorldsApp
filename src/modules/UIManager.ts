@@ -114,6 +114,7 @@ export class UIManager {
       
       toolbarCanvas.SetInteractionState(InteractionState.Static);
       toolbarCanvas.MakeScreenCanvas();
+      toolbarCanvas.SetVisibility(true); // Ensure canvas is visible
       
       const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
       if (!mainToolbarId) {
@@ -154,7 +155,8 @@ export class UIManager {
       if (typeof mainToolbar.LoadFromURL === 'function') {
         mainToolbar.LoadFromURL('ui/build/index.html');
         Logging.Log('📄 UIManager: Loading toolbar HTML from URL');
-        this.disableEditToolbar();
+        // Enable the toolbar after loading (it should be visible after authentication)
+        this.enableEditToolbar();
       } else {
         Logging.LogError('❌ UIManager: LoadFromURL method not available on toolbar entity');
       }
