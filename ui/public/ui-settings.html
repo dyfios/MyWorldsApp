@@ -276,6 +276,7 @@
 
         // Double-tap detection for space key
         let lastSpacePress = 0;
+        let spaceKeyDown = false;
         const doubleTapThreshold = 300; // milliseconds
 
         // Load settings from localStorage
@@ -469,12 +470,27 @@
 
             // Double-tap space key to toggle flying
             document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
         }
 
         // Handle keyboard events for double-tap space detection
         function handleKeyDown(event) {
             if (event.code === 'Space' || event.key === ' ') {
+                // If key is already down, ignore repeated keydown events
+                if (spaceKeyDown) {
+                    event.preventDefault(); // Prevent page scroll
+                    return;
+                }
+                
+                spaceKeyDown = true;
                 event.preventDefault(); // Prevent page scroll
+            }
+        }
+
+        // Handle key up events for double-tap space detection
+        function handleKeyUp(event) {
+            if ((event.code === 'Space' || event.key === ' ') && spaceKeyDown) {
+                spaceKeyDown = false;
                 
                 const now = Date.now();
                 const timeSinceLastPress = now - lastSpacePress;

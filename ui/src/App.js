@@ -391,12 +391,27 @@ function App() {
   // Double-tap space key to toggle flying mode
   React.useEffect(() => {
     let lastSpacePress = 0;
+    let spaceKeyDown = false;
     const doubleTapThreshold = 300; // milliseconds
 
     const handleKeyDown = (event) => {
       // Only handle space key when chat is not active
       if ((event.code === 'Space' || event.key === ' ') && !isChatActive) {
-        // Don't prevent default here as it might interfere with other functionality
+        // If key is already down, ignore repeated keydown events
+        if (spaceKeyDown) {
+          event.preventDefault(); // Prevent scroll on held spacebar
+          return;
+        }
+        
+        spaceKeyDown = true;
+        event.preventDefault(); // Prevent scroll
+      }
+    };
+
+    const handleKeyUp = (event) => {
+      // Only handle space key when chat is not active
+      if ((event.code === 'Space' || event.key === ' ') && !isChatActive && spaceKeyDown) {
+        spaceKeyDown = false;
         
         const now = Date.now();
         const timeSinceLastPress = now - lastSpacePress;
@@ -419,12 +434,14 @@ function App() {
       }
     };
 
-    // Add event listener to document
+    // Add event listeners to document
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
 
     // Cleanup function
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
     };
   }, [isChatActive, uiSettings]);
 
