@@ -188,6 +188,9 @@ export class MyWorld {
             addTool('Square Shovel (4x)', this.uiManager.squareShovelx4Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_4, Square Shovel (4x), ${(globalThis as any).uiManager.squareShovelx4Path})');
             addTool('Square Shovel (8x)', this.uiManager.squareShovelx8Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_8, Square Shovel (8x), ${(globalThis as any).uiManager.squareShovelx8Path})');
             addTool('Sledge Hammer', this.uiManager.sledgeHammerPath, 'TOOL.ADD_DOCK_BUTTON(SLEDGE_HAMMER, Sledge Hammer, ${(globalThis as any).uiManager.sledgeHammerPath})');
+            this.addEditToolbarButton('Hand', this.uiManager.handPath, 'TOOL.DOCK_BUTTON_CLICKED(HAND)');
+            this.addEditToolbarButton('Square Shovel', this.uiManager.squareShovelx1Path, 'TOOL.DOCK_BUTTON_CLICKED(SQUARE_SHOVEL_1)');
+            this.addEditToolbarButton('Sledge Hammer', this.uiManager.sledgeHammerPath, 'TOOL.DOCK_BUTTON_CLICKED(SLEDGE_HAMMER)');
             Logging.Log('Planet tools added successfully');
           }
         } catch (error) {
