@@ -18,6 +18,8 @@ export class EntityPlacement {
   public instanceID: string | null = null;
   public orientationIndex: number = 0;
   public scripts: { [key: string]: any } = {};
+  public wheels: AutomobileEntityWheel[] = [];
+  public mass: number = 0;
   public modelRotation: Quaternion | null = null;
   public modelPath: string | null = null;
   public entityBeingPlaced: boolean = false;
@@ -43,9 +45,9 @@ export class EntityPlacement {
     // Define global callback for character entity loading completion
     (globalThis as any).startPlacing = (entityToPlace: BaseEntity, entityType: string,
       entityIndex: number, variantIndex: number, entityID: string, variantID: string,
-      modelPath: string, instanceId: string) => {
+      modelPath: string, wheels: AutomobileEntityWheel[], mass: number, instanceId: string) => {
       this.startPlacing(entityToPlace, entityType, entityIndex, variantIndex, entityID,
-        variantID, modelPath, instanceId);
+        variantID, modelPath, wheels, mass, instanceId);
     };
 
     (globalThis as any).stopPlacing = () => {
@@ -137,6 +139,8 @@ export class EntityPlacement {
     entityID: string,
     variantID: string,
     modelPath: string,
+    wheels: AutomobileEntityWheel[],
+    mass: number,
     instanceID: string,
     offset?: Vector3,
     rotation?: Quaternion,
@@ -171,6 +175,8 @@ export class EntityPlacement {
     this.instanceID = instanceID;
     this.orientationIndex = 0;
     this.scripts = scripts || {};
+    this.wheels = wheels;
+    this.mass = mass;
     
     entityToPlace.SetHighlight(true);
     // Input.TurnLocomotionMode = Input.VRTurnLocomotionMode.None; // VR-specific, commented out
@@ -184,10 +190,12 @@ export class EntityPlacement {
 
     if (this.placingEntity == null) {
       if (keepSpawning === true && this.entityType && this.entityIndex !== null && 
-          this.variantIndex !== null && this.entityID && this.variantID) {
-        // const instanceUUID = UUID.NewUUID().ToString();
-        // Would call MW_Entity_LoadEntity here - integrated with EntityManager
-        Logging.Log("[EntityPlacer] Would spawn new entity for keep spawning mode");
+        this.variantIndex !== null && this.entityID && this.variantID) {
+        const instanceID = UUID.NewUUID().ToString();
+        (globalThis as any).loadEntity(this.entityIndex, this.variantIndex, instanceID,
+          this.entityIndex + "." + this.variantIndex + "." + instanceID, this.entityID, this.variantID,
+          null, this.entityType, Vector3.zero, Quaternion.identity, Vector3.one, this.modelPath,
+          [ this.modelPath ], this.wheels, this.mass, AutomobileType.Car, this.scripts, true);
       }
       return;
     }
@@ -222,9 +230,11 @@ export class EntityPlacement {
     this.placingEntity = null;
     
     if (keepSpawning === true && this.entityID && this.variantID) {
-      // const instanceUUID = UUID.NewUUID().ToString();
-      // Would spawn new entity for continued placement
-      Logging.Log("[EntityPlacer] Would spawn new entity for continued placement");
+      const instanceID = UUID.NewUUID().ToString();
+      (globalThis as any).loadEntity(this.entityIndex, this.variantIndex, instanceID,
+        this.entityIndex + "." + this.variantIndex + "." + instanceID, this.entityID, this.variantID,
+        null, this.entityType, Vector3.zero, Quaternion.identity, Vector3.one, this.modelPath,
+        [ this.modelPath ], this.wheels, this.mass, AutomobileType.Car, this.scripts, true);
     }
 
     this.entityBeingPlaced = false;
@@ -327,6 +337,8 @@ export class EntityManager {
   private currentEntityId: string = "";
   private currentVariantId: string = "";
   private currentModelPath: string = "";
+  private currentWheels: AutomobileEntityWheel[] | undefined = undefined;
+  private currentMass: number | undefined = undefined
 
   constructor() {
     this.entityPlacement = new EntityPlacement();
@@ -428,6 +440,8 @@ export class EntityManager {
     this.currentEntityId = entityId;
     this.currentVariantId = variantId || "";
     this.currentModelPath = meshObject;
+    this.currentWheels = wheels;
+    this.currentMass = mass;
     if (type == null || type === "") {
       type = "mesh";
     }
@@ -500,7 +514,7 @@ export class EntityManager {
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
     (globalThis as any).startPlacing(entity, "mesh", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
-      this.currentVariantId, this.currentModelPath, entity.id);
+      this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, entity.id);
   }
 
   triggerEntityInstancesAfterTemplates(): void {
