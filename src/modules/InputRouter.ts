@@ -134,6 +134,10 @@ export class InputRouter {
     var thirdPersonCharacterController = Context.GetContext("THIRD_PERSON_CHARACTER_CONTROLLER");
     var entityPlacementComponent = Context.GetContext("ENTITY_PLACEMENT_COMPONENT");
     
+    if (this.isControlHeld) {
+
+    }
+
     if (key === "Control") {
       this.isControlHeld = true;
     }
