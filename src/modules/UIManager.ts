@@ -271,7 +271,7 @@ export class UIManager {
             const parts = buttonType.split('.');
             if (parts.length >= 3) {
               const entityID = parts[1];
-              const variantID = parts[2];
+              const variantID = parts[2].split(',')[0]; // Remove comma and everything after it
               const instanceID = UUID.NewUUID().ToString();
               
               Logging.Log('🏗️ UIManager: Entity button clicked - entityID: ' + entityID + ', variantID: ' + variantID);

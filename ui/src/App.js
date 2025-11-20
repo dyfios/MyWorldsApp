@@ -10,7 +10,7 @@ function App() {
   const [buttons, setButtons] = useState([]);
   
   // Configuration: Maximum number of buttons in dock (configurable limit)
-  const [maxDockButtons, setMaxDockButtons] = useState(10);
+  const [maxDockButtons, setMaxDockButtons] = useState(9);
 
   const [selectedButtonId, setSelectedButtonId] = useState(null);
   const [isChatActive, setIsChatActive] = useState(false);
