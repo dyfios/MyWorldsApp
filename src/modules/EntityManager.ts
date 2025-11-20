@@ -445,6 +445,9 @@ export class EntityManager {
     this.currentEntityId = entityId;
     this.currentVariantId = variantId || "";
     this.currentModelPath = meshObject;
+    if (type == null || type === "") {
+      type = "mesh";
+    }
     switch (type) {
       case 'mesh':
         var onCompleteCallback = 'onMeshEntityLoadedGeneric';
