@@ -1563,6 +1563,26 @@ export class TiledSurfaceRenderer extends WorldRendering {
       return this.getMaterialForDigging(regionIdx, height);
     };
 
+    (globalThis as any).tiledsurfacerenderer_getRegionIndexForWorldPos = (worldPos: Vector3) => {
+      return this.getRegionIndexForWorldPos(worldPos);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getWorldPosForRegionPos = (regionPos: Vector3, regionIdx: Vector2Int) => {
+      return this.getWorldPosForRegionPos(regionPos, regionIdx);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getWorldPositionForRenderedPosition = (renderedPos: Vector3) => {
+      return this.getWorldPositionForRenderedPosition(renderedPos);
+    };
+    
+    (globalThis as any).tiledsurfacerenderer_getRenderedPositionForWorldPosition = (worldPos: Vector3) => {
+      return this.getRenderedPositionForWorldPosition(worldPos);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos = (worldPos: Vector3, regionIdx: Vector2Int) => {
+      return this.getRegionPosForWorldPos(worldPos, regionIdx);
+    };
+
     (globalThis as any).tiledsurfacerenderer = this;
   }
 

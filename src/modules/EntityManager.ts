@@ -6,7 +6,7 @@ import { Position, Rotation } from '../types/config';
 import { EntityData } from '../types/entity';
 
 export class EntityPlacement {
-  public placingEntity: any = null;
+  public placingEntity: BaseEntity | null = null;
   public entityType: string | null = null;
   public modelOffset: Vector3 | null = null;
   public placingOffset: Vector3 | null = null;
@@ -21,6 +21,8 @@ export class EntityPlacement {
   public modelRotation: Quaternion | null = null;
   public modelPath: string | null = null;
   public entityBeingPlaced: boolean = false;
+  public gridEnabled: boolean = true;
+  public gridSize: number = 1;
 
   constructor() {
     // Store this instance in WebVerse Context
@@ -88,41 +90,31 @@ export class EntityPlacement {
       return;
     }
 
-    let gridEnabled = false;
-    if (WorldStorage.GetItem("ENTITY-GRID-ENABLED") === "TRUE") {
-      gridEnabled = true;
-    }
-
-    let gridSize = parseFloat(WorldStorage.GetItem("ENTITY-GRID-SIZE") || "1");
-    if (gridSize <= 0) {
-      gridSize = 1;
-    }
-
     const hitInfo = Input.GetPointerRaycast(Vector3.forward);
     if (hitInfo != null && hitInfo.entity != null) {
       if (hitInfo.entity !== this.placingEntity) {
         let gridSnappedPosition: Vector3;
         
-        if (gridEnabled) {
+        if (this.gridEnabled) {
           gridSnappedPosition = new Vector3(
-            Math.round(hitInfo.hitPoint.x / gridSize) * gridSize + this.modelOffset.x,
-            Math.round(hitInfo.hitPoint.y / gridSize) * gridSize + this.modelOffset.y,
-            Math.round(hitInfo.hitPoint.z / gridSize) * gridSize + this.modelOffset.z
+            Math.round(hitInfo.hitPoint.x / this.gridSize) * this.gridSize + this.modelOffset.x,
+            Math.round(hitInfo.hitPoint.y / this.gridSize) * this.gridSize + this.modelOffset.y,
+            Math.round(hitInfo.hitPoint.z / this.gridSize) * this.gridSize + this.modelOffset.z
           );
 
           // Adjust position based on surface normal
           if (hitInfo.hitPointNormal.x >= normalPlacementThreshold) {
-            gridSnappedPosition.x += gridSize;
+            gridSnappedPosition.x += this.gridSize;
           } else if (hitInfo.hitPointNormal.x <= -normalPlacementThreshold) {
-            gridSnappedPosition.x -= gridSize;
+            gridSnappedPosition.x -= this.gridSize;
           }
           
           if (hitInfo.hitPointNormal.y <= -normalPlacementThreshold) {
-            gridSnappedPosition.y -= gridSize;
+            gridSnappedPosition.y -= this.gridSize;
           }
           
           if (hitInfo.hitPointNormal.z <= -normalPlacementThreshold) {
-            gridSnappedPosition.z -= gridSize;
+            gridSnappedPosition.z -= this.gridSize;
           }
         } else {
           gridSnappedPosition = new Vector3(
@@ -204,13 +196,13 @@ export class EntityPlacement {
       return;
     }
     
-    const tlc = Context.GetContext("MW_TOP_LEVEL_CONTEXT");
-    const pos = this.placingEntity.GetPosition(false);
-    // const rot = this.placingEntity.GetRotation(false);
-    // const regionPos = pos;
+    const pos: Vector3 = (globalThis as any).tiledsurfacerenderer_getWorldPositionForRenderedPos(this.placingEntity.GetPosition(false));
+    //const rot: Quaternion = this.placingEntity.GetRotation(false);
+    const terrainIndex = (globalThis as any).tiledsurfacerenderer_getRegionIndexForWorldPos(pos);
+    //const regionPos = (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos(pos, terrainIndex);
 
     // Send REST request to add entity instance
-    if (tlc && this.instanceID && this.entityID && this.variantID) {
+    if (this.instanceID && this.entityID && this.variantID) {
       // This would integrate with your REST module
       Logging.Log(`[EntityPlacer] Placing entity at position: ${pos.x}, ${pos.y}, ${pos.z}`);
     }
@@ -222,6 +214,7 @@ export class EntityPlacement {
     }
 
     // Finalize placement
+    this.placingEntity.SetParent((globalThis as any).tiledsurfacerenderer.getTerrainTileForIndex(terrainIndex));
     this.placingEntity.SetHighlight(false);
     if (this.placingEntity instanceof AutomobileEntity || this.placingEntity instanceof AirplaneEntity) {
       this.placingEntity.SetInteractionState(InteractionState.Physical);
