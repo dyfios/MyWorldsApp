@@ -438,9 +438,162 @@ export class EnvironmentModifier {
   }
 
   /**
+   * Place character in automobile
+   */
+  private placeCharacterInAutomobile(entity: AutomobileEntity): void {
+    (globalThis as any).MW_Input_EnvMod_PlaceCharacterInAutomobile(entity);
+  }
+
+  /**
+   * Place character in airplane
+   */
+  private placeCharacterInAirplane(entity: AirplaneEntity): void {
+    (globalThis as any).MW_Input_EnvMod_PlaceCharacterInAirplane(entity);
+  }
+
+  /**
    * Handle right mouse button press
    */
   private handleRightPress(): void {
-    Logging.Log('Right mouse button pressed');
+    var hitInfo = Input.GetPointerRaycast(Vector3.forward);
+
+    if (this.interactionMode == "HAND") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof AutomobileEntity) {
+                    this.placeCharacterInAutomobile(hitInfo.entity);
+                }
+                else if (hitInfo.entity instanceof AirplaneEntity) {
+                    this.placeCharacterInAirplane(hitInfo.entity);
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "SQUARE-SHOVEL-1") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "SQUARE-SHOVEL-2") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "SQUARE-SHOVEL-4") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "SQUARE-SHOVEL-8") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "SLEDGE-HAMMER") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof MeshEntity) {
+                    
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "TERRAIN-LAYER-0") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "TERRAIN-LAYER-1") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "TERRAIN-LAYER-2") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "TERRAIN-LAYER-3") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "TERRAIN-LAYER-4") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "TERRAIN-LAYER-5") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "TERRAIN-LAYER-6") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "TERRAIN-LAYER-7") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity) {
+                    this.performDig(hitInfo.entity, hitInfo, 1);
+                }
+            }
+        }
+    }
+    else if (this.interactionMode == "ENTITY-PLACING") {
+        if (hitInfo != null) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity || hitInfo.entity instanceof MeshEntity) {
+                    (globalThis as any).cancelPlacing();
+                }
+            }
+        }
+    }
   }
 }
