@@ -483,6 +483,8 @@ export class StaticSurfaceRenderer extends WorldRendering {
 
         // Load entity using EntityManager with correct parameters
         const loadedInstanceId = this.entityManager.loadEntity(
+          null,
+          null,
           instanceId,
           instanceTag,
           entityId,
@@ -592,12 +594,12 @@ export class StaticSurfaceRenderer extends WorldRendering {
  * Tiled surface renderer for large terrains
  */
 export class TiledSurfaceRenderer extends WorldRendering {
+  public entitiesConfig: any;
   private restClient: REST;
   private stateServiceClient: REST;
   private queryParams: ProcessQueryParams;
   private entityManager: EntityManager;
   private worldConfig: any;
-  private entitiesConfig: any;
   private terrainConfig: any;
   private biomesConfig: any;
   private worldAddress: string | undefined;
@@ -1065,7 +1067,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
           try {
             addTool('${terrainLayer}', '${this.terrainConfig.layers[terrainLayer].color_texture}', 'TOOL.ADD_DOCK_BUTTON(TERRAIN.${terrainLayer}, ${terrainLayer}, ${this.terrainConfig.layers[terrainLayer].color_texture})');
             var numTerrainButtons = parseInt(WorldStorage.GetItem("MYWORLDS.DOCKUI.TERRAIN_BUTTONS"));
-            if (numTerrainButtons < 4) {
+            if (numTerrainButtons < 3) {
               this.addEditToolbarButton('${terrainLayer}', '${this.terrainConfig.layers[terrainLayer].color_texture}', 'TOOL.DOCK_BUTTON_CLICKED(TERRAIN.${terrainLayer}, ${terrainLayer}, ${this.terrainConfig.layers[terrainLayer].color_texture})');
               WorldStorage.SetItem("MYWORLDS.DOCKUI.TERRAIN_BUTTONS", (numTerrainButtons + 1).toString());
             }
@@ -1296,8 +1298,8 @@ export class TiledSurfaceRenderer extends WorldRendering {
         if (entityType == null || entityType == "") {
           entityType = "mesh";
         }
-        this.entityManager.loadEntity(entityColl[entity].instanceid, undefined, entityColl[entity].entityid,
-          entityColl[entity].variantid, undefined, entityType, entityPos,
+        this.entityManager.loadEntity(null, null, entityColl[entity].instanceid, undefined,
+          entityColl[entity].entityid, entityColl[entity].variantid, undefined, entityType, entityPos,
           new Quaternion(entityColl[entity].xrotation, entityColl[entity].yrotation,
             entityColl[entity].zrotation, entityColl[entity].wrotation), Vector3.one,
           this.entitiesConfig[entityName].variants[variantName].model,
@@ -1560,6 +1562,8 @@ export class TiledSurfaceRenderer extends WorldRendering {
     (globalThis as any).tiledsurfacerenderer_getMaterialForDigging = (regionIdx: Vector2Int, height: number) => {
       return this.getMaterialForDigging(regionIdx, height);
     };
+
+    (globalThis as any).tiledsurfacerenderer = this;
   }
 
   async initialize(): Promise<void> {

@@ -20,6 +20,7 @@ export class EntityPlacement {
   public scripts: { [key: string]: any } = {};
   public modelRotation: Quaternion | null = null;
   public modelPath: string | null = null;
+  public entityBeingPlaced: boolean = false;
 
   constructor() {
     // Store this instance in WebVerse Context
@@ -38,7 +39,7 @@ export class EntityPlacement {
    */
   private setupGlobalCallbacks(): void {
     // Define global callback for character entity loading completion
-    (globalThis as any).startPlacing = (entityToPlace: MeshEntity, entityType: string,
+    (globalThis as any).startPlacing = (entityToPlace: BaseEntity, entityType: string,
       entityIndex: number, variantIndex: number, entityID: string, variantID: string,
       modelPath: string, instanceId: string) => {
       this.startPlacing(entityToPlace, entityType, entityIndex, variantIndex, entityID,
@@ -147,7 +148,7 @@ export class EntityPlacement {
   }
 
   startPlacing(
-    entityToPlace: any,
+    entityToPlace: BaseEntity,
     entityType: string,
     entityIndex: number,
     variantIndex: number,
@@ -160,17 +161,11 @@ export class EntityPlacement {
     scripts?: { [key: string]: any },
     placementOffset?: Vector3
   ): void {
-    WorldStorage.SetItem("TERRAIN-EDIT-LAYER", "-1");
+    //WorldStorage.SetItem("TERRAIN-EDIT-LAYER", "-1");
     
-    const entityPlacementComponent = Context.GetContext("ENTITY_PLACEMENT_COMPONENT") as EntityPlacement;
-    if (entityPlacementComponent == null) {
-      Logging.LogError("[EntityPlacer] Unable to get context.");
-      return;
-    }
+    this.exitDeleteMode();
     
-    entityPlacementComponent.exitDeleteMode();
-    
-    if (entityPlacementComponent.placingEntity != null) {
+    if (this.placingEntity != null) {
       Logging.LogWarning("[EntityPlacer] Placing Entity already assigned. Placing Entity must be stopped.");
       return;
     }
@@ -180,37 +175,26 @@ export class EntityPlacement {
       return;
     }
     
-    entityPlacementComponent.entityType = entityType;
-    entityPlacementComponent.modelOffset = offset || Vector3.zero;
-    entityPlacementComponent.modelRotation = rotation || Quaternion.identity;
-    entityPlacementComponent.placingOffset = placementOffset || Vector3.zero;
-    entityPlacementComponent.placingEntity = entityToPlace;
-    entityPlacementComponent.placementLocked = true;
-    entityPlacementComponent.entityIndex = entityIndex;
-    entityPlacementComponent.variantIndex = variantIndex;
-    entityPlacementComponent.entityID = entityID;
-    entityPlacementComponent.variantID = variantID;
-    entityPlacementComponent.modelPath = modelPath;
-    entityPlacementComponent.instanceID = instanceID;
-    entityPlacementComponent.orientationIndex = 0;
-    entityPlacementComponent.scripts = scripts || {};
+    this.entityType = entityType;
+    this.modelOffset = offset || Vector3.zero;
+    this.modelRotation = rotation || Quaternion.identity;
+    this.placingOffset = placementOffset || Vector3.zero;
+    this.placingEntity = entityToPlace;
+    this.placementLocked = true;
+    this.entityIndex = entityIndex;
+    this.variantIndex = variantIndex;
+    this.entityID = entityID;
+    this.variantID = variantID;
+    this.modelPath = modelPath;
+    this.instanceID = instanceID;
+    this.orientationIndex = 0;
+    this.scripts = scripts || {};
     
-    Context.DefineContext("ENTITY_PLACEMENT_COMPONENT", entityPlacementComponent);
     entityToPlace.SetHighlight(true);
-    WorldStorage.SetItem("ENTITY-BEING-PLACED", "TRUE");
     // Input.TurnLocomotionMode = Input.VRTurnLocomotionMode.None; // VR-specific, commented out
   }
 
   stopPlacing(): void {
-    // const configModule = Context.GetContext("CONFIGURATION_MODULE");
-    // const identityModule = Context.GetContext("IDENTITY_MODULE");
-    const worldRenderingModule = Context.GetContext("WORLD_RENDERING_MODULE");
-    
-    if (worldRenderingModule == null) {
-      Logging.LogError("[EntityPlacer] Unable to get renderer context.");
-      return;
-    }
-    
     let keepSpawning = false;
     if (WorldStorage.GetItem("ENTITY-KEEP-SPAWNING") === "TRUE") {
       keepSpawning = true;
@@ -260,8 +244,7 @@ export class EntityPlacement {
       Logging.Log("[EntityPlacer] Would spawn new entity for continued placement");
     }
 
-    Context.DefineContext("ENTITY_PLACEMENT_COMPONENT", this);
-    WorldStorage.SetItem("ENTITY-BEING-PLACED", "FALSE");
+    this.entityBeingPlaced = false;
     // Input.TurnLocomotionMode = Input.VRTurnLocomotionMode.Snap; // VR-specific, commented out
   }
 
@@ -271,8 +254,7 @@ export class EntityPlacement {
       this.placingEntity = null;
     }
 
-    Context.DefineContext("ENTITY_PLACEMENT_COMPONENT", this);
-    WorldStorage.SetItem("ENTITY-BEING-PLACED", "FALSE");
+    this.entityBeingPlaced = false;
     // Input.TurnLocomotionMode = Input.VRTurnLocomotionMode.Snap; // VR-specific, commented out
   }
   
@@ -357,6 +339,12 @@ export class EntityManager {
   private entities: Map<string, EntityData> = new Map();
   private worldStorage: Map<string, any> = new Map();
 
+  private currentEntityIndex: string = "";
+  private currentVariantIndex: string = "";
+  private currentEntityId: string = "";
+  private currentVariantId: string = "";
+  private currentModelPath: string = "";
+
   constructor() {
     this.entityPlacement = new EntityPlacement();
     this.setupGlobalCallbacks();
@@ -371,11 +359,17 @@ export class EntityManager {
       this.onMeshEntityLoadedGeneric(entity);
     };
 
+    (globalThis as any).onMeshEntityLoadedGenericPlacing = (entity: any) => {
+      this.onMeshEntityLoadedGenericPlacing(entity);
+    };
+
     (globalThis as any).triggerEntityInstancesAfterTemplates = () => {
       this.triggerEntityInstancesAfterTemplates();
     };
 
     (globalThis as any).loadEntity = (
+      entityIndex: string,
+      variantIndex: string,
       instanceId: string,
       instanceTag: string | undefined,
       entityId: string,
@@ -390,9 +384,12 @@ export class EntityManager {
       wheels: AutomobileEntityWheel[] | undefined,
       mass: number | undefined,
       autoType: AutomobileType | undefined,
-      scripts: string | undefined
+      scripts: string | undefined,
+      placingEntity: boolean | undefined
     ): string => {
       return this.loadEntity(
+        entityIndex,
+        variantIndex,
         instanceId,
         instanceTag,
         entityId,
@@ -407,7 +404,8 @@ export class EntityManager {
         wheels,
         mass,
         autoType,
-        scripts
+        scripts,
+        placingEntity
       );
     };
   }
@@ -416,6 +414,8 @@ export class EntityManager {
    * Load an entity into the world
    */
   loadEntity(
+    entityIndex: string | null,
+    variantIndex: string | null,
     instanceId: string,
     instanceTag: string | undefined,
     entityId: string,
@@ -430,19 +430,31 @@ export class EntityManager {
     wheels: AutomobileEntityWheel[] | undefined = undefined,
     mass: number | undefined = undefined,
     autoType: AutomobileType | undefined = undefined,
-    scripts: string | undefined = undefined
+    scripts: string | undefined = undefined,
+    placingEntity: boolean = false
   ): string {
     let parentEntity = null;
     if (entityParent != null && entityParent != undefined && entityParent !== "" && entityParent != "null") {
       parentEntity = Entity.Get(entityParent);
     }
-if (entityId == null || variantId == null || scale == null) {
+    if (entityId == null || variantId == null || scale == null) {
 
-}
+    }
+    this.currentEntityIndex = entityIndex || "";
+    this.currentVariantIndex = variantIndex || "";
+    this.currentEntityId = entityId;
+    this.currentVariantId = variantId || "";
+    this.currentModelPath = meshObject;
     switch (type) {
       case 'mesh':
+        var onCompleteCallback = 'onMeshEntityLoadedGeneric';
+        if (placingEntity) {
+          onCompleteCallback = 'onMeshEntityLoadedGenericPlacing';
+        } else {
+          onCompleteCallback = 'onMeshEntityLoadedGeneric';
+        }
         MeshEntity.Create(parentEntity, meshObject, meshResources, position, rotation, instanceId,
-          'onMeshEntityLoadedGeneric', false);
+          onCompleteCallback, false);
         break;
       case 'automobile':
         if (!wheels || mass === undefined || !autoType) {
@@ -510,10 +522,18 @@ if (entityId == null || variantId == null || scale == null) {
     Logging.Log(`Entity ${entityId} placement complete`);
   }
 
-  onMeshEntityLoadedGeneric(entity: any): void {
+  onMeshEntityLoadedGeneric(entity: MeshEntity): void {
     Logging.Log(`✓ Mesh entity loaded successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
+  }
+
+  onMeshEntityLoadedGenericPlacing(entity: MeshEntity): void {
+    Logging.Log(`✓ Mesh entity loaded for placement successfully: ${entity.id}`);
+    entity.SetInteractionState(InteractionState.Static);
+    entity.SetVisibility(true);
+    (globalThis as any).startPlacing(entity, "mesh", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
+      this.currentVariantId, this.currentModelPath, entity.id);
   }
 
   triggerEntityInstancesAfterTemplates(): void {

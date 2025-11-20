@@ -272,15 +272,31 @@ export class UIManager {
             if (parts.length >= 3) {
               const entityID = parts[1];
               const variantID = parts[2];
+              const instanceID = UUID.NewUUID().ToString();
               
               Logging.Log('🏗️ UIManager: Entity button clicked - entityID: ' + entityID + ', variantID: ' + variantID);
               
-              //(globalThis as any).cancelPlacing();
-              //(globalThis as any).loadEntity()
-
-              // TODO: Handle entity placement logic here
-              // Example: (globalThis as any).startEntityPlacement(entityID, variantID);
-              
+              (globalThis as any).cancelPlacing();
+              for (var entity in (globalThis as any).tiledsurfacerenderer.entitiesConfig) {
+                if ((globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].id == entityID) {
+                  for (var variant in (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants) {
+                    if ((globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].variant_id == variantID) {
+                      (globalThis as any).loadEntity(entity, variant, instanceID,
+                        entity + "." + variant + "." + instanceID, entityID, variantID, null,
+                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].type,
+                        Vector3.zero, Quaternion.identity, Vector3.one,
+                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].model,
+                        [ (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].model ],
+                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].wheels,
+                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].mass,
+                        AutomobileType.Car,
+                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].scripts,
+                        true);
+                      return;
+                    }
+                  }
+                }
+              }
             } else {
               Logging.LogError('❌ UIManager: Invalid ENTITY button format: ' + buttonType + ' (expected ENTITY.<entityID>.<variantID>)');
             }
