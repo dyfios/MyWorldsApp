@@ -25,6 +25,7 @@ export class EntityPlacement {
   public entityBeingPlaced: boolean = false;
   public gridEnabled: boolean = true;
   public gridSize: number = 1;
+  public rotationIncrement: number = 90;
 
   constructor() {
     // Store this instance in WebVerse Context
@@ -68,6 +69,10 @@ export class EntityPlacement {
 
     (globalThis as any).placementUpdate = () => {
       this.placementUpdate();
+    };
+
+    (globalThis as any).rotateOneStep = (axis: string, negative: boolean) => {
+      this.rotateOneStep(axis, negative);
     };
   }
 
@@ -301,7 +306,7 @@ export class EntityPlacement {
     }
     
     const currentRot = this.placingEntity.GetEulerRotation(false);
-    let rotIncrement = parseFloat(WorldStorage.GetItem("ENTITY-ROTATION-INCREMENT") || "90");
+    let rotIncrement = this.rotationIncrement;
     
     if (negative) {
       rotIncrement = -rotIncrement;

@@ -3,6 +3,8 @@
  */
 
 export class InputRouter {
+  private isControlHeld: boolean = false;
+
   constructor() {
     this.setupGlobalCallbacks();
   }
@@ -131,7 +133,11 @@ export class InputRouter {
   processKeyPress(key: string): void {
     var thirdPersonCharacterController = Context.GetContext("THIRD_PERSON_CHARACTER_CONTROLLER");
     var entityPlacementComponent = Context.GetContext("ENTITY_PLACEMENT_COMPONENT");
-    if (key === "r") {
+    
+    if (key === "Control") {
+      this.isControlHeld = true;
+    }
+    else if (key === "r") {
         entityPlacementComponent.ToggleOrientation();
     }
     else if (key === "q") {
@@ -177,7 +183,11 @@ export class InputRouter {
    */
   processKeyRelease(key: string): void {
     var thirdPersonCharacterController = Context.GetContext("THIRD_PERSON_CHARACTER_CONTROLLER");
-    if (key === "q") {
+    
+    if (key === "Control") {
+      this.isControlHeld = false;
+    }
+    else if (key === "q") {
         thirdPersonCharacterController.currentMotion.y = 0;
     }
     else if (key === "z") {
