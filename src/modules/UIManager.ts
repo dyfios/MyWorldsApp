@@ -270,19 +270,21 @@ export class UIManager {
             // Parse ENTITY.<entityID>.<variantID> format
             const parts = buttonType.split('.');
             if (parts.length >= 3) {
-              const entityID = parts[1];
-              const variantID = parts[2].split(',')[0]; // Remove comma and everything after it
+              const entityName = parts[1];
+              const variantName = parts[2].split(',')[0]; // Remove comma and everything after it
               const instanceID = UUID.NewUUID().ToString();
               
-              Logging.Log('🏗️ UIManager: Entity button clicked - entityID: ' + entityID + ', variantID: ' + variantID);
+              Logging.Log('🏗️ UIManager: Entity button clicked - entityID: ' + entityName + ', variantID: ' + variantName);
               
               (globalThis as any).cancelPlacing();
               for (var entity in (globalThis as any).tiledsurfacerenderer.entitiesConfig) {
-                if ((globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].id == entityID) {
+                if (entity == entityName) {
                   for (var variant in (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants) {
-                    if ((globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].variant_id == variantID) {
+                    if (variant == variantName) {
                       (globalThis as any).loadEntity(entity, variant, instanceID,
-                        entity + "." + variant + "." + instanceID, entityID, variantID, null,
+                        entity + "." + variant + "." + instanceID,
+                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].id,
+                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].variant_id, null,
                         (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].type,
                         Vector3.zero, Quaternion.identity, Vector3.one,
                         (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].model,
