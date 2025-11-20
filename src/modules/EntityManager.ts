@@ -68,17 +68,7 @@ export class EntityPlacement {
   }
 
   private setupPlacementUpdateInterval(): void {
-    // Use WebVerse Time.SetInterval for placement updates
-    Time.SetInterval(`
-      var entityPlacementComponent = Context.GetContext("ENTITY_PLACEMENT_COMPONENT");
-      if (entityPlacementComponent == null) {
-        Logging.LogError("[EntityPlacer] Unable to get entity placement component.");
-      } else {
-        globalThis.placementUpdate();
-        globalThis.entityPlacementComponent.placementLocked = false;
-        Context.DefineContext("ENTITY_PLACEMENT_COMPONENT", entityPlacementComponent);
-      }`,
-      0.1);
+    Time.SetInterval(`globalThis.placementUpdate();`, 0.1);
   }
 
   placementUpdate(): void {
@@ -160,7 +150,7 @@ export class EntityPlacement {
     rotation?: Quaternion,
     scripts?: { [key: string]: any },
     placementOffset?: Vector3
-  ): void {
+  ): void {Logging.Log("qqaa");
     //WorldStorage.SetItem("TERRAIN-EDIT-LAYER", "-1");
     
     this.exitDeleteMode();
@@ -481,8 +471,6 @@ export class EntityManager {
 
     Logging.Log("scripts " + scripts);
 
-    this.finishLoadingPlacingEntity(instanceId);
-
     return instanceId;
   }
 
@@ -499,23 +487,6 @@ export class EntityManager {
     // Terrain snapping logic would go here
     // For now, just log the action
     Logging.Log(`Snapping entity ${entityId} to terrain at position ` + JSON.stringify(entity.position));
-  }
-
-  /**
-   * Finish loading and placing an entity
-   */
-  finishLoadingPlacingEntity(entityId: string): void {
-    const metadata = this.worldStorage.get(entityId);
-    if (!metadata) {
-      Logging.LogWarning(`No metadata found for entity ${entityId}`);
-      return;
-    }
-
-    // Snap to terrain
-    this.snapEntityToTerrain(entityId);
-
-    // Add to script engine (would integrate with ScriptEngine module)
-    Logging.Log(`Entity ${entityId} loading complete`);
   }
 
   /**
