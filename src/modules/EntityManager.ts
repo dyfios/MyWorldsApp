@@ -192,11 +192,11 @@ export class EntityPlacement {
       return;
     }
     
-    if (this.placementLocked === true) {
-      return;
-    }
+    //if (this.placementLocked === true) {
+    //  return;
+    //}
     
-    const pos: Vector3 = (globalThis as any).tiledsurfacerenderer_getWorldPositionForRenderedPos(this.placingEntity.GetPosition(false));
+    const pos: Vector3 = (globalThis as any).tiledsurfacerenderer_getWorldPositionForRenderedPosition(this.placingEntity.GetPosition(false));
     //const rot: Quaternion = this.placingEntity.GetRotation(false);
     const terrainIndex = (globalThis as any).tiledsurfacerenderer_getRegionIndexForWorldPos(pos);
     //const regionPos = (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos(pos, terrainIndex);
