@@ -267,7 +267,7 @@ export class UIManager {
           break;
         default:
           if (buttonType.startsWith('ENTITY.')) {
-            // Parse ENTITY.<entityID>.<variantID> format
+            (globalThis as any).setInteractionMode('ENTITY-PLACEMENT');
             const parts = buttonType.split('.');
             if (parts.length >= 3) {
               const entityName = parts[1];

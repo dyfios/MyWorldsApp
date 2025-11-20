@@ -176,7 +176,7 @@ export class EntityPlacement {
     // Input.TurnLocomotionMode = Input.VRTurnLocomotionMode.None; // VR-specific, commented out
   }
 
-  stopPlacing(): void {
+  stopPlacing(): void {Logging.Log("poiu");
     let keepSpawning = false;
     if (WorldStorage.GetItem("ENTITY-KEEP-SPAWNING") === "TRUE") {
       keepSpawning = true;

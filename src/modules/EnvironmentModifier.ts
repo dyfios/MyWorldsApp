@@ -187,7 +187,7 @@ export class EnvironmentModifier {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity || hitInfo.entity instanceof MeshEntity) {
                     WorldStorage.SetItem("ENTITY-KEEP-SPAWNING", "TRUE");
-                    (globalThis as any).StopPlacing();
+                    (globalThis as any).stopPlacing();
                 }
             }
         }
