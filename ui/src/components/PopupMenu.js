@@ -38,6 +38,11 @@ const PopupMenu = ({
         filtered.push(newTab);
       }
       
+      // If this is the first iframe tab being added, set it as active
+      if (filtered.length === 1) {
+        setActiveTabId(newTab.id);
+      }
+      
       return [...filtered, settingsTab];
     });
     
