@@ -247,26 +247,32 @@ export class UIManager {
       switch (buttonType) {
         case 'HAND':
           Logging.Log('🔨 UIManager: Hand button clicked');
+          (globalThis as any).cancelPlacing();
           (globalThis as any).setInteractionMode('HAND');
           break;
         case 'SQUARE_SHOVEL_1':
           Logging.Log('🎨 UIManager: Square Shovel 1 button clicked');
+          (globalThis as any).cancelPlacing();
           (globalThis as any).setInteractionMode('SQUARE-SHOVEL-1');
           break;
         case 'SQUARE_SHOVEL_2':
           Logging.Log('📦 UIManager: Square Shovel 2 button clicked');
+          (globalThis as any).cancelPlacing();
           (globalThis as any).setInteractionMode('SQUARE-SHOVEL-2');
           break;
         case 'SQUARE_SHOVEL_4':
           Logging.Log('🗑️ UIManager: Square Shovel 4 button clicked');
+          (globalThis as any).cancelPlacing();
           (globalThis as any).setInteractionMode('SQUARE-SHOVEL-4');
           break;
         case 'SQUARE_SHOVEL_8':
           Logging.Log('🗑️ UIManager: Square Shovel 8 button clicked');
+          (globalThis as any).cancelPlacing();
           (globalThis as any).setInteractionMode('SQUARE-SHOVEL-8');
           break;
         case 'SLEDGE_HAMMER':
           Logging.Log('🔨 UIManager: Sledgehammer button clicked');
+          (globalThis as any).cancelPlacing();
           (globalThis as any).setInteractionMode('SLEDGE-HAMMER');
           break;
         default:
@@ -313,9 +319,10 @@ export class UIManager {
                 
                 Logging.Log('⛏️ UIManager: Terrain button clicked - layerName: ' + layerName);
 
-                Logging.Log((globalThis as any).tiledsurfacerenderer.terrainConfig.layers[layerName]);
+                const layerNum = (globalThis as any).tiledsurfacerenderer.terrainConfig.layers[layerName]["layer"] as number;
+                (globalThis as any).cancelPlacing();
+                (globalThis as any).setInteractionMode('TERRAIN-LAYER-' + layerNum);
               }
-              (globalThis as any).setInteractionMode('TERRAIN-LAYER-X');
             } else {
             Logging.Log('🔧 UIManager: Unknown button type clicked: ' + buttonType);
           }
