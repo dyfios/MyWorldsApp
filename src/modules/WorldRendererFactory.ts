@@ -611,6 +611,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
   private water: WaterEntity | null = null;
   private regionLoadInProgress: boolean = false;
   private initialWorldLoadInProgress: boolean = true;
+  private initialLoadStartTime: number = 0;
   private terrainTiles: { [key: string]: TerrainEntity | string } = {};
   private biomeMap: { [key: string]: any } = {};
   private characterSynchronizer: string | null = null;
@@ -732,19 +733,32 @@ export class TiledSurfaceRenderer extends WorldRendering {
     // For now, keep water near user, will want to make more sophisticated
     if (this.water != null) {
       if (this.initialWorldLoadInProgress == true) {
-        this.water.SetInteractionState(InteractionState.Hidden);
+        //this.water.SetInteractionState(InteractionState.Hidden);
       }
       else {
-        this.water.SetInteractionState(InteractionState.Static);
         this.water.SetPosition(new Vector3(
           renderedPos.x, 127, renderedPos.z), false);
       }
     }
 
-    if (Object.keys(this.terrainTiles).length >= 9) {
-      if (!this.isAnyTerrainTileLoading()) {
+    if (this.initialWorldLoadInProgress == true && Object.keys(this.terrainTiles).length >= 9) {
+      // Record the start time the first time we enter this logic block
+      if (this.initialLoadStartTime === 0) {
+        this.initialLoadStartTime = Date.now();
+      }
+      
+      const currentTime = Date.now();
+      const loadingTimeElapsed = (currentTime - this.initialLoadStartTime) / 1000; // Convert to seconds
+      const loadingTimeoutReached = loadingTimeElapsed >= 60; // 60 second timeout
+      
+      if (!this.isAnyTerrainTileLoading() || loadingTimeoutReached) {
         this.initialWorldLoadInProgress = false;
+        this.water?.SetInteractionState(InteractionState.Static);
         (globalThis as any).toggleLoadingPanel(false);
+        
+        if (loadingTimeoutReached) {
+          Logging.LogWarning('⏰ TiledSurfaceRenderer: Initial world loading timeout reached (60 seconds) - proceeding despite pending terrain tiles');
+        }
       }
     }
   }
