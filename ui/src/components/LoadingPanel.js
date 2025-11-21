@@ -6,13 +6,13 @@ const LoadingPanel = () => {
   const [message, setMessage] = useState('Loading...');
 
   // API: Show loading panel
-  const showLoading = (loadingMessage = 'Loading...') => {console.log("z");
+  const showLoading = (loadingMessage = 'Loading...') => {
     setMessage(loadingMessage);
     setIsVisible(true);
   };
 
   // API: Hide loading panel
-  const hideLoading = () => {console.log("y");
+  const hideLoading = () => {
     setIsVisible(false);
   };
 

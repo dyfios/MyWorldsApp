@@ -418,11 +418,11 @@ export class UIManager {
       }
 
       // Call the loading panel API
-      const jsCommand = `console.log("a");
-        if (window.loadingPanelAPI && window.loadingPanelAPI.show && window.loadingPanelAPI.hide) {console.log("b");
-          if (${show}) {console.log("c");
+      const jsCommand = `
+        if (window.loadingPanelAPI && window.loadingPanelAPI.show && window.loadingPanelAPI.hide) {
+          if (${show}) {
             window.loadingPanelAPI.show();
-          } else {console.log("d");
+          } else {
             window.loadingPanelAPI.hide();
           }
         }
