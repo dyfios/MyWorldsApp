@@ -87,8 +87,8 @@ export class UIManager {
       this.clearTools();
     };
 
-    (globalThis as any).toggleLoginPanel = (show: boolean) => {
-      this.toggleLoginPanel(show);
+    (globalThis as any).toggleLoadingPanel = (show: boolean) => {
+      this.toggleLoadingPanel(show);
     };
 
     // Expose the UI manager instance and retry method globally for Time.SetTimeout callbacks
@@ -403,36 +403,36 @@ export class UIManager {
     }
   }
 
-  toggleLoginPanel(show: boolean): void {
+  toggleLoadingPanel(show: boolean): void {
     try {
       const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
       if (!mainToolbarId) {
-        Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found, cannot toggle login panel');
+        Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found, cannot toggle loading panel');
         return;
       }
 
       const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
       if (!mainToolbar) {
-        Logging.LogError('❌ UIManager: Main toolbar entity not found, cannot toggle login panel');
+        Logging.LogError('❌ UIManager: Main toolbar entity not found, cannot toggle loading panel');
         return;
       }
 
-      // Call the login panel API
-      const jsCommand = `
-        if (window.loadingPanelAPI && window.loadingPanelAPI.show && window.loadingPanelAPI.hide) {
-          if (${show}) {
+      // Call the loading panel API
+      const jsCommand = `console.log("a");
+        if (window.loadingPanelAPI && window.loadingPanelAPI.show && window.loadingPanelAPI.hide) {console.log("b");
+          if (${show}) {console.log("c");
             window.loadingPanelAPI.show();
-          } else {
+          } else {console.log("d");
             window.loadingPanelAPI.hide();
           }
         }
       `;
       
       mainToolbar.ExecuteJavaScript(jsCommand, '');
-      Logging.Log('✅ UIManager: Login panel toggle command sent to UI space: ' + show);
+      Logging.Log('✅ UIManager: Loading panel toggle command sent to UI space: ' + show);
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
-      Logging.LogError('❌ UIManager: Error in toggleLoginPanel: ' + errorMessage);
+      Logging.LogError('❌ UIManager: Error in toggleLoadingPanel: ' + errorMessage);
     }
   }
 
