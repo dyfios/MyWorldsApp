@@ -282,6 +282,7 @@ export class EnvironmentModifier {
    */
   deleteEntity(entity: BaseEntity): void {
     Logging.Log('Deleting entity "' + entity.id + '"');
+    entity.Delete(true);
   }
 
   /**
