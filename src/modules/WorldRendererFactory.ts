@@ -630,7 +630,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
     this.entityManager = new EntityManager();
     this.identityModule = new Identity();
     this.setupGlobalCallbacks();
-    (globalThis as any).toggleLoadingPanel(true);
+    Time.SetTimeout(`this.toggleLoadingPanel(true)`, 1000);
   }
 
   /**
