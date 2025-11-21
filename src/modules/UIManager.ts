@@ -309,7 +309,7 @@ export class UIManager {
           } else if (buttonType.startsWith('TERRAIN.')) {
               const parts = buttonType.split('.');
               if (parts.length >= 2) {
-                const layerName = parts[1];
+                const layerName = parts[1].split(',')[0]; // Remove comma and everything after it
                 
                 Logging.Log('⛏️ UIManager: Terrain button clicked - layerName: ' + layerName);
 
