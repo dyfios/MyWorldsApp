@@ -303,7 +303,10 @@ export class UIManager {
                   }
                 }
               }
-            } else if (buttonType.startsWith('TERRAIN.')) {
+            } else {
+              Logging.LogError('❌ UIManager: Invalid ENTITY button format: ' + buttonType + ' (expected ENTITY.<entityID>.<variantID>)');
+            }
+          } else if (buttonType.startsWith('TERRAIN.')) {
               const parts = buttonType.split('.');
               if (parts.length >= 2) {
                 const layerName = parts[1];
@@ -313,10 +316,7 @@ export class UIManager {
                 Logging.Log((globalThis as any).tiledsurfacerenderer.terrainConfig.layers[layerName]);
               }
               (globalThis as any).setInteractionMode('TERRAIN-LAYER-X');
-            }else {
-              Logging.LogError('❌ UIManager: Invalid ENTITY button format: ' + buttonType + ' (expected ENTITY.<entityID>.<variantID>)');
-            }
-          } else {
+            } else {
             Logging.Log('🔧 UIManager: Unknown button type clicked: ' + buttonType);
           }
           // Handle unknown button types
