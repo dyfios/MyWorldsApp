@@ -611,7 +611,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
   private water: WaterEntity | null = null;
   private regionLoadInProgress: boolean = false;
   private initialWorldLoadInProgress: boolean = true;
-  private initialLoadStartTime: number = 0;
+  private initialLoadStartTime: Date | null = null;
   private terrainTiles: { [key: string]: TerrainEntity | string } = {};
   private biomeMap: { [key: string]: any } = {};
   private characterSynchronizer: string | null = null;
@@ -743,12 +743,12 @@ export class TiledSurfaceRenderer extends WorldRendering {
 
     if (this.initialWorldLoadInProgress == true && Object.keys(this.terrainTiles).length >= 9) {
       // Record the start time the first time we enter this logic block
-      if (this.initialLoadStartTime === 0) {
-        this.initialLoadStartTime = Date.now();
+      if (this.initialLoadStartTime === null) {
+        this.initialLoadStartTime = (Date as any).now;
       }
       
-      const currentTime = Date.now();
-      const loadingTimeElapsed = (currentTime - this.initialLoadStartTime) / 1000; // Convert to seconds
+      const currentTime = (Date as any).now;
+      const loadingTimeElapsed = this.calculateElapsedSeconds(this.initialLoadStartTime!, currentTime);
       const loadingTimeoutReached = loadingTimeElapsed >= 60; // 60 second timeout
       
       if (!this.isAnyTerrainTileLoading() || loadingTimeoutReached) {
@@ -1726,6 +1726,28 @@ export class TiledSurfaceRenderer extends WorldRendering {
       }
     }
     return false;
+  }
+
+  /**
+   * Calculate elapsed seconds between two Date objects
+   * @param startTime Start time Date object
+   * @param currentTime Current time Date object
+   * @returns Elapsed seconds (approximate calculation)
+   */
+  private calculateElapsedSeconds(startTime: Date, currentTime: Date): number {
+    // Calculate elapsed time using date components
+    // This is an approximation since we don't have direct millisecond comparison
+    const startSeconds = (startTime as any).hour * 3600 + (startTime as any).minute * 60 + (startTime as any).second;
+    const currentSeconds = (currentTime as any).hour * 3600 + (currentTime as any).minute * 60 + (currentTime as any).second;
+    
+    let elapsedSeconds = currentSeconds - startSeconds;
+    
+    // Handle day rollover (simple case - assume max 1 day difference)
+    if (elapsedSeconds < 0) {
+      elapsedSeconds += 24 * 3600; // Add 24 hours worth of seconds
+    }
+    
+    return elapsedSeconds;
   }
 
   dispose(): void {
