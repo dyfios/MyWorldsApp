@@ -265,7 +265,7 @@ export class UIManager {
           Logging.Log('🗑️ UIManager: Square Shovel 8 button clicked');
           (globalThis as any).setInteractionMode('SQUARE-SHOVEL-8');
           break;
-        case 'SLEDGEHAMMER':
+        case 'SLEDGE_HAMMER':
           Logging.Log('🔨 UIManager: Sledgehammer button clicked');
           (globalThis as any).setInteractionMode('SLEDGE-HAMMER');
           break;
@@ -303,7 +303,17 @@ export class UIManager {
                   }
                 }
               }
-            } else {
+            } else if (buttonType.startsWith('TERRAIN.')) {
+              const parts = buttonType.split('.');
+              if (parts.length >= 2) {
+                const layerName = parts[1];
+                
+                Logging.Log('⛏️ UIManager: Terrain button clicked - layerName: ' + layerName);
+
+                Logging.Log((globalThis as any).tiledsurfacerenderer.terrainConfig.layers[layerName]);
+              }
+              (globalThis as any).setInteractionMode('TERRAIN-LAYER-X');
+            }else {
               Logging.LogError('❌ UIManager: Invalid ENTITY button format: ' + buttonType + ' (expected ENTITY.<entityID>.<variantID>)');
             }
           } else {
