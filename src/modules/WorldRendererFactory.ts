@@ -630,6 +630,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
     this.entityManager = new EntityManager();
     this.identityModule = new Identity();
     this.setupGlobalCallbacks();
+    (globalThis as any).toggleLoginPanel(true);
   }
 
   /**
@@ -743,6 +744,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
     if (Object.keys(this.terrainTiles).length >= 9) {
       if (!this.isAnyTerrainTileLoading()) {
         this.initialWorldLoadInProgress = false;
+        (globalThis as any).toggleLoginPanel(false);
       }
     }
   }
