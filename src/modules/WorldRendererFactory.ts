@@ -610,6 +610,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
   private currentRegion: Vector2Int = new Vector2Int(0, 0);
   private water: WaterEntity | null = null;
   private regionLoadInProgress: boolean = false;
+  private initialWorldLoadInProgress: boolean = true;
   private terrainTiles: { [key: string]: TerrainEntity | string } = {};
   private biomeMap: { [key: string]: any } = {};
   private characterSynchronizer: string | null = null;
@@ -729,13 +730,19 @@ export class TiledSurfaceRenderer extends WorldRendering {
 
     // For now, keep water near user, will want to make more sophisticated
     if (this.water != null) {
-      if (this.regionLoadInProgress == true) {
+      if (this.initialWorldLoadInProgress == true) {
         this.water.SetInteractionState(InteractionState.Hidden);
       }
       else {
         this.water.SetInteractionState(InteractionState.Static);
         this.water.SetPosition(new Vector3(
           renderedPos.x, 127, renderedPos.z), false);
+      }
+    }
+
+    if (!this.regionLoadInProgress) {
+      if (!this.isAnyTerrainTileLoading()) {
+        this.initialWorldLoadInProgress = false;
       }
     }
   }
@@ -1157,7 +1164,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
 
   enableWater(water: WaterEntity): void {
     Logging.Log("Enabling Water...");
-    water.SetInteractionState(InteractionState.Static);
+    water.SetInteractionState(InteractionState.Hidden);
     water.SetVisibility(true);
     this.water = water;
     (globalThis as any).playerController.setMotionModeFree();
@@ -1690,6 +1697,19 @@ export class TiledSurfaceRenderer extends WorldRendering {
     } else {
       Logging.LogWarning('TiledSurfaceRenderer: Sun controller not available for time update');
     }
+  }
+
+  /**
+   * Check if any terrain tiles are currently loading
+   * @returns True if any terrain tile is in "loading" state, false otherwise
+   */
+  isAnyTerrainTileLoading(): boolean {
+    for (const tile in this.terrainTiles) {
+      if (this.terrainTiles[tile] === "loading") {
+        return true;
+      }
+    }
+    return false;
   }
 
   dispose(): void {
