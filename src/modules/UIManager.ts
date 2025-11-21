@@ -87,6 +87,10 @@ export class UIManager {
       this.clearTools();
     };
 
+    (globalThis as any).toggleLoginPanel = (show: boolean) => {
+      this.toggleLoginPanel(show);
+    };
+
     // Expose the UI manager instance and retry method globally for Time.SetTimeout callbacks
     (globalThis as any).uiManager = this;
   }
@@ -396,6 +400,39 @@ export class UIManager {
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       Logging.LogError('❌ UIManager: Error applying UI Settings: ' + errorMessage);
+    }
+  }
+
+  toggleLoginPanel(show: boolean): void {
+    try {
+      const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+      if (!mainToolbarId) {
+        Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found, cannot toggle login panel');
+        return;
+      }
+
+      const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+      if (!mainToolbar) {
+        Logging.LogError('❌ UIManager: Main toolbar entity not found, cannot toggle login panel');
+        return;
+      }
+
+      // Call the login panel API
+      const jsCommand = `
+        if (window.loadingPanelAPI && window.loadingPanelAPI.show && window.loadingPanelAPI.hide) {
+          if (${show}) {
+            window.loadingPanelAPI.show();
+          } else {
+            window.loadingPanelAPI.hide();
+          }
+        }
+      `;
+      
+      mainToolbar.ExecuteJavaScript(jsCommand, '');
+      Logging.Log('✅ UIManager: Login panel toggle command sent to UI space: ' + show);
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      Logging.LogError('❌ UIManager: Error in toggleLoginPanel: ' + errorMessage);
     }
   }
 
