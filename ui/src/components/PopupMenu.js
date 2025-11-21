@@ -28,9 +28,14 @@ const PopupMenu = ({
       type: 'iframe'
     };
     
+    let isFirstTab = false;
+    
     setTabs(prev => {
       const filtered = prev.filter(tab => tab.type !== 'settings');
       const settingsTab = prev.find(tab => tab.type === 'settings');
+      
+      // Check if this will be the first iframe tab
+      isFirstTab = filtered.length === 0;
       
       if (position !== null && position >= 0 && position < filtered.length) {
         filtered.splice(position, 0, newTab);
@@ -38,13 +43,13 @@ const PopupMenu = ({
         filtered.push(newTab);
       }
       
-      // If this is the first iframe tab being added, set it as active
-      if (filtered.length === 1) {
-        setActiveTabId(newTab.id);
-      }
-      
       return [...filtered, settingsTab];
     });
+    
+    // If this is the first iframe tab being added, set it as active
+    if (isFirstTab) {
+      setActiveTabId(newTab.id);
+    }
     
     return newTab.id;
   }, []);
