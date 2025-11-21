@@ -4,6 +4,7 @@ import './App.css';
 import ButtonDock from './components/ButtonDock';
 import ChatConsole from './components/ChatConsole';
 import PopupMenu from './components/PopupMenu';
+import LoadingPanel from './components/LoadingPanel';
 import { useUISettings } from './hooks/useUISettings';
 
 function App() {
@@ -473,6 +474,8 @@ function App() {
         onOpen={handlePopupMenuOpen}
         onClose={handlePopupMenuClose}
       />
+
+      <LoadingPanel />
     </div>
   );
 }
