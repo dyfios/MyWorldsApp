@@ -729,8 +729,14 @@ export class TiledSurfaceRenderer extends WorldRendering {
 
     // For now, keep water near user, will want to make more sophisticated
     if (this.water != null) {
-      this.water.SetPosition(new Vector3(
-        renderedPos.x, 127, renderedPos.z), false);
+      if (this.regionLoadInProgress == true) {
+        this.water.SetInteractionState(InteractionState.Hidden);
+      }
+      else {
+        this.water.SetInteractionState(InteractionState.Static);
+        this.water.SetPosition(new Vector3(
+          renderedPos.x, 127, renderedPos.z), false);
+      }
     }
   }
 
