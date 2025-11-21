@@ -740,7 +740,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
       }
     }
 
-    if (!this.regionLoadInProgress) {
+    if (Object.keys(this.terrainTiles).length >= 9) {
       if (!this.isAnyTerrainTileLoading()) {
         this.initialWorldLoadInProgress = false;
       }
