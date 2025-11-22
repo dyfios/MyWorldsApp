@@ -33,6 +33,7 @@ export class EntityPlacement {
   public gridEnabled: boolean = true;
   public gridSize: number = 1;
   public rotationIncrement: number = 90;
+  public keepSpawning: boolean = true;
 
   constructor() {
     // Store this instance in WebVerse Context
@@ -159,7 +160,7 @@ export class EntityPlacement {
     offset?: Vector3,
     rotation?: Quaternion,
     placementOffset?: Vector3
-  ): void {Logging.Log("qqaa");
+  ): void {
     //WorldStorage.SetItem("TERRAIN-EDIT-LAYER", "-1");
     
     this.exitDeleteMode();
@@ -196,13 +197,8 @@ export class EntityPlacement {
   }
 
   stopPlacing(): void {
-    let keepSpawning = false;
-    if (WorldStorage.GetItem("ENTITY-KEEP-SPAWNING") === "TRUE") {
-      keepSpawning = true;
-    }
-
     if (this.placingEntity == null) {
-      if (keepSpawning === true && this.entityType && this.entityIndex !== null && 
+      if (this.keepSpawning === true && this.entityType && this.entityIndex !== null && 
         this.variantIndex !== null && this.entityID && this.variantID) {
         const instanceID = UUID.NewUUID().ToString();
         (globalThis as any).loadEntity(this.entityIndex, this.variantIndex, instanceID,
@@ -260,7 +256,7 @@ export class EntityPlacement {
     }
     this.placingEntity = null;
     
-    if (keepSpawning === true && this.entityID && this.variantID) {
+    if (this.keepSpawning === true && this.entityID && this.variantID) {
       const instanceID = UUID.NewUUID().ToString();
       (globalThis as any).loadEntity(this.entityIndex, this.variantIndex, instanceID,
         this.entityIndex + "." + this.variantIndex + "." + instanceID, this.entityID, this.variantID,
@@ -484,7 +480,7 @@ export class EntityManager {
     var automobileWheels: AutomobileEntityWheel[] = [];
     if (wheels != null && wheels != undefined) {
       for (var wheel in wheels) {
-        automobileWheels.push(new AutomobileEntityWheel(wheels[wheel].name, wheels[wheel].radius));
+        automobileWheels.push(new AutomobileEntityWheel(wheels[wheel].name as string, wheels[wheel].radius as number));
       }
     }
     this.currentWheels = automobileWheels;

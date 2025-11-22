@@ -184,9 +184,8 @@ export class EnvironmentModifier {
     }
     else if (this.interactionMode == "ENTITY-PLACING") {
         if (hitInfo != null) {
-            if (hitInfo.entity != null) {
+            if (hitInfo.entity != null) {Logging.Log("hit of type " + typeof hitInfo.entity);
                 if (hitInfo.entity instanceof TerrainEntity || hitInfo.entity instanceof MeshEntity) {
-                    WorldStorage.SetItem("ENTITY-KEEP-SPAWNING", "TRUE");
                     (globalThis as any).stopPlacing();
                 }
             }
