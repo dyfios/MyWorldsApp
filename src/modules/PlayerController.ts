@@ -268,6 +268,7 @@ export class PlayerController {
     this.internalCharacterEntity.SetVisibility(false, false);
     this.inVehicle = true;
     this.activeVehicle = automobileEntity;
+    Input.wasdMotionEnabled = false;
   }
 
   placePlayerInAirplaneEntity(airplaneEntity: AirplaneEntity): void {
@@ -280,6 +281,7 @@ export class PlayerController {
     this.internalCharacterEntity.SetVisibility(false, false);
     this.inVehicle = true;
     this.activeVehicle = airplaneEntity;
+    Input.wasdMotionEnabled = false;
   }
 
   exitVehicle(): void {
@@ -298,6 +300,7 @@ export class PlayerController {
         // Place the camera on the character.
         this.internalCharacterEntity.PlaceCameraOn();
         Camera.SetPosition(new Vector3(0, 1.5, -2.75), true);
+        Input.wasdMotionEnabled = true;
     }
     else {
         Logging.LogError("[ThirdPersonCharacter] Cannot exit vehicle, not in a vehicle.");
