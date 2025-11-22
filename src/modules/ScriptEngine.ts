@@ -28,7 +28,7 @@ export class ScriptEngine {
       Logging.LogError('Failed to add script entity: invalid entity ID');
       return;
     }
-    this.scripts.set(newScriptId, scripts);
+    this.scripts.set(newScriptId, [entity, scripts]);
   }
 
   /**
