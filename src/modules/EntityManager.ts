@@ -25,7 +25,7 @@ export class EntityPlacement {
   public instanceID: string | null = null;
   public orientationIndex: number = 0;
   public scripts: { [key: string]: any } = {};
-  public wheels: AutomobileEntityWheel[] = [];
+  public wheels: any = null;
   public mass: number = 0;
   public modelRotation: Quaternion | null = null;
   public modelPath: string | null = null;
