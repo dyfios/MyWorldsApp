@@ -6,6 +6,12 @@ import { Position, Rotation } from '../types/config';
 import { EntityData } from '../types/entity';
 import { ScriptEngine } from './ScriptEngine';
 
+// Local implementation of AutomobileType enum
+enum AutomobileType {
+  Car = 0,
+  Truck = 1
+}
+
 export class EntityPlacement {
   public placingEntity: BaseEntity | null = null;
   public entityType: string | null = null;

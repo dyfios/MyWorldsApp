@@ -2,6 +2,12 @@
  * UI Manager - Manages UI elements and edit toolbar
  */
 
+// Local implementation of AutomobileType enum
+enum AutomobileType {
+  Car = 0,
+  Truck = 1
+}
+
 export interface UIUpdateData {
   type: string;
   payload?: any;

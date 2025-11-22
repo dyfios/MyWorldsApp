@@ -9,6 +9,12 @@ import { EntityManager } from './EntityManager';
 import { DockButtonInfo } from './UIManager';
 import { Identity } from './Identity';
 
+// Local implementation of AutomobileType enum since the WebVerse runtime may not expose it
+enum AutomobileType {
+  Car = 0,
+  Truck = 1
+}
+
 /**
  * Entity instance format received from the server
  */
