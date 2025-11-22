@@ -448,7 +448,7 @@ export class EntityManager {
     scale: Vector3 = new Vector3(1, 1, 1),
     meshObject: string,
     meshResources: string[],
-    wheels: AutomobileEntityWheel[] | undefined = undefined,
+    wheels: any | undefined = undefined,
     mass: number | undefined = undefined,
     autoType: AutomobileType | undefined = undefined,
     scripts: string | undefined = undefined,
@@ -466,7 +466,14 @@ export class EntityManager {
     this.currentEntityId = entityId;
     this.currentVariantId = variantId || "";
     this.currentModelPath = meshObject;
-    this.currentWheels = wheels;
+    this.currentWheels = undefined;
+    var automobileWheels: AutomobileEntityWheel[] = [];
+    if (wheels != null && wheels != undefined) {
+      for (var wheel in wheels) {
+        automobileWheels.push(new AutomobileEntityWheel(wheels[wheel].name, wheels[wheel].radius));
+      }
+    }
+    this.currentWheels = automobileWheels;
     this.currentMass = mass;
     this.currentScripts = scripts;
     if (type == null || type === "") {
@@ -488,7 +495,7 @@ export class EntityManager {
           throw new Error('Missing automobile parameters: wheels, mass, or autoType');
         }
         Logging.Log("meshobject " + meshObject);
-        AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, wheels,
+        AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, this.currentWheels,
           mass, autoType, instanceId, instanceTag, 'onAutomobileEntityLoadedGeneric', false);
         break;
       case 'airplane':
@@ -532,7 +539,7 @@ export class EntityManager {
     Logging.Log(`✓ Mesh entity loaded successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
-    var scripts = this.currentScripts ? JSON.parse(this.currentScripts) : null;
+    var scripts = this.currentScripts as any;
     if (scripts != null) {
       ((globalThis as any).scriptEngine as ScriptEngine).addScriptEntity(entity, scripts);
 
@@ -557,7 +564,7 @@ export class EntityManager {
     Logging.Log(`✓ Mesh entity loaded for placement successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
-    var scripts = this.currentScripts ? JSON.parse(this.currentScripts) : null;
+    var scripts = this.currentScripts;
     (globalThis as any).startPlacing(entity, "mesh", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
       this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, scripts, entity.id);
   }

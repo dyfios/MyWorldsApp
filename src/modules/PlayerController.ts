@@ -19,6 +19,8 @@ export enum MotionMode {
 export class PlayerController {
   public internalCharacterEntity: CharacterEntity;
   public motionMode: MotionMode = MotionMode.Physical;
+  public inVehicle: boolean = false;
+  public activeVehicle: AutomobileEntity | AirplaneEntity | null = null;
   // private cameraMode: 'firstPerson' | 'thirdPerson' = 'thirdPerson'; // Reserved for future camera mode switching
 
   constructor(initialPosition: Vector3, characterName: string, characterId: string | undefined) {
@@ -212,55 +214,44 @@ export class PlayerController {
   }
 
   placePlayerInAutomobileEntity(automobileEntity: AutomobileEntity): void {
-    var context = Context.GetContext("THIRD_PERSON_CHARACTER_CONTROLLER");
-
-    context.characterEntity.SetParent(automobileEntity);
-    context.characterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
-    context.characterEntity.SetRotation(Quaternion.identity, true, false);
-    context.characterEntity.SetInteractionState(InteractionState.Static);
-    context.characterEntity.fixHeight = false;
-    context.characterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, false, null));
-    context.characterEntity.SetVisibility(false, false);
-    context.inVehicle = true;
-    (globalThis as any).playerController.activeVehicle = automobileEntity;
-
-    Context.DefineContext("THIRD_PERSON_CHARACTER_CONTROLLER", context);
+    this.internalCharacterEntity.SetParent(automobileEntity);
+    this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
+    this.internalCharacterEntity.SetRotation(Quaternion.identity, true, false);
+    this.internalCharacterEntity.SetInteractionState(InteractionState.Static);
+    this.internalCharacterEntity.fixHeight = false;
+    this.internalCharacterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, false, null));
+    this.internalCharacterEntity.SetVisibility(false, false);
+    this.inVehicle = true;
+    this.activeVehicle = automobileEntity;
   }
 
   placePlayerInAirplaneEntity(airplaneEntity: AirplaneEntity): void {
-    var context = Context.GetContext("THIRD_PERSON_CHARACTER_CONTROLLER");
-
-    context.characterEntity.SetParent(airplaneEntity);
-    context.characterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
-    context.characterEntity.SetRotation(Quaternion.identity, true, false);
-    context.characterEntity.SetInteractionState(InteractionState.Static);
-    context.characterEntity.fixHeight = false;
-    context.characterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, false, null));
-    context.characterEntity.SetVisibility(false, false);
-    context.inVehicle = true;
-    (globalThis as any).playerController.activeVehicle = airplaneEntity;
-
-    Context.DefineContext("THIRD_PERSON_CHARACTER_CONTROLLER", context);
-  };
+    this.internalCharacterEntity.SetParent(airplaneEntity);
+    this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
+    this.internalCharacterEntity.SetRotation(Quaternion.identity, true, false);
+    this.internalCharacterEntity.SetInteractionState(InteractionState.Static);
+    this.internalCharacterEntity.fixHeight = false;
+    this.internalCharacterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, false, null));
+    this.internalCharacterEntity.SetVisibility(false, false);
+    this.inVehicle = true;
+    this.activeVehicle = airplaneEntity;
+  }
 
   exitVehicle(): void {
-    var context = Context.GetContext("THIRD_PERSON_CHARACTER_CONTROLLER");
-    if (context.inVehicle && (globalThis as any).playerController.activeVehicle != null) {
-        var vehiclePosition = (globalThis as any).playerController.activeVehicle.GetPosition(false);
-        context.characterEntity.SetParent(null);
-        context.characterEntity.SetPosition(new Vector3(
+    if (this.inVehicle && this.activeVehicle != null) {
+        var vehiclePosition = this.activeVehicle.GetPosition(false);
+        this.internalCharacterEntity.SetParent(null);
+        this.internalCharacterEntity.SetPosition(new Vector3(
             vehiclePosition.x, vehiclePosition.y + 2, vehiclePosition.z), true, false);
-        context.characterEntity.SetRotation(Quaternion.identity, true, false);
-        context.characterEntity.SetInteractionState(InteractionState.Physical);
-        context.characterEntity.fixHeight = true;
-        context.characterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, true, null));
-        context.characterEntity.SetVisibility(true, false);
-        context.inVehicle = false;
-        (globalThis as any).playerController.activeVehicle = null;
-        Context.DefineContext("THIRD_PERSON_CHARACTER_CONTROLLER", context);
+        this.internalCharacterEntity.SetRotation(Quaternion.identity, true, false);
+        this.internalCharacterEntity.SetInteractionState(InteractionState.Physical);
+        this.internalCharacterEntity.fixHeight = true;
+        this.internalCharacterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, true, null));
+        this.internalCharacterEntity.SetVisibility(true, false);
+        this.inVehicle = false;
+        this.activeVehicle = null;
         // Place the camera on the character.
-        context.characterEntity.PlaceCameraOn();
-        Context.DefineContext("THIRD_PERSON_CHARACTER_CONTROLLER", context);
+        this.internalCharacterEntity.PlaceCameraOn();
         Camera.SetPosition(new Vector3(0, 1.5, -2.75), true);
     }
     else {
@@ -269,47 +260,60 @@ export class PlayerController {
   }
 
   startVehicleEngine(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.engineStartStop = true;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity)
+        this.activeVehicle.engineStartStop = true;
     }
   }
 
   moveVehicleForward(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.brake = 0;
-        (globalThis as any).playerController.activeVehicle.throttle = 1;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.brake = 0;
+        this.activeVehicle.throttle = 1;
+      }
     }
   }
 
   moveVehicleBackward(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.brake = 1;
-        (globalThis as any).playerController.activeVehicle.throttle = 0;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.brake = 1;
+        this.activeVehicle.throttle = 0;
+      }
     }
   }
 
   stopMovingVehicle(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.brake = 0;
-        (globalThis as any).playerController.activeVehicle.throttle = 0;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.brake = 0;
+        this.activeVehicle.throttle = 0;
+      }
     }
   }
 
   steerVehicleLeft(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.steer = -1;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.steer = -1;
+      }
     }
   }
 
   steerVehicleRight(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.steer = 1;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.steer = 1;
+      }
     }
   }
 
   stopSteeringVehicle(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.steer = 0;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.steer = 0;
+      }
     }
   }
 

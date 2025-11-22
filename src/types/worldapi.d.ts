@@ -1718,23 +1718,17 @@ declare enum AutomobileType {
  * Class for automobile entity wheel.
  */
 declare class AutomobileEntityWheel {
-    /** Wheel radius. */
-    radius: number;
-    /** Suspension distance. */
-    suspensionDistance: number;
-    /** Suspension spring. */
-    suspensionSpring: number;
-    /** Suspension damper. */
-    suspensionDamper: number;
-    /** Suspension target position. */
-    suspensionTargetPosition: number;
-    /** Forward friction. */
-    forwardFriction: number;
-    /** Sideways friction. */
-    sidewaysFriction: number;
+    /** Submesh corresponding to the wheel. */
+    wheelSubMesh: string;
+    /** Radius of the wheel. */
+    wheelRadius: number;
 
-    /** Constructor for automobile entity wheel. */
-    constructor();
+    /**
+     * Constructor for automobile entity wheel.
+     * @param wheelSubMesh Submesh corresponding to the wheel.
+     * @param wheelRadius Radius of the wheel.
+     */
+    constructor(wheelSubMesh: string, wheelRadius: number);
 }
 
 /**
