@@ -390,6 +390,14 @@ export class EntityManager {
       this.onMeshEntityLoadedGenericPlacing(entity);
     };
 
+    (globalThis as any).onAutomobileEntityLoadedGeneric = (entity: AutomobileEntity) => {
+      this.onAutomobileEntityLoadedGeneric(entity);
+    };
+
+    (globalThis as any).onAutomobileEntityLoadedGenericPlacing = (entity: AutomobileEntity) => {
+      this.onAutomobileEntityLoadedGenericPlacing(entity);
+    };
+
     (globalThis as any).triggerEntityInstancesAfterTemplates = () => {
       this.triggerEntityInstancesAfterTemplates();
     };
@@ -500,9 +508,14 @@ export class EntityManager {
         if (!wheels || mass === undefined || autoType === undefined) {
           throw new Error('Missing automobile parameters: wheels, mass, or autoType');
         }
-        Logging.Log("meshobject " + meshObject);
-        AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, this.currentWheels,
-          mass, autoType, instanceId, instanceTag, 'onAutomobileEntityLoadedGeneric', false);
+        if (placingEntity) {
+          AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, this.currentWheels,
+            mass, autoType, instanceId, instanceTag, 'onAutomobileEntityLoadedGenericPlacing', false);
+          break;
+        } else {
+          AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, this.currentWheels,
+            mass, autoType, instanceId, instanceTag, 'onAutomobileEntityLoadedGeneric', false);
+        }
         break;
       case 'airplane':
         if (mass === undefined) {
@@ -572,6 +585,39 @@ export class EntityManager {
     entity.SetVisibility(true);
     var scripts = this.currentScripts;
     (globalThis as any).startPlacing(entity, "mesh", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
+      this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, scripts, entity.id);
+  }
+
+  onAutomobileEntityLoadedGeneric(entity: AutomobileEntity): void {
+    Logging.Log(`✓ Automobile entity loaded successfully: ${entity.id}`);
+    entity.SetInteractionState(InteractionState.Static);
+    entity.SetVisibility(true);
+    var scripts = this.currentScripts as any;
+    if (scripts != null) {
+      ((globalThis as any).scriptEngine as ScriptEngine).addScriptEntity(entity, scripts);
+      ((globalThis as any).scriptEngine as ScriptEngine).runOnCreateScript(entity);
+
+      if (scripts["0_25_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_25IntervalScript(entity, scripts["0_25_update"]);
+      }
+      if (scripts["0_5_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_5IntervalScript(entity, scripts["0_5_update"]);
+      }
+      if (scripts["1_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add1_0IntervalScript(entity, scripts["1_0_update"]);
+      }
+      if (scripts["2_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add2_0IntervalScript(entity, scripts["2_0_update"]);
+      }
+    }
+  }
+
+  onAutomobileEntityLoadedGenericPlacing(entity: AutomobileEntity): void {
+    Logging.Log(`✓ Automobile entity loaded for placement successfully: ${entity.id}`);
+    entity.SetInteractionState(InteractionState.Static);
+    entity.SetVisibility(true);
+    var scripts = this.currentScripts;
+    (globalThis as any).startPlacing(entity, "automobile", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
       this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, scripts, entity.id);
   }
 
