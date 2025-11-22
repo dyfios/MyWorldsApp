@@ -442,14 +442,14 @@ export class EnvironmentModifier {
    * Place character in automobile
    */
   private placeCharacterInAutomobile(entity: AutomobileEntity): void {
-    (globalThis as any).MW_Input_EnvMod_PlaceCharacterInAutomobile(entity);
+    (globalThis as any).placePlayerInAutomobile(entity);
   }
 
   /**
    * Place character in airplane
    */
   private placeCharacterInAirplane(entity: AirplaneEntity): void {
-    (globalThis as any).MW_Input_EnvMod_PlaceCharacterInAirplane(entity);
+    (globalThis as any).placePlayerInAirplane(entity);
   }
 
   /**

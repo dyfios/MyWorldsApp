@@ -261,8 +261,11 @@ export class PlayerController {
 
   startVehicleEngine(): void {
     if (this.activeVehicle != null) {
-      if (this.activeVehicle instanceof AutomobileEntity)
+      if (this.activeVehicle instanceof AutomobileEntity) {
         this.activeVehicle.engineStartStop = true;
+      } else if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.StartEngine();
+      }
     }
   }
 
@@ -271,6 +274,8 @@ export class PlayerController {
       if (this.activeVehicle instanceof AutomobileEntity) {
         this.activeVehicle.brake = 0;
         this.activeVehicle.throttle = 1;
+      } else if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.throttle += 0.1;
       }
     }
   }
@@ -280,6 +285,8 @@ export class PlayerController {
       if (this.activeVehicle instanceof AutomobileEntity) {
         this.activeVehicle.brake = 1;
         this.activeVehicle.throttle = 0;
+      } else if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.throttle -= 0.1;
       }
     }
   }
@@ -289,6 +296,8 @@ export class PlayerController {
       if (this.activeVehicle instanceof AutomobileEntity) {
         this.activeVehicle.brake = 0;
         this.activeVehicle.throttle = 0;
+      } else if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.StopEngine();
       }
     }
   }
@@ -297,6 +306,8 @@ export class PlayerController {
     if (this.activeVehicle != null) {
       if (this.activeVehicle instanceof AutomobileEntity) {
         this.activeVehicle.steer = -1;
+      } else if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.roll -= 1;
       }
     }
   }
@@ -305,6 +316,8 @@ export class PlayerController {
     if (this.activeVehicle != null) {
       if (this.activeVehicle instanceof AutomobileEntity) {
         this.activeVehicle.steer = 1;
+      } else if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.roll += 1;
       }
     }
   }
@@ -316,6 +329,8 @@ export class PlayerController {
       }
     }
   }
+
+  // TODO pitch/yaw controls for airplane
 
   pauseForUI(): void {
     Logging.Log("Pausing player controls for UI");
