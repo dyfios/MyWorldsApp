@@ -35,7 +35,7 @@ export class PlayerController {
 
   startMaintenance(): void {
     Logging.Log('Starting PlayerController maintenance interval function');
-    this.maintenanceFunctionID = Time.SetInterval("playercontroller_maintenance();", 0.5);
+    this.maintenanceFunctionID = Time.SetInterval("playercontroller_maintenance();", 0.03);
   }
 
   stopMaintenance(): void {
