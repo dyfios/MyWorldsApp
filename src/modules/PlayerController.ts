@@ -21,6 +21,7 @@ export class PlayerController {
   public motionMode: MotionMode = MotionMode.Physical;
   public inVehicle: boolean = false;
   public activeVehicle: AutomobileEntity | AirplaneEntity | null = null;
+  private maintenanceFunctionID: UUID | null = null;
   // private cameraMode: 'firstPerson' | 'thirdPerson' = 'thirdPerson'; // Reserved for future camera mode switching
 
   constructor(initialPosition: Vector3, characterName: string, characterId: string | undefined) {
@@ -29,12 +30,37 @@ export class PlayerController {
     this.internalCharacterEntity = CharacterEntity.Create(null, initialPosition,
       Quaternion.identity, Vector3.one, false, characterName, characterId,
       "onPlayerCharacterEntityLoaded");
+    this.startMaintenance();
   }
 
-   /**
+  startMaintenance(): void {
+    Logging.Log('Starting PlayerController maintenance interval function');
+    this.maintenanceFunctionID = Time.SetInterval("playercontroller_maintenance();", 0.5);
+  }
+
+  stopMaintenance(): void {
+    if (this.maintenanceFunctionID != null) {
+      Time.StopInterval(this.maintenanceFunctionID.ToString());
+      this.maintenanceFunctionID = null;
+    }
+  }
+
+  maintenance(): void {
+    if (this.inVehicle && this.activeVehicle != null) {
+      // Update player position to match vehicle position
+      this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
+    }
+  }
+
+  /**
    * Setup global callback functions for WebVerse entity loading
-   */
+  */
   private setupGlobalCallbacks(): void {
+    // Define global callback for player controller maintenance
+    (globalThis as any).playercontroller_maintenance = () => {
+      this.maintenance();
+    };
+    
     // Define global callback for character entity loading completion
     (globalThis as any).onPlayerCharacterEntityLoaded = (entity: any) => {
       this.onPlayerCharacterEntityLoaded(entity);
