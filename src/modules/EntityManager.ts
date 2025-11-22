@@ -497,7 +497,7 @@ export class EntityManager {
           onCompleteCallback, false);
         break;
       case 'automobile':
-        if (!wheels || mass === undefined || !autoType) {
+        if (!wheels || mass === undefined || autoType === undefined) {
           throw new Error('Missing automobile parameters: wheels, mass, or autoType');
         }
         Logging.Log("meshobject " + meshObject);
