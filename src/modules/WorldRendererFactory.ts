@@ -9,12 +9,6 @@ import { EntityManager } from './EntityManager';
 import { DockButtonInfo } from './UIManager';
 import { Identity } from './Identity';
 
-// Local implementation of AutomobileType enum since the WebVerse runtime may not expose it
-enum AutomobileType {
-  Car = 0,
-  Truck = 1
-}
-
 /**
  * Entity instance format received from the server
  */
@@ -1336,7 +1330,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
           [this.entitiesConfig[entityName].variants[variantName].model],
           this.entitiesConfig[entityName].variants[variantName].wheels,
           this.entitiesConfig[entityName].variants[variantName].mass,
-          AutomobileType.Car,
+          AutomobileType.Default,
           this.entitiesConfig[entityName].variants[variantName].scripts);
       }
       //this.worldLoaded = true;

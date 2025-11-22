@@ -6,12 +6,6 @@ import { Position, Rotation } from '../types/config';
 import { EntityData } from '../types/entity';
 import { ScriptEngine } from './ScriptEngine';
 
-// Local implementation of AutomobileType enum
-enum AutomobileType {
-  Car = 0,
-  Truck = 1
-}
-
 export class EntityPlacement {
   public placingEntity: BaseEntity | null = null;
   public entityType: string | null = null;
@@ -204,7 +198,7 @@ export class EntityPlacement {
         (globalThis as any).loadEntity(this.entityIndex, this.variantIndex, instanceID,
           this.entityIndex + "." + this.variantIndex + "." + instanceID, this.entityID, this.variantID,
           null, this.entityType, Vector3.zero, Quaternion.identity, Vector3.one, this.modelPath,
-          [ this.modelPath ], this.wheels, this.mass, AutomobileType.Car, this.scripts, true);
+          [ this.modelPath ], this.wheels, this.mass, AutomobileType.Default, this.scripts, true);
       }
       return;
     }
@@ -261,7 +255,7 @@ export class EntityPlacement {
       (globalThis as any).loadEntity(this.entityIndex, this.variantIndex, instanceID,
         this.entityIndex + "." + this.variantIndex + "." + instanceID, this.entityID, this.variantID,
         null, this.entityType, Vector3.zero, Quaternion.identity, Vector3.one, this.modelPath,
-        [ this.modelPath ], this.wheels, this.mass, AutomobileType.Car, this.scripts, true);
+        [ this.modelPath ], this.wheels, this.mass, AutomobileType.Default, this.scripts, true);
     }
 
     this.entityBeingPlaced = false;

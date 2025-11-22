@@ -2,12 +2,6 @@
  * UI Manager - Manages UI elements and edit toolbar
  */
 
-// Local implementation of AutomobileType enum
-enum AutomobileType {
-  Car = 0,
-  Truck = 1
-}
-
 export interface UIUpdateData {
   type: string;
   payload?: any;
@@ -307,7 +301,7 @@ export class UIManager {
                         [ (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].model ],
                         (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].wheels,
                         (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].mass,
-                        AutomobileType.Car,
+                        AutomobileType.Default,
                         (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].scripts,
                         true);
                       return;

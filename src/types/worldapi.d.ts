@@ -1710,8 +1710,7 @@ declare interface VoxelBlockSubType {
  * Automobile type enum.
  */
 declare enum AutomobileType {
-    Car = 0,
-    Truck = 1
+    Default = 0
 }
 
 /**
