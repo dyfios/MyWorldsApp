@@ -60,6 +60,21 @@ export class PlayerController {
       this.startVehicleEngine();
     };
 
+    // Define global callback for stopping vehicle engine
+    (globalThis as any).stopVehicleEngine = () => {
+      this.stopVehicleEngine();
+    };
+
+    // Define global callback for pitching vehicle up
+    (globalThis as any).pitchVehicleUp = () => {
+      this.pitchVehicleUp();
+    };
+
+    // Define global callback for pitching vehicle down
+    (globalThis as any).pitchVehicleDown = () => {
+      this.pitchVehicleDown();
+    };
+
     // Define global callback for moving vehicle forward
     (globalThis as any).moveVehicleForward = () => {
       this.moveVehicleForward();
@@ -88,6 +103,36 @@ export class PlayerController {
     // Define global callback for stopping vehicle steering
     (globalThis as any).stopSteeringVehicle = () => {
       this.stopSteeringVehicle();
+    };
+
+    // Define global callback for rolling vehicle left
+    (globalThis as any).rollVehicleLeft = () => {
+      this.rollVehicleLeft();
+    };
+
+    // Define global callback for rolling vehicle right
+    (globalThis as any).rollVehicleRight = () => {
+      this.rollVehicleRight();
+    };
+
+    // Define global callback for throttling vehicle up
+    (globalThis as any).throttleVehicleUp = () => {
+      this.throttleVehicleUp();
+    };
+
+    // Define global callback for throttling vehicle down
+    (globalThis as any).throttleVehicleDown = () => {
+      this.throttleVehicleDown();
+    };
+
+    // Define global callback for yawing vehicle left
+    (globalThis as any).yawVehicleLeft = () => {
+      this.yawVehicleLeft();
+    };
+
+    // Define global callback for yawing vehicle right
+    (globalThis as any).yawVehicleRight = () => {
+      this.yawVehicleRight();
     };
 
     // Define global callback for pausing for UI
@@ -269,13 +314,37 @@ export class PlayerController {
     }
   }
 
+  stopVehicleEngine(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+
+      } else if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.StopEngine();
+      }
+    }
+  }
+
+  pitchVehicleUp(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.pitch += 1;
+      }
+    }
+  }
+
+  pitchVehicleDown(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.pitch -= 1;
+      }
+    }
+  }
+
   moveVehicleForward(): void {
     if (this.activeVehicle != null) {
       if (this.activeVehicle instanceof AutomobileEntity) {
         this.activeVehicle.brake = 0;
         this.activeVehicle.throttle = 1;
-      } else if (this.activeVehicle instanceof AirplaneEntity) {
-        this.activeVehicle.throttle += 0.1;
       }
     }
   }
@@ -285,8 +354,6 @@ export class PlayerController {
       if (this.activeVehicle instanceof AutomobileEntity) {
         this.activeVehicle.brake = 1;
         this.activeVehicle.throttle = 0;
-      } else if (this.activeVehicle instanceof AirplaneEntity) {
-        this.activeVehicle.throttle -= 0.1;
       }
     }
   }
@@ -296,8 +363,6 @@ export class PlayerController {
       if (this.activeVehicle instanceof AutomobileEntity) {
         this.activeVehicle.brake = 0;
         this.activeVehicle.throttle = 0;
-      } else if (this.activeVehicle instanceof AirplaneEntity) {
-        this.activeVehicle.StopEngine();
       }
     }
   }
@@ -306,8 +371,6 @@ export class PlayerController {
     if (this.activeVehicle != null) {
       if (this.activeVehicle instanceof AutomobileEntity) {
         this.activeVehicle.steer = -1;
-      } else if (this.activeVehicle instanceof AirplaneEntity) {
-        this.activeVehicle.roll -= 1;
       }
     }
   }
@@ -316,8 +379,6 @@ export class PlayerController {
     if (this.activeVehicle != null) {
       if (this.activeVehicle instanceof AutomobileEntity) {
         this.activeVehicle.steer = 1;
-      } else if (this.activeVehicle instanceof AirplaneEntity) {
-        this.activeVehicle.roll += 1;
       }
     }
   }
@@ -330,7 +391,53 @@ export class PlayerController {
     }
   }
 
-  // TODO pitch/yaw controls for airplane
+  rollVehicleLeft(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.roll -= 1;
+      }
+    }
+  }
+
+  rollVehicleRight(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.roll += 1;
+      }
+    }
+  }
+
+  throttleVehicleUp(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.throttle += 1;
+      }
+    }
+  }
+
+  throttleVehicleDown(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.throttle -= 1;
+      }
+    }
+  }
+
+  yawVehicleLeft(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.yaw -= 1;
+      }
+    }
+  }
+
+  yawVehicleRight(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.yaw += 1;
+      }
+    }
+  }
 
   pauseForUI(): void {
     Logging.Log("Pausing player controls for UI");

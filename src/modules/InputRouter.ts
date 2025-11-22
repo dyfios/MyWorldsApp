@@ -131,9 +131,6 @@ export class InputRouter {
    * Process key events
    */
   processKeyPress(key: string): void {
-    var thirdPersonCharacterController = Context.GetContext("THIRD_PERSON_CHARACTER_CONTROLLER");
-    var entityPlacementComponent = Context.GetContext("ENTITY_PLACEMENT_COMPONENT");
-    
     if (this.isControlHeld) {
 
     }
@@ -141,41 +138,43 @@ export class InputRouter {
     if (key === "Control") {
       this.isControlHeld = true;
     }
-    else if (key === "r") {
-        entityPlacementComponent.ToggleOrientation();
-    }
-    else if (key === "q") {
-        thirdPersonCharacterController.currentMotion.y = 1;
-    }
-    else if (key === "z") {
-        thirdPersonCharacterController.currentMotion.y = -1;
-    }
     else if (key == "e") {
         (globalThis as any).startVehicleEngine();
     }
+    else if (key == "r") {
+      (globalThis as any).stopVehicleEngine();
+    }
     else if (key == "w") {
         (globalThis as any).moveVehicleForward();
+        (globalThis as any).pitchVehicleUp();
     }
     else if (key == "s") {
         (globalThis as any).moveVehicleBackward();
+        (globalThis as any).pitchVehicleDown();
     }
     else if (key == "a") {
         (globalThis as any).steerVehicleLeft();
+        (globalThis as any).rollVehicleLeft();
     }
     else if (key == "d") {
         (globalThis as any).steerVehicleRight();
+        (globalThis as any).rollVehicleRight();
     }
     else if (key == "i") {
         (globalThis as any).performRotate("z", false);
+        (globalThis as any).throttleVehicleUp();
     }
     else if (key == "j") {
         (globalThis as any).performRotate("y", true);
+        (globalThis as any).yawVehicleLeft();
     }
     else if (key == "k") {
         (globalThis as any).performRotate("z", true);
+        (globalThis as any).throttleVehicleDown();
     }
     else if (key == "l") {
         (globalThis as any).performRotate("y", false);
+        (globalThis as any).yawVehicleRight();
     }
     else if (key == "x") {
         (globalThis as any).exitVehicle();
@@ -186,16 +185,8 @@ export class InputRouter {
    * Process key release events
    */
   processKeyRelease(key: string): void {
-    var thirdPersonCharacterController = Context.GetContext("THIRD_PERSON_CHARACTER_CONTROLLER");
-    
     if (key === "Control") {
       this.isControlHeld = false;
-    }
-    else if (key === "q") {
-        thirdPersonCharacterController.currentMotion.y = 0;
-    }
-    else if (key === "z") {
-        thirdPersonCharacterController.currentMotion.y = 0;
     }
     else if (key == "w") {
         (globalThis as any).stopMovingVehicle();
