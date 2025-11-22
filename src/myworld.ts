@@ -310,7 +310,7 @@ export class MyWorld {
     await this.initializeWorldTypeSettings();
     
     // Set up global render function for WebVerse Time API
-    const renderFunctionName = 'myWorldRenderLoop';
+    ///const renderFunctionName = 'myWorldRenderLoop';
     
     // Store reference to this instance for the global function
     (globalThis as any).myWorldInstance = this;
@@ -319,7 +319,7 @@ export class MyWorld {
     const intervalSeconds = 1/60;
     Logging.Log('🔄 Setting up render loop with interval: ' + intervalSeconds + ' seconds');
     
-    this.renderIntervalId = Time.SetInterval(renderFunctionName, intervalSeconds);
+    //this.renderIntervalId = Time.SetInterval(renderFunctionName, intervalSeconds);
     
     if (this.renderIntervalId) {
       Logging.Log('✓ Render loop started with ID: ' + this.renderIntervalId);
