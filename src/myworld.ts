@@ -314,22 +314,6 @@ export class MyWorld {
     
     // Store reference to this instance for the global function
     (globalThis as any).myWorldInstance = this;
-    
-    // Create global render function
-    (globalThis as any)[renderFunctionName] = () => {
-      try {
-        const deltaTime = 1/60; // Fixed 60 FPS (0.0167 seconds per frame)
-        
-        // Update modules
-        this.context.modules.script.update(deltaTime);
-
-        // Render frame
-        this.context.modules.worldRendering.renderFrame(deltaTime);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        Logging.LogError('❌ Error in render loop: ' + errorMessage);
-      }
-    };
 
     // Start the interval - 60 FPS = 1/60 seconds = ~0.0167 seconds
     const intervalSeconds = 1/60;

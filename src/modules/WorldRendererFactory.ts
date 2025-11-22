@@ -47,7 +47,6 @@ export abstract class WorldRendering {
   protected config?: WorldConfig;
 
   abstract initialize(config: WorldConfig): Promise<void>;
-  abstract render(deltaTime: number): void;
   abstract dispose(): void;
 }
 
@@ -216,10 +215,6 @@ export class StaticSurfaceRenderer extends WorldRendering {
     }
 
     Logging.Log('StaticSurfaceRenderer initialized');
-  }
-
-  render(_deltaTime: number): void {
-    // Render static surface
   }
 
   /**
@@ -1645,10 +1640,6 @@ export class TiledSurfaceRenderer extends WorldRendering {
     Logging.Log('TiledSurfaceRenderer initialized');
   }
 
-  render(_deltaTime: number): void {
-    // Render tiled surface
-  }
-
   /**
    * Start the login process using the Identity module
    */
@@ -1770,10 +1761,6 @@ export class GlobeRenderer extends WorldRendering {
     Logging.Log('GlobeRenderer initialized');
   }
 
-  render(_deltaTime: number): void {
-    // Render globe
-  }
-
   dispose(): void {
     Logging.Log('GlobeRenderer disposed');
   }
@@ -1785,10 +1772,6 @@ export class GlobeRenderer extends WorldRendering {
 export class AtmosphereRenderer extends WorldRendering {
   async initialize(): Promise<void> {
     Logging.Log('AtmosphereRenderer initialized');
-  }
-
-  render(_deltaTime: number): void {
-    // Render atmosphere
   }
 
   dispose(): void {
@@ -1804,10 +1787,6 @@ export class OrbitalRenderer extends WorldRendering {
     Logging.Log('OrbitalRenderer initialized');
   }
 
-  render(_deltaTime: number): void {
-    // Render orbital view
-  }
-
   dispose(): void {
     Logging.Log('OrbitalRenderer disposed');
   }
@@ -1821,10 +1800,6 @@ export class StellarSystemRenderer extends WorldRendering {
     Logging.Log('StellarSystemRenderer initialized');
   }
 
-  render(_deltaTime: number): void {
-    // Render stellar system
-  }
-
   dispose(): void {
     Logging.Log('StellarSystemRenderer disposed');
   }
@@ -1836,10 +1811,6 @@ export class StellarSystemRenderer extends WorldRendering {
 export class GalacticRenderer extends WorldRendering {
   async initialize(): Promise<void> {
     Logging.Log('GalacticRenderer initialized');
-  }
-
-  render(_deltaTime: number): void {
-    // Render galaxy
   }
 
   dispose(): void {
@@ -1975,11 +1946,6 @@ export class SunController extends WorldRendering {
     }
   }
 
-  render(_deltaTime: number): void {
-    // Sun controller doesn't need continuous rendering
-    // Time updates are handled through explicit updateTimeOfDay calls
-  }
-
   /**
    * Set time of day using hours (0-24)
    * @param hours Time of day in hours (0-24)
@@ -2067,10 +2033,6 @@ export class WorldRendererFactory {
     this.renderers.push(sunController);
 
     Logging.Log('All renderers loaded');
-  }
-
-  renderFrame(deltaTime: number): void {
-    this.renderers.forEach(renderer => renderer.render(deltaTime));
   }
 
   /**

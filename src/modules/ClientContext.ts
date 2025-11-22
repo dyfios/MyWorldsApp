@@ -85,7 +85,6 @@ export class Modules {
    */
   dispose(): void {
     this.input.dispose();
-    this.script.dispose();
     this.sync.disconnect();
     this.ui.dispose();
     this.worldRendering.dispose();

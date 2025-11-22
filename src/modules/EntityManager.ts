@@ -4,6 +4,7 @@
 
 import { Position, Rotation } from '../types/config';
 import { EntityData } from '../types/entity';
+import { ScriptEngine } from './ScriptEngine';
 
 export class EntityPlacement {
   public placingEntity: BaseEntity | null = null;
@@ -46,9 +47,10 @@ export class EntityPlacement {
     // Define global callback for character entity loading completion
     (globalThis as any).startPlacing = (entityToPlace: BaseEntity, entityType: string,
       entityIndex: number, variantIndex: number, entityID: string, variantID: string,
-      modelPath: string, wheels: AutomobileEntityWheel[], mass: number, instanceId: string) => {
+      modelPath: string, wheels: AutomobileEntityWheel[], mass: number,
+      scripts: { [key: string]: any }, instanceId: string) => {
       this.startPlacing(entityToPlace, entityType, entityIndex, variantIndex, entityID,
-        variantID, modelPath, wheels, mass, instanceId);
+        variantID, modelPath, wheels, mass, scripts, instanceId);
     };
 
     (globalThis as any).stopPlacing = () => {
@@ -146,10 +148,10 @@ export class EntityPlacement {
     modelPath: string,
     wheels: AutomobileEntityWheel[],
     mass: number,
+    scripts: { [key: string]: any },
     instanceID: string,
     offset?: Vector3,
     rotation?: Quaternion,
-    scripts?: { [key: string]: any },
     placementOffset?: Vector3
   ): void {Logging.Log("qqaa");
     //WorldStorage.SetItem("TERRAIN-EDIT-LAYER", "-1");
@@ -187,7 +189,7 @@ export class EntityPlacement {
     // Input.TurnLocomotionMode = Input.VRTurnLocomotionMode.None; // VR-specific, commented out
   }
 
-  stopPlacing(): void {Logging.Log("poiu");
+  stopPlacing(): void {
     let keepSpawning = false;
     if (WorldStorage.GetItem("ENTITY-KEEP-SPAWNING") === "TRUE") {
       keepSpawning = true;
@@ -222,8 +224,26 @@ export class EntityPlacement {
     
     // Handle scripts if present
     if (this.scripts != null && Object.keys(this.scripts).length > 0) {
-      // Script integration would go here
       Logging.Log("[EntityPlacer] Adding scripts to placed entity");
+      ((globalThis as any).scriptEngine as ScriptEngine).addScriptEntity(this.placingEntity, this.scripts);
+
+      ((globalThis as any).scriptEngine as ScriptEngine).runOnCreateScript(this.placingEntity);
+
+      if (this.scripts["0_25_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_25IntervalScript(this.placingEntity, this.scripts["0_25_update"]);
+      }
+
+      if (this.scripts["0_5_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_5IntervalScript(this.placingEntity, this.scripts["0_5_update"]);
+      }
+
+      if (this.scripts["1_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add1_0IntervalScript(this.placingEntity, this.scripts["1_0_update"]);
+      }
+
+      if (this.scripts["2_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add2_0IntervalScript(this.placingEntity, this.scripts["2_0_update"]);
+      }
     }
 
     // Finalize placement
@@ -343,7 +363,8 @@ export class EntityManager {
   private currentVariantId: string = "";
   private currentModelPath: string = "";
   private currentWheels: AutomobileEntityWheel[] | undefined = undefined;
-  private currentMass: number | undefined = undefined
+  private currentMass: number | undefined = undefined;
+  private currentScripts: string | undefined = undefined;
 
   constructor() {
     this.entityPlacement = new EntityPlacement();
@@ -447,6 +468,7 @@ export class EntityManager {
     this.currentModelPath = meshObject;
     this.currentWheels = wheels;
     this.currentMass = mass;
+    this.currentScripts = scripts;
     if (type == null || type === "") {
       type = "mesh";
     }
@@ -481,8 +503,6 @@ export class EntityManager {
         throw new Error(`Unknown entity type: ${type}`);
     }
 
-    Logging.Log("scripts " + scripts);
-
     return instanceId;
   }
 
@@ -512,14 +532,34 @@ export class EntityManager {
     Logging.Log(`✓ Mesh entity loaded successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
+    var scripts = this.currentScripts ? JSON.parse(this.currentScripts) : null;
+    if (scripts != null) {
+      ((globalThis as any).scriptEngine as ScriptEngine).addScriptEntity(entity, scripts);
+
+      ((globalThis as any).scriptEngine as ScriptEngine).runOnCreateScript(entity);
+
+      if (scripts["0_25_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_25IntervalScript(entity, scripts["0_25_update"]);
+      }
+      if (scripts["0_5_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_5IntervalScript(entity, scripts["0_5_update"]);
+      }
+      if (scripts["1_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add1_0IntervalScript(entity, scripts["1_0_update"]);
+      }
+      if (scripts["2_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add2_0IntervalScript(entity, scripts["2_0_update"]);
+      }
+    }
   }
 
   onMeshEntityLoadedGenericPlacing(entity: MeshEntity): void {
     Logging.Log(`✓ Mesh entity loaded for placement successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
+    var scripts = this.currentScripts ? JSON.parse(this.currentScripts) : null;
     (globalThis as any).startPlacing(entity, "mesh", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
-      this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, entity.id);
+      this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, scripts, entity.id);
   }
 
   triggerEntityInstancesAfterTemplates(): void {
