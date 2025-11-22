@@ -54,7 +54,7 @@ export class EntityPlacement {
     // Define global callback for character entity loading completion
     (globalThis as any).startPlacing = (entityToPlace: BaseEntity, entityType: string,
       entityIndex: number, variantIndex: number, entityID: string, variantID: string,
-      modelPath: string, wheels: AutomobileEntityWheel[], mass: number,
+      modelPath: string, wheels: any, mass: number,
       scripts: { [key: string]: any }, instanceId: string) => {
       this.startPlacing(entityToPlace, entityType, entityIndex, variantIndex, entityID,
         variantID, modelPath, wheels, mass, scripts, instanceId);
@@ -153,7 +153,7 @@ export class EntityPlacement {
     entityID: string,
     variantID: string,
     modelPath: string,
-    wheels: AutomobileEntityWheel[],
+    wheels: any,
     mass: number,
     scripts: { [key: string]: any },
     instanceID: string,
@@ -364,7 +364,7 @@ export class EntityManager {
   private currentEntityId: string = "";
   private currentVariantId: string = "";
   private currentModelPath: string = "";
-  private currentWheels: AutomobileEntityWheel[] | undefined = undefined;
+  private currentWheels: any | undefined = undefined;
   private currentMass: number | undefined = undefined;
   private currentScripts: string | undefined = undefined;
 
@@ -412,7 +412,7 @@ export class EntityManager {
       scale: Vector3,
       meshObject: string,
       meshResources: string[],
-      wheels: AutomobileEntityWheel[] | undefined,
+      wheels: any | undefined,
       mass: number | undefined,
       autoType: AutomobileType | undefined,
       scripts: string | undefined,
@@ -476,14 +476,14 @@ export class EntityManager {
     this.currentEntityId = entityId;
     this.currentVariantId = variantId || "";
     this.currentModelPath = meshObject;
-    this.currentWheels = undefined;
+    this.currentWheels = wheels;
     var automobileWheels: AutomobileEntityWheel[] = [];
     if (wheels != null && wheels != undefined) {
       for (var wheel in wheels) {
         automobileWheels.push(new AutomobileEntityWheel(wheels[wheel].name as string, wheels[wheel].radius as number));
       }
     }
-    this.currentWheels = automobileWheels;
+    //this.currentWheels = automobileWheels;
     this.currentMass = mass;
     this.currentScripts = scripts;
     if (type == null || type === "") {
@@ -505,11 +505,11 @@ export class EntityManager {
           throw new Error('Missing automobile parameters: wheels, mass, or autoType');
         }
         if (placingEntity) {
-          AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, this.currentWheels,
+          AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, automobileWheels,
             mass, autoType, instanceId, instanceTag, 'onAutomobileEntityLoadedGenericPlacing', false);
           break;
         } else {
-          AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, this.currentWheels,
+          AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, automobileWheels,
             mass, autoType, instanceId, instanceTag, 'onAutomobileEntityLoadedGeneric', false);
         }
         break;

@@ -184,8 +184,9 @@ export class EnvironmentModifier {
     }
     else if (this.interactionMode == "ENTITY-PLACING") {
         if (hitInfo != null) {
-            if (hitInfo.entity != null) {Logging.Log("hit of type " + typeof hitInfo.entity);
-                if (hitInfo.entity instanceof TerrainEntity || hitInfo.entity instanceof MeshEntity) {
+            if (hitInfo.entity != null) {
+                if (hitInfo.entity instanceof TerrainEntity || hitInfo.entity instanceof MeshEntity
+                    || hitInfo.entity instanceof AutomobileEntity || hitInfo.entity instanceof AirplaneEntity) {
                     (globalThis as any).stopPlacing();
                 }
             }
