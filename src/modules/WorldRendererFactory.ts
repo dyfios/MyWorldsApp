@@ -591,8 +591,8 @@ export class StaticSurfaceRenderer extends WorldRendering {
  */
 export class TiledSurfaceRenderer extends WorldRendering {
   public entitiesConfig: any;
-  private restClient: REST;
-  private stateServiceClient: REST;
+  public restClient: REST;
+  public stateServiceClient: REST;
   private queryParams: ProcessQueryParams;
   private entityManager: EntityManager;
   private worldConfig: any;
@@ -611,7 +611,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
   private terrainTiles: { [key: string]: TerrainEntity | string } = {};
   private biomeMap: { [key: string]: any } = {};
   private characterSynchronizer: string | null = null;
-  private regionSynchronizers: { [key: string]: string } = {};
+  public regionSynchronizers: { [key: string]: string } = {};
   private regionSize: number = 512;
   private regionScale: number = 2;
   private numRegions: number = 256; // Number of regions along one axis

@@ -2,6 +2,8 @@
  * UI Manager - Manages UI elements and edit toolbar
  */
 
+import { SyncManager } from './SyncManager';
+
 export interface UIUpdateData {
   type: string;
   payload?: any;
@@ -226,6 +228,43 @@ export class UIManager {
               
               // Handle the button click based on type
               this.handleDockButtonClick(buttonType);
+            } else if (msg.startsWith('CHAT_INPUT.MESSAGE(')) {
+              // Handle chat message input - extract message parameter
+              const paramStart = msg.indexOf('(') + 1;
+              const paramEnd = msg.lastIndexOf(')');
+              
+              if (paramStart > 0 && paramEnd > paramStart) {
+                const message = msg.substring(paramStart, paramEnd).trim().replace(/['"]/g, '');
+                Logging.Log('💬 UIManager: Chat message received - message: ' + message);
+
+                const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+                if (!mainToolbarId) {
+                  Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found, cannot toggle loading panel');
+                  return;
+                }
+
+                const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+                if (!mainToolbar) {
+                  Logging.LogError('❌ UIManager: Main toolbar entity not found, cannot toggle loading panel');
+                  return;
+                }
+                
+                const jsCommand = `window.chatMessageAPI.addMessage("${(Date as any).Now.ToTimeString()} [You] ${message}");`;
+                
+                mainToolbar.ExecuteJavaScript(jsCommand, '');
+
+                ((globalThis as any).syncManager as SyncManager).globalSynchronizer?.SendGlobalMessage(message);
+              }
+            } else if (msg.startsWith('CHAT_INPUT.COMMAND(')) {
+              // Handle chat command input - extract command parameter
+              const paramStart = msg.indexOf('(') + 1;
+              const paramEnd = msg.lastIndexOf(')');
+
+              if (paramStart > 0 && paramEnd > paramStart) {
+                const command = msg.substring(paramStart, paramEnd).trim().replace(/['"]/g, '');
+                Logging.Log('💬 UIManager: Chat command received - command: ' + command);
+                ((globalThis as any).syncManager as SyncManager).globalSynchronizer?.SendGlobalMessage(command);
+              }
             } else {
               Logging.LogError('❌ UIManager: Invalid TOOL.DOCK_BUTTON_CLICKED message format: ' + msg);
             }

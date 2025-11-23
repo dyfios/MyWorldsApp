@@ -2,6 +2,9 @@
  * Environment Modifier - Handles environmental changes and effects
  */
 
+import { VOSSynchronizer } from "./VOSSynchronizer";
+import { TiledSurfaceRenderer } from "./WorldRendererFactory";
+
 export class EnvironmentModifier {
   private interactionMode: string = "HAND";
 
@@ -36,6 +39,16 @@ export class EnvironmentModifier {
     // Define global callback for setting interaction mode
     (globalThis as any).setInteractionMode = (mode: string) => {
       this.setInteractionMode(mode);
+    };
+
+    // Define global callback for terrain dig REST response
+    (globalThis as any).onTerrainDigRESTResponse = (response: any) => {
+        this.onTerrainDigRESTResponse(response);
+    };
+
+    // Define global callback for terrain build REST response
+    (globalThis as any).onTerrainBuildRESTResponse = (response: any) => {
+        this.onTerrainBuildRESTResponse(response);
     };
   }
 
@@ -194,6 +207,32 @@ export class EnvironmentModifier {
     }
   }
 
+  onTerrainDigRESTResponse(response: any): void {
+    if (response != null) {
+        var parsedResponse = JSON.parse(response);
+        if (parsedResponse != null) {
+            if (parsedResponse["accepted"] === true) {
+                Logging.Log('Terrain dig operation accepted by server');
+            } else {
+                Logging.LogError('Terrain dig operation rejected by server: ' + parsedResponse["response"]);
+            }
+        }
+    }
+  }
+
+  onTerrainBuildRESTResponse(response: any): void {
+    if (response != null) {
+        var parsedResponse = JSON.parse(response);
+        if (parsedResponse != null) {
+            if (parsedResponse["accepted"] === true) {
+                Logging.Log('Terrain build operation accepted by server');
+            } else {
+                Logging.LogError('Terrain build operation rejected by server: ' + parsedResponse["response"]);
+            }
+        }
+    }
+  }
+
   /**
    * Perform digging action on a terrain entity
    */
@@ -205,7 +244,7 @@ export class EnvironmentModifier {
       var brushMinHeight: number = 0;
       var gridSize: number = 1;
 
-      var terrainIndex = (globalThis as any).tiledsurfacerenderer_getIndexForTerrainTile(terrainEntity);
+      var terrainIndex: Vector2Int = (globalThis as any).tiledsurfacerenderer_getIndexForTerrainTile(terrainEntity);
 
       // Align the hit point to the grid
       var alignedHitPoint = new Vector3(
@@ -223,6 +262,25 @@ export class EnvironmentModifier {
         // Perform the dig operation using roundedCube brush type
         var digSuccess = terrainEntity.Dig(alignedHitPoint,
             TerrainEntityBrushType.roundedCube, layerToUse, brushSize, true);
+
+        const userId = this.getUserId();
+        const userToken = this.getUserToken();
+
+        var tsr = (globalThis as any).tiledsurfacerenderer as TiledSurfaceRenderer;
+
+        // REST API call to notify server of terrain dig
+        if (tsr && tsr.stateServiceClient) {
+            tsr.stateServiceClient.sendTerrainDigRequest(
+                terrainIndex, alignedHitPoint, layerToUse, brushSize,
+                userId, userToken, "onTerrainDigRESTResponse");
+        }
+
+        // Synchronize with server about the dig operation
+        var wsync = (globalThis as any).wsync_instance as VOSSynchronizer;
+        if (tsr && wsync) {
+            wsync.SendTerrainDigUpdate(tsr.regionSynchronizers[terrainIndex.x + '.' + terrainIndex.y],
+                alignedHitPoint, "roundedcube", layerToUse); // TODO add brush size
+        }
         
         if (digSuccess) {
             Logging.Log("Dig operation completed successfully");
@@ -249,6 +307,8 @@ export class EnvironmentModifier {
       var brushMinHeight: number = 0;
       var gridSize: number = 1;
 
+      var terrainIndex: Vector2Int = (globalThis as any).tiledsurfacerenderer_getIndexForTerrainTile(terrainEntity);
+
       // Align the hit point to the grid
       var alignedHitPoint = new Vector3(
         Math.round(hitInfo.hitPoint.x / gridSize) * gridSize,
@@ -263,6 +323,25 @@ export class EnvironmentModifier {
         // Perform the build operation using roundedCube brush type
         var buildSuccess = terrainEntity.Build(alignedHitPoint,
             TerrainEntityBrushType.roundedCube, layer, brushSize, true);
+
+        const userId = this.getUserId();
+        const userToken = this.getUserToken();
+
+        var tsr = (globalThis as any).tiledsurfacerenderer as TiledSurfaceRenderer;
+
+        // REST API call to notify server of terrain dig
+        if (tsr && tsr.stateServiceClient) {
+            tsr.stateServiceClient.sendTerrainBuildRequest(
+                terrainIndex, alignedHitPoint, layer, brushSize,
+                userId, userToken, "onTerrainBuildRESTResponse");
+        }
+
+        // Synchronize with server about the dig operation
+        var wsync = (globalThis as any).wsync_instance as VOSSynchronizer;
+        if (tsr && wsync) {
+            wsync.SendTerrainBuildUpdate(tsr.regionSynchronizers[terrainIndex.x + '.' + terrainIndex.y],
+                alignedHitPoint, "roundedcube", layer); // TODO add brush size
+        }
         
         if (buildSuccess) {
             Logging.Log("Build operation completed successfully");
@@ -596,5 +675,43 @@ export class EnvironmentModifier {
             }
         }
     }
+  }
+
+  /**
+ * Get user ID for API requests
+ * @returns User ID from Identity module if authenticated
+ */
+  private getUserId(): string {
+    // Access Identity from global context if available
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      if (contextUser && contextUser.userID) {
+        return contextUser.userID;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user ID from context: ' + error);
+    }
+
+    // Return empty string if not authenticated (no fallback)
+    return "";
+  }
+
+  /**
+   * Get user token for API requests
+   * @returns User token from Identity module or fallback value
+   */
+  private getUserToken(): string {
+    // Access Identity from global context if available
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      if (contextUser && contextUser.token) {
+        return contextUser.token;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user token from context: ' + error);
+    }
+
+    // Return empty string if not authenticated (no fallback)
+    return "";
   }
 }

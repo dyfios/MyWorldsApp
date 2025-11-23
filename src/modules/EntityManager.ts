@@ -5,6 +5,8 @@
 import { Position, Rotation } from '../types/config';
 import { EntityData } from '../types/entity';
 import { ScriptEngine } from './ScriptEngine';
+import { VOSSynchronizer } from './VOSSynchronizer';
+import { TiledSurfaceRenderer } from './WorldRendererFactory';
 
 export class EntityPlacement {
   public placingEntity: BaseEntity | null = null;
@@ -208,13 +210,20 @@ export class EntityPlacement {
     //}
     
     const pos: Vector3 = (globalThis as any).tiledsurfacerenderer_getWorldPositionForRenderedPosition(this.placingEntity.GetPosition(false));
-    //const rot: Quaternion = this.placingEntity.GetRotation(false);
+    const rot: Quaternion = this.placingEntity.GetRotation(false);
     const terrainIndex = (globalThis as any).tiledsurfacerenderer_getRegionIndexForWorldPos(pos);
-    //const regionPos = (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos(pos, terrainIndex);
+    const regionPos = (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos(pos, terrainIndex);
 
     // Send REST request to add entity instance
     if (this.instanceID && this.entityID && this.variantID) {
-      // This would integrate with your REST module
+      var tsr = (globalThis as any).tiledsurfacerenderer as TiledSurfaceRenderer;
+      const userId = this.getUserId();
+      const userToken = this.getUserToken();
+      tsr.restClient.sendPositionEntityRequest(terrainIndex, this.entityID, this.variantID,
+        this.instanceID, regionPos, rot, userId, userToken, "onCompleteCallback");
+      var wsync = (globalThis as any).wsync_instance as VOSSynchronizer;
+      wsync.SendEntityAddUpdate(tsr.regionSynchronizers[terrainIndex.x + '.' + terrainIndex.y],
+        this.instanceID, regionPos, rot);
       Logging.Log(`[EntityPlacer] Placing entity at position: ${pos.x}, ${pos.y}, ${pos.z}`);
     }
     
@@ -345,6 +354,44 @@ export class EntityPlacement {
         Logging.LogError("[EntityPlacer] Invalid placement axis.");
         return;
     }
+  }
+
+  /**
+ * Get user ID for API requests
+ * @returns User ID from Identity module if authenticated
+ */
+  private getUserId(): string {
+    // Access Identity from global context if available
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      if (contextUser && contextUser.userID) {
+        return contextUser.userID;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user ID from context: ' + error);
+    }
+
+    // Return empty string if not authenticated (no fallback)
+    return "";
+  }
+
+  /**
+   * Get user token for API requests
+   * @returns User token from Identity module or fallback value
+   */
+  private getUserToken(): string {
+    // Access Identity from global context if available
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      if (contextUser && contextUser.token) {
+        return contextUser.token;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user token from context: ' + error);
+    }
+
+    // Return empty string if not authenticated (no fallback)
+    return "";
   }
 }
 

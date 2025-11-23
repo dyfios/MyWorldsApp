@@ -2,7 +2,7 @@
  * REST API module for HTTP endpoints
  */
 
-import { EntityPlacementData, Position, Rotation } from '../types/config';
+import { EntityPlacementData, Position } from '../types/config';
 import { EntityData } from '../types/entity';
 
 export class REST {
@@ -21,16 +21,59 @@ export class REST {
     return uuid;
   }
 
-  async sendTerrainDigRequest(position: Position, radius: number, depth: number): Promise<void> {
-    await this.post('/terrain/dig', { position, radius, depth }, "application/json");
+  sendTerrainDigRequest(terrainIndex: Vector2Int, hitPoint: Vector3, digLayer: number, brushSize: number,
+    userId: string, userToken: string, onComplete: string): void {
+    this.get('/modifyterrain', {
+      'regionX': terrainIndex.x,
+      'regionY': terrainIndex.y,
+      'x': hitPoint.x,
+      'y': hitPoint.y,
+      'z': hitPoint.z,
+      'operation': 'dig',
+      'brushType': 'roundedCube',
+      'layer': digLayer,
+      'brushSize': brushSize,
+      'userId': userId,
+      'userToken': userToken
+    }, onComplete);
   }
 
-  async sendTerrainBuildRequest(position: Position, radius: number, height: number): Promise<void> {
-    await this.post('/terrain/build', { position, radius, height }, "application/json");
+  sendTerrainBuildRequest(terrainIndex: Vector2Int, hitPoint: Vector3, buildLayer: number, brushSize: number,
+    userId: string, userToken: string, onComplete: string): void{
+    this.get('/modifyterrain', {
+      'regionX': terrainIndex.x,
+      'regionY': terrainIndex.y,
+      'x': hitPoint.x,
+      'y': hitPoint.y,
+      'z': hitPoint.z,
+      'operation': 'build',
+      'brushType': 'roundedCube',
+      'layer': buildLayer,
+      'brushSize': brushSize,
+      'userId': userId,
+      'userToken': userToken
+    }, onComplete);
   }
 
-  async sendPositionEntityRequest(entityId: string, position: Position, rotation?: Rotation): Promise<void> {
-    await this.post('/entity/position', { entityId, position, rotation }, "application/json");
+  sendPositionEntityRequest(terrainIndex: Vector2Int, entityId: string, variantId: string,
+    instanceId: string, position: Vector3, rotation: Quaternion, userId: string,
+    userToken: string, onComplete: string): void {
+    this.get('/positionentity', {
+      'regionX': terrainIndex.x,
+      'regionY': terrainIndex.y,
+      'entityID': entityId,
+      'variantID': variantId,
+      'instanceID': instanceId,
+      'xPosition': position.x,
+      'yPosition': position.y,
+      'zPosition': position.z,
+      'xRotation': rotation.x,
+      'yRotation': rotation.y,
+      'zRotation': rotation.z,
+      'wRotation': rotation.w,
+      'userID': userId,
+      'userToken': userToken
+     }, onComplete);
   }
 
   async sendDeleteEntityRequest(entityId: string): Promise<void> {

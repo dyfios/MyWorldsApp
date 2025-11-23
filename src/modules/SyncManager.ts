@@ -314,38 +314,6 @@ export class SyncManager {
   }
 
   /**
-   * Publish a diff to other clients
-   */
-  publish(diff: SyncDiff): void {
-    if (!this.connected) {
-      Logging.LogWarning('Cannot publish: not connected to synchronizers');
-      return;
-    }
-    
-    if (this.vosSynchronizer) {
-      // Send through VOS
-      const vosMessage: VOSMessage = {
-        type: diff.type,
-        data: diff.data,
-        timestamp: diff.timestamp
-      };
-      
-      const success = this.vosSynchronizer.SendMessage(vosMessage);
-      if (success) {
-        Logging.Log('Published VOS sync diff: ' + JSON.stringify(diff));
-      } else {
-        Logging.LogError('Failed to publish VOS sync diff');
-      }
-    } else {
-      // Fallback to simulation mode
-      Logging.Log('Publishing sync diff (simulation): ' + JSON.stringify(diff));
-      
-      // For simulation, notify local listeners
-      this.handleSyncMessage(diff);
-    }
-  }
-
-  /**
    * Handle incoming sync message
    */
   private handleSyncMessage(diff: SyncDiff): void {
@@ -364,18 +332,6 @@ export class SyncManager {
     this.connected = false;
     this.listeners = [];
     Logging.Log('Disconnected from synchronizers');
-  }
-
-  /**
-   * Sync an entity through VOS
-   */
-  syncEntity(entityId: string, entityData: any): boolean {
-    if (!this.connected || !this.vosSynchronizer) {
-      Logging.LogWarning('Cannot sync entity: not connected to VOS');
-      return false;
-    }
-    
-    return this.vosSynchronizer.SyncEntity(entityId, entityData);
   }
 
   /**
