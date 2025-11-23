@@ -219,11 +219,13 @@ export class EntityPlacement {
       var tsr = (globalThis as any).tiledsurfacerenderer as TiledSurfaceRenderer;
       const userId = this.getUserId();
       const userToken = this.getUserToken();
-      tsr.restClient.sendPositionEntityRequest(terrainIndex, this.entityID, this.variantID,
-        this.instanceID, regionPos, rot, userId, userToken, "onCompleteCallback");
-      var wsync = (globalThis as any).wsync_instance as VOSSynchronizer;
-      wsync.SendEntityAddUpdate(tsr.regionSynchronizers[terrainIndex.x + '.' + terrainIndex.y],
-        this.instanceID, regionPos, rot);
+      if (tsr) {
+        tsr.restClient.sendPositionEntityRequest(terrainIndex, this.entityID, this.variantID,
+          this.instanceID, regionPos, rot, userId, userToken, "onCompleteCallback");
+        var wsync = (globalThis as any).wsync_instance as VOSSynchronizer;
+        wsync.SendEntityAddUpdate(tsr.regionSynchronizers[terrainIndex.x + '.' + terrainIndex.y],
+          this.instanceID, regionPos, rot);
+      }
       Logging.Log(`[EntityPlacer] Placing entity at position: ${pos.x}, ${pos.y}, ${pos.z}`);
     }
     
