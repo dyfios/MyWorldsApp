@@ -11,7 +11,6 @@ import { UIManager } from './modules/UIManager';
 export class MyWorld {
   private context: ClientContext;
   private queryParams: ProcessQueryParams;
-  private renderIntervalId: any = null;
 
   constructor() {
     try {
@@ -314,35 +313,15 @@ export class MyWorld {
     
     // Store reference to this instance for the global function
     (globalThis as any).myWorldInstance = this;
-
-    // Start the interval - 60 FPS = 1/60 seconds = ~0.0167 seconds
-    const intervalSeconds = 1/60;
-    Logging.Log('🔄 Setting up render loop with interval: ' + intervalSeconds + ' seconds');
-    
-    //this.renderIntervalId = Time.SetInterval(renderFunctionName, intervalSeconds);
-    
-    if (this.renderIntervalId) {
-      Logging.Log('✓ Render loop started with ID: ' + this.renderIntervalId);
-    } else {
-      Logging.LogError('❌ Failed to start render loop');
-    }
   }
 
   /**
    * Dispose of the client
    */
   dispose(): void {
-    // Stop the render loop
-    if (this.renderIntervalId) {
-      Logging.Log('🔄 Stopping render loop...');
-      Time.StopInterval(this.renderIntervalId.ToString());
-      this.renderIntervalId = null;
-    }
-    
     // Clean up global references
     try {
       delete (globalThis as any).myWorldInstance;
-      delete (globalThis as any).myWorldRenderLoop;
     } catch (error) {
       // Ignore cleanup errors
     }

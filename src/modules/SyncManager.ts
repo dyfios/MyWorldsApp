@@ -15,6 +15,7 @@ export interface SyncDiff {
 }
 
 export class SyncManager {
+  public globalSynchronizer: VOSSynchronizer | null = null;
   private listeners: ((diff: SyncDiff) => void)[] = [];
   private connected: boolean = false;
   private vosSynchronizer?: VOSSynchronizer;
@@ -22,6 +23,224 @@ export class SyncManager {
 
   constructor(syncConfig?: VOSSynchronizerConfig) {
     this.syncConfig = syncConfig;
+    (globalThis as any).syncManager = this;
+  }
+
+  connectToGlobalSynchronizer(worldConfig: any, onConnect: any, onJoinSession: any): void {
+    const globalSyncConfig: VOSSynchronizerConfig = {
+      host: worldConfig["vos-synchronization-service"]["host"],
+      port: worldConfig["vos-synchronization-service"]["port"],
+      tls: worldConfig["vos-synchronization-service"]["tls"],
+      sessionId: worldConfig["vos-synchronization-service"]["global-session-id"],
+      sessionTag: worldConfig["vos-synchronization-service"]["global-session-tag"],
+      transport: worldConfig["vos-synchronization-service"]["transport"].toLowerCase() === 'tcp'
+        ? VSSTransport.TCP : VSSTransport.WebSocket
+    };
+    
+    try {
+      this.globalSynchronizer = new VOSSynchronizer(globalSyncConfig, onConnect, onJoinSession, this.onVSSMessage);
+      this.globalSynchronizer.Connect();
+    } catch (error) {
+      Logging.LogError('Failed to create global synchronizer: ' + error);
+    }
+  }
+
+  onVSSMessage(topic: string, sender: string, msg: string): void {
+    const clientID = this.getUserId();
+    // Filter messages from this client.
+    if (clientID == sender && !topic.startsWith("PLAYER")) {
+        return;
+    }
+    
+    if (topic === "TERRAIN.EDIT.DIG") {
+        var msgFields = JSON.parse(msg);
+        
+        if (msgFields.position === null || msgFields.position.x === null || msgFields.position.y === null || msgFields.position.z === null) {
+            Logging.LogError("OnVSSMessage: Terrain edit dig message missing position.");
+            return;
+        }
+        
+        if (msgFields.brushType === null) {
+            Logging.LogError("OnVSSMessage: Terrain edit dig message missing brushType.");
+            return;
+        }
+        
+        if (msgFields.lyr === null) {
+            Logging.LogError("OnVSSMessage: Terrain edit dig message missing lyr.");
+            return;
+        }
+        
+        var brushType = TerrainEntityBrushType.sphere;
+        if (msgFields.brushType === "sphere") {
+            brushType = TerrainEntityBrushType.sphere;
+        }
+        else if (msgFields.brushType === "roundedcube") {
+            brushType = TerrainEntityBrushType.roundedCube;
+        }
+
+        var terrainEntity: TerrainEntity = (globalThis as any).tiledsurfacerenderer_getTerrainTileForIndex(
+          (globalThis as any).tiledsurfacerenderer_getRegionIndexForWorldPos(
+            new Vector3(msgFields.position.x, msgFields.position.y, msgFields.position.z)));
+        var regionPos = (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos(
+          new Vector3(msgFields.position.x, msgFields.position.y, msgFields.position.z));
+        terrainEntity.Dig(regionPos, brushType, msgFields.lyr, 1, false); // TODO handle brush size
+    }
+    else if (topic === "TERRAIN.EDIT.BUILD") {
+        var msgFields = JSON.parse(msg);
+        
+        if (msgFields.position === null || msgFields.position.x === null || msgFields.position.y === null || msgFields.position.z === null) {
+            Logging.LogError("OnVSSMessage: Terrain edit build message missing position.");
+            return;
+        }
+        
+        if (msgFields.brushType === null) {
+            Logging.LogError("OnVSSMessage: Terrain edit build message missing brushType.");
+            return;
+        }
+        
+        if (msgFields.lyr === null) {
+            Logging.LogError("OnVSSMessage: Terrain edit build message missing lyr.");
+            return;
+        }
+        
+        var brushType = TerrainEntityBrushType.sphere;
+        if (msgFields.brushType === "sphere") {
+            brushType = TerrainEntityBrushType.sphere;
+        }
+        else if (msgFields.brushType === "roundedcube") {
+            brushType = TerrainEntityBrushType.roundedCube;
+        }
+        
+        var terrainEntity: TerrainEntity = (globalThis as any).tiledsurfacerenderer_getTerrainTileForIndex(
+          (globalThis as any).tiledsurfacerenderer_getRegionIndexForWorldPos(
+            new Vector3(msgFields.position.x, msgFields.position.y, msgFields.position.z)));
+        var regionPos = (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos(
+          new Vector3(msgFields.position.x, msgFields.position.y, msgFields.position.z));
+        terrainEntity.Build(regionPos, brushType, msgFields.lyr, 1, false); // TODO handle brush size
+    }
+    else if (topic === "MESSAGE.CREATE") {
+        msgFields = JSON.parse(msg);
+        
+        if (!msgFields.hasOwnProperty("message")) {
+            Logging.LogError("OnVSSMessage: Message missing message field.");
+            return;
+        }
+        
+        if (!msgFields.hasOwnProperty("client-id")) {
+            Logging.LogError("OnVSSMessage: Message missing client-id.");
+            return;
+        }
+        
+        var message = msgFields.message;
+        var clientId = msgFields["client-id"];
+        var clientTag = msgFields["client-tag"];
+
+        // Check if this message is from the current client.
+        if (clientId == clientID) {
+            return;
+        }
+
+        var senderName = clientId === "system" ? "System" : `${clientTag}`;
+        var timestamp = (Date as any).now.ToTimeString();
+        
+        // Check if this is a command response (sent by system)
+        if (msgFields.hasOwnProperty("is-command-response") && msgFields["is-command-response"] === true) {
+            // This is a command response, only show it to the original sender
+            // The server already handles this, so just display it
+            ((globalThis as any).uiManager as UIManager).addRemoteConsoleMessage(timestamp, senderName, message);
+        } else {
+            // Regular message, display to all
+            ((globalThis as any).uiManager as UIManager).addRemoteConsoleMessage(timestamp, senderName, message);
+        }
+    }
+    else if (topic === "SESSION.MESSAGE") {
+        msgFields = JSON.parse(msg);
+        
+        if (!msgFields.hasOwnProperty("type")) {
+            Logging.LogError("OnVSSMessage: Session message missing type.");
+            return;
+        }
+        
+        if (!msgFields.hasOwnProperty("content")) {
+            Logging.LogError("OnVSSMessage: Session message missing content.");
+            return;
+        }
+        
+        if (!msgFields.hasOwnProperty("client-id")) {
+            Logging.LogError("OnVSSMessage: Session message missing client-id.");
+            return;
+        }
+        
+        var messageType = msgFields.type.toUpperCase();
+        var content = msgFields.content;
+        var clientId = msgFields["client-id"];
+        
+        if (messageType === "MSG") {
+            // Handle MSG messages by logging to console
+            var senderName = clientId === "system" ? "System" : `Client ${clientId}`;
+            var timestamp = (Date as any).now.ToTimeString();
+            
+            // Use the dedicated console message function
+            ((globalThis as any).uiManager as UIManager).addRemoteConsoleMessage(timestamp, senderName, content);
+        }
+        // CMD messages are handled server-side and don't need client processing
+    }
+    else if (topic === "PLAYER.TELEPORT") {
+        msgFields = JSON.parse(msg);
+        
+        if (!msgFields.hasOwnProperty("action") || msgFields.action !== "player-teleport") {
+            Logging.LogError("OnVSSMessage: Invalid teleport message action.");
+            return;
+        }
+        
+        if (!msgFields.hasOwnProperty("position")) {
+            Logging.LogError("OnVSSMessage: Teleport message missing position.");
+            return;
+        }
+        
+        if (!msgFields.hasOwnProperty("client-id")) {
+            Logging.LogError("OnVSSMessage: Teleport message missing client-id.");
+            return;
+        }
+        
+        var position = msgFields.position;
+        var clientId = msgFields["client-id"];
+        
+        // Validate position data
+        if (typeof position.x !== 'number' || typeof position.y !== 'number' || typeof position.z !== 'number') {
+            Logging.LogError("OnVSSMessage: Invalid teleport position coordinates.");
+            return;
+        }
+        
+        // Get the current client context to check if this teleport is for us
+        var vosContext = Context.GetContext("VOSSynchronizationContext");
+        
+        if (vosContext && vosContext.clientID === clientId) {
+            // This teleport is for our client - update our position
+            var playerModule = Context.GetContext("PLAYER_MODULE");
+            
+            if (playerModule && playerModule.thirdPersonCharacterController && playerModule.thirdPersonCharacterController.characterEntity) {
+                // Convert world coordinates to rendered coordinates accounting for world offset
+                var worldPosition = new Vector3(position.x, position.y, position.z);
+                var renderedPosition = (globalThis as any).tiledsurfacerender.getRenderedPositionForWorldPosition(worldPosition);
+                
+                Logging.Log(`[Teleport] Moving player to world position: ${position.x}, ${position.y}, ${position.z} (rendered: ${renderedPosition.x}, ${renderedPosition.y}, ${renderedPosition.z})`);
+                
+                // Update character position using rendered coordinates
+                (globalThis as any).setMotionModeFree();
+                (globalThis as any).setCharacterPosition(renderedPosition);
+                
+                // Update camera if needed
+                // Camera position will be automatically updated by the character controller
+            } else {
+                Logging.LogError("OnVSSMessage: Unable to teleport - player module or character not available.");
+            }
+        } else {
+            // This teleport is for another client - we might want to update their representation
+            // For now, just log it
+            Logging.Log(`[Teleport] Client ${clientId} teleported to position: ${position.x}, ${position.y}, ${position.z}`);
+        }
+      }
   }
 
   /**
@@ -39,7 +258,7 @@ export class SyncManager {
           this.handleSyncMessage({
             type: 'entity_update',
             data: message.data,
-            timestamp: message.timestamp || Date.now()
+            timestamp: message.timestamp || (Date as any).now
           });
         });
         
@@ -47,7 +266,7 @@ export class SyncManager {
           this.handleSyncMessage({
             type: 'player_update',
             data: message.data,
-            timestamp: message.timestamp || Date.now()
+            timestamp: message.timestamp || (Date as any).now
           });
         });
         
@@ -55,7 +274,7 @@ export class SyncManager {
           this.handleSyncMessage({
             type: 'ui_update',
             data: message.data,
-            timestamp: message.timestamp || Date.now()
+            timestamp: message.timestamp || (Date as any).now
           });
         });
         
@@ -182,6 +401,25 @@ export class SyncManager {
    */
   isVOSConnected(): boolean {
     return this.vosSynchronizer?.IsConnected() || false;
+  }
+
+  /**
+ * Get user ID for API requests
+ * @returns User ID from Identity module if authenticated
+ */
+  private getUserId(): string {
+    // Access Identity from global context if available
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      if (contextUser && contextUser.userID) {
+        return contextUser.userID;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user ID from context: ' + error);
+    }
+
+    // Return empty string if not authenticated (no fallback)
+    return "";
   }
 }
 

@@ -8,6 +8,7 @@ import { ProcessQueryParams, WorldMetadata } from '../utils/ProcessQueryParams';
 import { EntityManager } from './EntityManager';
 import { DockButtonInfo } from './UIManager';
 import { Identity } from './Identity';
+import { SyncManager } from './SyncManager';
 
 /**
  * Entity instance format received from the server
@@ -1217,6 +1218,14 @@ export class TiledSurfaceRenderer extends WorldRendering {
     this.stateServiceClient.sendBiomeManifestRequest('onBiomeManifestReceived');
   }
 
+  onGlobalSynchronizerConnected(): void {
+    Logging.Log("Global synchronizer connected.");
+  }
+
+  onGlobalSessionJoined(): void {
+    Logging.Log("Global synchronization session joined.");
+  }
+
   onWorldManifestReceived(response: string): void {
     try {
       Logging.Log('🎯 TiledSurfaceRenderer: onWorldManifestReceived callback invoked');
@@ -1229,6 +1238,8 @@ export class TiledSurfaceRenderer extends WorldRendering {
           Logging.LogError("MetaWorld->GotWorldConfig: Invalid World Config. Aborting.");
         } else {
           this.applyWorldConfig();
+          ((globalThis as any).syncManager as SyncManager).connectToGlobalSynchronizer(
+            this.worldConfig, this.onGlobalSynchronizerConnected, this.onGlobalSessionJoined);
         }
       }
 

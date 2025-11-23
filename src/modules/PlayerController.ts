@@ -195,6 +195,16 @@ export class PlayerController {
     (globalThis as any).setFlyingMode = (enabled: boolean) => {
       this.setFlyingMode(enabled);
     };
+
+    // Define global callback for setting character position
+    (globalThis as any).setCharacterPosition = (newPosition: Vector3) => {
+      this.setCharacterPosition(newPosition);
+    };
+
+    // Define global callback for setting motion mode to free
+    (globalThis as any).setMotionModeFree = () => {
+      this.setMotionModeFree();
+    };
   }
 
   /**

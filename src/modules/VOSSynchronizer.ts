@@ -1,18 +1,15 @@
 /**
- * VOSSynchronizer - TypeScript wrapper for WebVerse VOSSynchronization API
- * Provides high-level abstraction for VOS (Versionable Object System) protocol communication
+ * VOSSynchronizer - TypeScript wrapper for WebVerse WorldSync API
+ * Provides high-level abstraction for WorldSync protocol communication
  */
-
-// VOSSynchronization and VSSTransport are available as global declarations from WebVerse runtime
 
 export interface VOSSynchronizerConfig {
     host: string;
     port: number;
-    tls?: boolean;
+    tls: boolean;
     sessionId: string;
     sessionTag: string;
     transport?: VSSTransport;
-    position?: Vector3;
 }
 
 export interface VOSMessage {
@@ -35,18 +32,21 @@ export interface VOSEntityMessage extends VOSMessage {
 }
 
 export class VOSSynchronizer {
+    public onConnected = null;
+    public onJoinSession = null;
+    public onMessage = null;
     private config: VOSSynchronizerConfig;
     private isConnected: boolean = false;
     private messageHandlers: Map<string, ((message: VOSMessage) => void)[]> = new Map();
     private sessionMessageHandlers: Map<string, ((message: VOSSessionMessage) => void)[]> = new Map();
     private entitySyncCallbacks: Map<string, (entity: any) => void> = new Map();
 
-    constructor(config: VOSSynchronizerConfig) {
-        this.config = {
-            tls: false,
-            transport: VSSTransport.WebSocket,
-            ...config
-        };
+    constructor(config: VOSSynchronizerConfig, onConnected = null, onJoinSession = null, onMessage: any = null) {
+        this.config = config;
+        this.onConnected = onConnected;
+        this.onJoinSession = onJoinSession;
+        this.onMessage = onMessage;
+        (globalThis as any).wsync_instance = this; // TODO: clean up, this will get overwritten for each instance.
     }
 
     /**
@@ -55,42 +55,29 @@ export class VOSSynchronizer {
      */
     public async Connect(): Promise<boolean> {
         try {
-            let success: boolean;
+            const userId: string = this.getUserId();
+            const userToken: string = this.getUserToken();
 
-            if (this.config.position) {
-                // Create session with position
-                success = VOSSynchronization.CreateSession(
-                    this.config.host,
-                    this.config.port,
-                    this.config.tls || false,
-                    this.config.sessionId,
-                    this.config.sessionTag,
-                    this.config.position,
-                    this.config.transport
-                );
-            } else {
-                // Create session without position
-                success = VOSSynchronization.CreateSession(
-                    this.config.host,
-                    this.config.port,
-                    this.config.tls || false,
-                    this.config.sessionId,
-                    this.config.sessionTag,
-                    this.config.transport
-                );
-            }
-
-            if (success) {
-                this.isConnected = true;
-                console.log(`VOSSynchronizer: Connected to ${this.config.host}:${this.config.port}`);
+            const onJoinAction = `
+                if (this.wsync_instance.onConnected != null) {
+                    this.wsync_instance.onConnected();
+                }
                 
-                // Start message processing if available
-                this.setupMessageHandling();
-            } else {
-                console.error('VOSSynchronizer: Failed to create VOS session');
-            }
+                if (this.wsync_instance.onMessage != null) {
+                    VOSSynchronization.RegisterMessageCallback(this.wsync_instance.config.sessionId, this.wsync_instance.onMessage);
+                }
 
-            return success;
+                Logging.Log('[VOSSynchronization:Connect] Joined Session');
+                if (this.wsync_instance.onJoinSession != null) {
+                    this.wsync_instance.onJoinSession();
+                }
+            `;
+
+            VOSSynchronization.JoinSession(this.config.host, this.config.port,
+                this.config.tls, this.config.sessionId, this.config.sessionTag,
+                onJoinAction, this.config.transport, userId, userToken);
+            
+            return true;
         } catch (error) {
             console.error('VOSSynchronizer: Connection error:', error);
             this.isConnected = false;
@@ -259,15 +246,6 @@ export class VOSSynchronizer {
     }
 
     /**
-     * Setup message handling (placeholder for future WebVerse API methods)
-     */
-    private setupMessageHandling(): void {
-        // This method would set up listeners for incoming VOS messages
-        // when the WebVerse API exposes message receiving capabilities
-        console.log('VOSSynchronizer: Message handling setup complete');
-    }
-
-    /**
      * Handle incoming messages (internal processing)
      * @param message The incoming message
      */
@@ -303,6 +281,44 @@ export class VOSSynchronizer {
             this.HandleEntityUpdate(message.entityId, message.data);
         }
     }
+
+    /**
+ * Get user ID for API requests
+ * @returns User ID from Identity module if authenticated
+ */
+  private getUserId(): string {
+    // Access Identity from global context if available
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      if (contextUser && contextUser.userID) {
+        return contextUser.userID;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user ID from context: ' + error);
+    }
+
+    // Return empty string if not authenticated (no fallback)
+    return "";
+  }
+
+  /**
+   * Get user token for API requests
+   * @returns User token from Identity module or fallback value
+   */
+  private getUserToken(): string {
+    // Access Identity from global context if available
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      if (contextUser && contextUser.token) {
+        return contextUser.token;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user token from context: ' + error);
+    }
+
+    // Return empty string if not authenticated (no fallback)
+    return "";
+  }
 }
 
 export default VOSSynchronizer;

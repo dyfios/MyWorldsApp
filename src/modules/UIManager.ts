@@ -794,6 +794,31 @@ export class UIManager {
     }
   }
 
+  addRemoteConsoleMessage(timestamp: any, sender: any, content: any): void {
+    try {
+      const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+      if (!mainToolbarId) {
+        Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found, cannot add remote console message');
+        return;
+      }
+
+      const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+      if (!mainToolbar) {
+        Logging.LogError('❌ UIManager: Main toolbar entity not found, cannot add remote console message');
+        return;
+      }
+
+      // Call the Add Message API
+      const jsCommand = `window.chatMessageAPI.addMessage("${timestamp} [${sender}] ${content}");`;
+      
+      mainToolbar.ExecuteJavaScript(jsCommand, '');
+      Logging.Log('✅ UIManager: Add remote console message command sent to UI space');
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      Logging.LogError('❌ UIManager: Error in addRemoteConsoleMessage: ' + errorMessage);
+    }
+  }
+
   /**
    * Show/hide edit toolbar
    */
