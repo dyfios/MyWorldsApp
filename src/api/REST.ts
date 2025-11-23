@@ -88,7 +88,7 @@ export class REST {
     this.get('/getregioninfo', {
       'regionX': regionIdx.x,
       'regionY': regionIdx.y,
-      'userId': userId,
+      'userID': userId,
       'userToken': userToken
     }, onComplete);
   }
