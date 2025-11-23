@@ -54,8 +54,13 @@ export class REST {
     }, onComplete);
   }
 
-  sendRegionInfoRequest(regionId: string, onComplete: string): void {
-    this.get(`/region/${regionId}`, undefined, onComplete);
+  sendRegionInfoRequest(regionIdx: Vector2Int, userId: string, userToken: string, onComplete: string): void {
+    this.get(`/getregioninfo`, {
+      'regionX': regionIdx.x,
+      'regionY': regionIdx.y,
+      'userID': userId,
+      'userToken': userToken
+    }, onComplete);
   }
 
   sendGetTerrainRequest(regionIdx: Vector2Int, userID: string, userToken: string, onComplete: string): void {
