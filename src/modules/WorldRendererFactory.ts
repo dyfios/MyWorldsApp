@@ -718,6 +718,10 @@ export class TiledSurfaceRenderer extends WorldRendering {
       }
     }
     var newRegion = this.getRegionIndexForWorldPos(this.getWorldPositionForRenderedPosition(renderedPos));
+    
+    // Check for terrain boundary crossing and shift character position if needed
+    this.checkAndHandleTerrainBoundaries(renderedPos, newRegion);
+    
     if (this.currentRegion != newRegion) {
       this.currentRegion = newRegion;
     }
@@ -757,6 +761,65 @@ export class TiledSurfaceRenderer extends WorldRendering {
           Logging.LogWarning('⏰ TiledSurfaceRenderer: Initial world loading timeout reached (60 seconds) - proceeding despite pending terrain tiles');
         }
       }
+    }
+  }
+
+  /**
+   * Check if character has crossed terrain boundaries and shift position if needed
+   * @param renderedPos Current character rendered position
+   * @param newRegion Current region index
+   */
+  private checkAndHandleTerrainBoundaries(renderedPos: Vector3, newRegion: Vector2Int): void {
+    if ((globalThis as any).playerController.internalCharacterEntity == null) {
+      return;
+    }
+
+    const regionSize_meters = this.regionSize * this.regionScale;
+    const worldPos = this.getWorldPositionForRenderedPosition(renderedPos);
+    let shiftNeeded = false;
+    let newWorldPos = new Vector3(worldPos.x, worldPos.y, worldPos.z);
+
+    // Check X boundary (region index 0 or numRegions - 1)
+    if (newRegion.x <= 0) {
+      // Character crossed to the left edge (region 0), shift to right side (region 255)
+      newWorldPos.x += this.numRegions * regionSize_meters;
+      shiftNeeded = true;
+      Logging.Log(`Character crossed left boundary (region ${newRegion.x}), shifting to right side (region 255)`);
+    } else if (newRegion.x >= this.numRegions - 1) {
+      // Character crossed to the right edge (region numRegions-1), shift to left side (region 0)
+      newWorldPos.x -= this.numRegions * regionSize_meters;
+      shiftNeeded = true;
+      Logging.Log(`Character crossed right boundary (region ${newRegion.x}), shifting to left side (region 0)`);
+    }
+
+    // Check Z boundary (region index 0 or numRegions - 1)  
+    if (newRegion.y <= 0) {
+      // Character crossed to the front edge (region 0), shift to back side (region 255) and rotate 180°
+      newWorldPos.z += this.numRegions * regionSize_meters;
+      shiftNeeded = true;
+      // Rotate character 180 degrees around Y-axis
+      const currentRotation = (globalThis as any).playerController.internalCharacterEntity.GetRotation(false);
+      const currentEuler = currentRotation.GetEulerAngles();
+      const newRotation = Quaternion.FromEulerAngles(currentEuler.x, currentEuler.y + 180, currentEuler.z);
+      (globalThis as any).playerController.internalCharacterEntity.SetRotation(newRotation, false);
+      Logging.Log(`Character crossed front boundary (region ${newRegion.y}), shifting to back side (region 255) and rotating 180°`);
+    } else if (newRegion.y >= this.numRegions - 1) {
+      // Character crossed to the back edge (region numRegions-1), shift to front side (region 0) and rotate 180°
+      newWorldPos.z -= this.numRegions * regionSize_meters;
+      shiftNeeded = true;
+      // Rotate character 180 degrees around Y-axis
+      const currentRotation = (globalThis as any).playerController.internalCharacterEntity.GetRotation(false);
+      const currentEuler = currentRotation.GetEulerAngles();
+      const newRotation = Quaternion.FromEulerAngles(currentEuler.x, currentEuler.y + 180, currentEuler.z);
+      (globalThis as any).playerController.internalCharacterEntity.SetRotation(newRotation, false);
+      Logging.Log(`Character crossed back boundary (region ${newRegion.y}), shifting to front side (region 0) and rotating 180°`);
+    }
+
+    // Apply the position shift if needed
+    if (shiftNeeded) {
+      const newRenderedPos = this.getRenderedPositionForWorldPosition(newWorldPos);
+      (globalThis as any).playerController.internalCharacterEntity.SetPosition(newRenderedPos, false);
+      Logging.Log(`Character position shifted from ${renderedPos.x}, ${renderedPos.y}, ${renderedPos.z} to ${newRenderedPos.x}, ${newRenderedPos.y}, ${newRenderedPos.z}`);
     }
   }
 
@@ -1312,7 +1375,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
     if (this.centerRegion.y < 1) {
       if (terrainIndex.y > 2) {
         terrainPos.x -= this.numRegions * this.regionSize * this.regionScale;
-        terrainRot = Quaternion.FromEulerAngles(0, 180, 0);
+        terrainRot = Quaternion.FromEulerAngles(0, 180, 0); // TODO terrain cannot be rotated, do when converted to mesh
       }
     }
 
@@ -1320,7 +1383,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
     if (this.centerRegion.y > this.numRegions - 2) {
       if (terrainIndex.y < this.numRegions - 3) {
         terrainPos.x += this.numRegions * this.regionSize * this.regionScale;
-        terrainRot = Quaternion.FromEulerAngles(0, 180, 0);
+        terrainRot = Quaternion.FromEulerAngles(0, 180, 0); // TODO terrain cannot be rotated, do when converted to mesh
       }
     }
 
