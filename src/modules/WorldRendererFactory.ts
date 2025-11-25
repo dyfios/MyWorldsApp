@@ -617,6 +617,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
   private numRegions: number = 256; // Number of regions along one axis
   private identityModule: Identity;
   private sun: SunController | null = null;
+  private centerRegion: Vector2Int = new Vector2Int(0, 0);
 
   constructor() {
     super();
@@ -786,10 +787,34 @@ export class TiledSurfaceRenderer extends WorldRendering {
       return;
     }
 
+    this.centerRegion = centerRegionIdx;
+
     const neighbors = this.getWrappedNeighbors(centerRegionIdx, this.numRegions);
     for (const neighborIdx of neighbors) {
       if (this.terrainTiles[neighborIdx.x + "." + neighborIdx.y] == null) {
         this.loadRegion(neighborIdx);
+        if (centerRegionIdx.x < 1) {
+          if (neighborIdx.x > 2) {
+            // tile pos x -= numRegions * regionSize
+          }
+        }
+        if (centerRegionIdx.x > this.numRegions - 2) {
+          if (neighborIdx.x < this.numRegions - 3) {
+            // tile pos x += numRegions * regionSize
+          }
+        }
+        if (centerRegionIdx.y < 1) {
+          if (neighborIdx.y > 2) {
+            // tile pos z -= numRegions * regionSize
+            // tile rot y += 180
+          }
+        }
+        if (centerRegionIdx.y > this.numRegions - 2) {
+          if (neighborIdx.y < this.numRegions - 3) {
+            // tile pos z += numRegions * regionSize
+            // tile rot y += 180
+          }
+        }
         return;
       }
     }
@@ -1264,8 +1289,43 @@ export class TiledSurfaceRenderer extends WorldRendering {
       this.getBiomeIDForTerrainTile(terrain);
     this.terrainTiles[terrainIndex.x + "." + terrainIndex.y] = terrain;
 
-    terrain.SetPosition(this.getRenderedPositionForWorldPosition(this.getWorldPosForRegionIndex(
-      new Vector2Int(terrainIndex.x, terrainIndex.y))), false);
+    var terrainPos: Vector3 = this.getRenderedPositionForWorldPosition(this.getWorldPosForRegionIndex(
+      new Vector2Int(terrainIndex.x, terrainIndex.y)));
+    
+    var terrainRot: Quaternion = Quaternion.identity;
+
+    // Handle wrapping over left edge
+    if (this.centerRegion.x < 1) {
+      if (terrainIndex.x > 2) {
+        terrainPos.x -= this.numRegions * this.regionSize;
+      }
+    }
+
+    // Handle wrapping over right edge
+    if (this.centerRegion.x > this.numRegions - 2) {
+      if (terrainIndex.x < this.numRegions - 3) {
+        terrainPos.x += this.numRegions * this.regionSize;
+      }
+    }
+
+    // Handle wrapping over top edge
+    if (this.centerRegion.y < 1) {
+      if (terrainIndex.y > 2) {
+        terrainPos.z -= this.numRegions * this.regionSize;
+        terrainRot = Quaternion.FromEulerAngles(0, 180, 0);
+      }
+    }
+
+    // Handle wrapping over bottom edge
+    if (this.centerRegion.y > this.numRegions - 2) {
+      if (terrainIndex.y < this.numRegions - 3) {
+        terrainPos.z += this.numRegions * this.regionSize;
+        terrainRot = Quaternion.FromEulerAngles(0, 180, 0);
+      }
+    }
+
+    terrain.SetPosition(terrainPos, false);
+    terrain.SetRotation(terrainRot, false);
 
     // Check authentication before making requests
     if (!this.isUserAuthenticated()) {
