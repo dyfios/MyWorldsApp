@@ -719,10 +719,8 @@ export class TiledSurfaceRenderer extends WorldRendering {
     }
     var newRegion = this.getRegionIndexForWorldPos(this.getWorldPositionForRenderedPosition(renderedPos));
     
-    // Check for terrain boundary crossing and shift character position if needed
-    this.checkAndHandleTerrainBoundaries(renderedPos, newRegion);
-    
     if (this.currentRegion != newRegion) {
+      this.checkAndHandleTerrainBoundaries(this.currentRegion, newRegion);
       this.currentRegion = newRegion;
     }
 
@@ -766,53 +764,60 @@ export class TiledSurfaceRenderer extends WorldRendering {
 
   /**
    * Check if character has crossed terrain boundaries and shift position if needed
-   * @param renderedPos Current character rendered position
+   * @param oldRegion Previous region index
    * @param newRegion Current region index
    */
-  private checkAndHandleTerrainBoundaries(renderedPos: Vector3, newRegion: Vector2Int): void {
+  private checkAndHandleTerrainBoundaries(oldRegion: Vector2Int, newRegion: Vector2Int): void {
     if ((globalThis as any).playerController.internalCharacterEntity == null) {
       return;
     }
 
     const regionSize_meters = this.regionSize * this.regionScale;
-    const worldPos = this.getWorldPositionForRenderedPosition(renderedPos);
     let shiftNeeded = false;
+    let rotationNeeded = false;
+
+    // Get current character position
+    const renderedPos = (globalThis as any).playerController.internalCharacterEntity.GetPosition(false);
+    const worldPos = this.getWorldPositionForRenderedPosition(renderedPos);
     let newWorldPos = new Vector3(worldPos.x, worldPos.y, worldPos.z);
 
-    // Check X boundary (region index 0 or numRegions - 1)
-    if (newRegion.x <= 0) {
-      // Character crossed to the left edge (region 0), shift to right side (region 255)
-      newWorldPos.x += this.numRegions * regionSize_meters;
-      shiftNeeded = true;
-      Logging.Log(`Character crossed left boundary (region ${newRegion.x}), shifting to right side (region 255)`);
-    } else if (newRegion.x >= this.numRegions - 1) {
-      // Character crossed to the right edge (region numRegions-1), shift to left side (region 0)
+    // Check X boundary crossing (horizontal wrapping)
+    // If old region was in first half but new region is in second half (or vice versa), it's a wrap
+    const halfWorld = this.numRegions / 2; // 128
+    
+    if (oldRegion.x < halfWorld && newRegion.x > halfWorld) {
+      // Character wrapped from left side to right side
       newWorldPos.x -= this.numRegions * regionSize_meters;
       shiftNeeded = true;
-      Logging.Log(`Character crossed right boundary (region ${newRegion.x}), shifting to left side (region 0)`);
+      Logging.Log(`Character wrapped from left boundary (region ${oldRegion.x}) to right side (region ${newRegion.x})`);
+    } else if (oldRegion.x > halfWorld && newRegion.x < halfWorld) {
+      // Character wrapped from right side to left side
+      newWorldPos.x += this.numRegions * regionSize_meters;
+      shiftNeeded = true;
+      Logging.Log(`Character wrapped from right boundary (region ${oldRegion.x}) to left side (region ${newRegion.x})`);
     }
 
-    // Check Z boundary (region index 0 or numRegions - 1)  
-    if (newRegion.y <= 0) {
-      // Character crossed to the front edge (region 0), shift to back side (region 255) and rotate 180°
-      newWorldPos.z += this.numRegions * regionSize_meters;
-      shiftNeeded = true;
-      // Rotate character 180 degrees around Y-axis
-      const currentRotation = (globalThis as any).playerController.internalCharacterEntity.GetRotation(false);
-      const currentEuler = currentRotation.GetEulerAngles();
-      const newRotation = Quaternion.FromEulerAngles(currentEuler.x, currentEuler.y + 180, currentEuler.z);
-      (globalThis as any).playerController.internalCharacterEntity.SetRotation(newRotation, false);
-      Logging.Log(`Character crossed front boundary (region ${newRegion.y}), shifting to back side (region 255) and rotating 180°`);
-    } else if (newRegion.y >= this.numRegions - 1) {
-      // Character crossed to the back edge (region numRegions-1), shift to front side (region 0) and rotate 180°
+    // Check Z boundary crossing (vertical wrapping)  
+    if (oldRegion.y < halfWorld && newRegion.y > halfWorld) {
+      // Character wrapped from front side to back side
       newWorldPos.z -= this.numRegions * regionSize_meters;
       shiftNeeded = true;
-      // Rotate character 180 degrees around Y-axis
+      rotationNeeded = true;
+      Logging.Log(`Character wrapped from front boundary (region ${oldRegion.y}) to back side (region ${newRegion.y}) - rotating 180°`);
+    } else if (oldRegion.y > halfWorld && newRegion.y < halfWorld) {
+      // Character wrapped from back side to front side
+      newWorldPos.z += this.numRegions * regionSize_meters;
+      shiftNeeded = true;
+      rotationNeeded = true;
+      Logging.Log(`Character wrapped from back boundary (region ${oldRegion.y}) to front side (region ${newRegion.y}) - rotating 180°`);
+    }
+
+    // Apply rotation for Z-direction crossings
+    if (rotationNeeded) {
       const currentRotation = (globalThis as any).playerController.internalCharacterEntity.GetRotation(false);
       const currentEuler = currentRotation.GetEulerAngles();
       const newRotation = Quaternion.FromEulerAngles(currentEuler.x, currentEuler.y + 180, currentEuler.z);
       (globalThis as any).playerController.internalCharacterEntity.SetRotation(newRotation, false);
-      Logging.Log(`Character crossed back boundary (region ${newRegion.y}), shifting to front side (region 0) and rotating 180°`);
     }
 
     // Apply the position shift if needed
