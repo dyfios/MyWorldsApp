@@ -1297,21 +1297,21 @@ export class TiledSurfaceRenderer extends WorldRendering {
     // Handle wrapping over left edge
     if (this.centerRegion.x < 1) {
       if (terrainIndex.x > 2) {
-        terrainPos.x -= this.numRegions * this.regionSize * this.regionScale;
+        terrainPos.z -= this.numRegions * this.regionSize * this.regionScale;
       }
     }
 
     // Handle wrapping over right edge
     if (this.centerRegion.x > this.numRegions - 2) {
       if (terrainIndex.x < this.numRegions - 3) {
-        terrainPos.x += this.numRegions * this.regionSize * this.regionScale;
+        terrainPos.z += this.numRegions * this.regionSize * this.regionScale;
       }
     }
 
     // Handle wrapping over top edge
     if (this.centerRegion.y < 1) {
       if (terrainIndex.y > 2) {
-        terrainPos.z -= this.numRegions * this.regionSize * this.regionScale;
+        terrainPos.x -= this.numRegions * this.regionSize * this.regionScale;
         terrainRot = Quaternion.FromEulerAngles(0, 180, 0);
       }
     }
@@ -1319,7 +1319,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
     // Handle wrapping over bottom edge
     if (this.centerRegion.y > this.numRegions - 2) {
       if (terrainIndex.y < this.numRegions - 3) {
-        terrainPos.z += this.numRegions * this.regionSize * this.regionScale;
+        terrainPos.x += this.numRegions * this.regionSize * this.regionScale;
         terrainRot = Quaternion.FromEulerAngles(0, 180, 0);
       }
     }
