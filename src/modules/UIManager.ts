@@ -124,6 +124,14 @@ export class UIManager {
       this.disableVRToolbar();
     };
 
+    (globalThis as any).toggleEditToolbar = () => {
+      this.toggleEditToolbar();
+    };
+
+    (globalThis as any).toggleVRToolbar = () => {
+      this.toggleVRToolbar();
+    };
+
     // Expose the UI manager instance and retry method globally for Time.SetTimeout callbacks
     (globalThis as any).uiManager = this;
   }
@@ -686,6 +694,34 @@ export class UIManager {
     Logging.Log('🎯 UIManager: messageEditToolbar invoked with: ' + msg);
   }
 
+  toggleEditToolbar(): void {
+    const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+    if (!mainToolbarId) {
+      Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found in storage');
+      return;
+    }
+    const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+    if (!mainToolbar) {
+      Logging.LogError('❌ UIManager: Main toolbar entity not found');
+      return;
+    }
+    mainToolbar.ExecuteJavaScript('window.popupMenuAPI.toggleMenu();', '');
+  }
+
+  toggleVRToolbar(): void {
+    const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-HTML-ID');
+    if (!vrToolbarHTMLId) {
+      Logging.LogError('❌ UIManager: VR-TOOLBAR-HTML-ID not found in storage');
+      return;
+    }
+    const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId) as HTMLEntity;
+    if (!vrToolbarHTMLEntity) {
+      Logging.LogError('❌ UIManager: VR toolbar entity not found');
+      return;
+    }
+    vrToolbarHTMLEntity.ExecuteJavaScript('window.popupMenuAPI.toggleMenu();', '');
+  }
+
   /**
    * Initialize edit toolbar
    */
@@ -945,15 +981,6 @@ export class UIManager {
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       Logging.LogError('❌ UIManager: Error in addRemoteConsoleMessage: ' + errorMessage);
-    }
-  }
-
-  /**
-   * Show/hide edit toolbar
-   */
-  toggleEditToolbar(visible: boolean): void {
-    if (this.editToolbar) {
-      this.editToolbar.style.display = visible ? 'block' : 'none';
     }
   }
 
