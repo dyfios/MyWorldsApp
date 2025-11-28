@@ -381,7 +381,7 @@ export class InputRouter {
    */
   processRightTriggerPress(): void {
     WorldStorage.SetItem("RIGHT-TRIGGER-STATE", "PRESSED");
-    (globalThis as any).processLeftTriggerPress();
+    (globalThis as any).processTriggerPress();
   }
 
   /**

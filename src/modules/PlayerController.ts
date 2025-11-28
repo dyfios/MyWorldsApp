@@ -301,6 +301,7 @@ export class PlayerController {
     (globalThis as any).playerController.internalCharacterEntity.PlaceCameraOn();
     Input.SetAvatarEntityByTag((globalThis as any).playerController.internalCharacterEntity.tag);
     Input.SetRigOffset(new Vector3(0, 1.5, -2.75));
+    this.internalCharacterEntity.SetRotation(Quaternion.identity, true, false);
     this.setMotionModePhysical();
     this.setCameraModeThirdPerson();
     this.inVR = false;
