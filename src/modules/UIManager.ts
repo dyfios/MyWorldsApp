@@ -1160,7 +1160,7 @@ export class UIManager {
       vrToolbarCanvas.SetInteractionState(InteractionState.Static);
       vrToolbarCanvas.MakeWorldCanvas();
       vrToolbarCanvas.SetVisibility(true);
-      vrToolbarCanvas.SetSize(new Vector2(1000, 1000));
+      vrToolbarCanvas.SetSize(new Vector2(1000, 1079));
       Input.AddLeftHandFollower(vrToolbarCanvas.GetParent() as BaseEntity);
       
       const vrToolbarHTMLId = UUID.NewUUID().ToString();
@@ -1173,7 +1173,7 @@ export class UIManager {
       WorldStorage.SetItem('VR-TOOLBAR-HTML-ID', vrToolbarHTMLId);
       
       HTMLEntity.Create(vrToolbarCanvas, new Vector2(0, 0),
-        new Vector2(1, 1), vrToolbarHTMLId, 'VRToolbar', 'handleVRToolbarMessage',
+        new Vector2(1, 1), vrToolbarHTMLId, 'VRToolbar', 'handleToolbarMessage',
         'finishVRToolbarCreation');
       
     } catch (error) {
