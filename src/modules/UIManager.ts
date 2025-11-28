@@ -280,6 +280,12 @@ export class UIManager {
                 
                 mainToolbar.ExecuteJavaScript(jsCommand, '');
 
+                const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-HTML-ID');
+                if (vrToolbarHTMLId) {
+                  const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId) as HTMLEntity;
+                  vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
+                }
+
                 ((globalThis as any).syncManager as SyncManager).globalSynchronizer?.SendGlobalMessage(message);
               }
             } else if (msg.startsWith('CHAT_INPUT.COMMAND(')) {
@@ -762,6 +768,14 @@ export class UIManager {
         }
       `;
       mainToolbar.ExecuteJavaScript(jsCommand, '');
+
+      const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-HTML-ID');
+      if (vrToolbarHTMLId) {
+        const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId) as HTMLEntity;
+        vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
+        Logging.Log('✅ UIManager: Button add command sent to VR toolbar');
+      }
+
       Logging.Log('✅ UIManager: Button add command sent to UI space');
   }
 
@@ -916,6 +930,13 @@ export class UIManager {
       const jsCommand = `window.chatMessageAPI.addMessage("${timestamp} [${sender}] ${content}");`;
       
       mainToolbar.ExecuteJavaScript(jsCommand, '');
+
+      const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-HTML-ID');
+      if (vrToolbarHTMLId) {
+        const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId) as HTMLEntity;
+        vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
+      }
+
       Logging.Log('✅ UIManager: Add remote console message command sent to UI space');
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
