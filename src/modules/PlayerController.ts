@@ -56,7 +56,7 @@ export class PlayerController {
         this.enterVRMode();
       }
     }
-    
+
     if (this.inVehicle && this.activeVehicle != null) {
       // Update player position to match vehicle position
       this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
@@ -281,6 +281,8 @@ export class PlayerController {
   enterVRMode(): void {
     Input.AddRigFollower((globalThis as any).playerController.internalCharacterEntity);
     this.inVR = true;
+    Input.gravityEnabled = false; // Rig handles gravity in VR
+    this.internalCharacterEntity.SetVisibility(false, false);
   }
 
   setMotionSpeed(speed: number): void {
@@ -300,6 +302,7 @@ export class PlayerController {
     Input.SetAvatarEntityByTag((globalThis as any).playerController.internalCharacterEntity.tag);
     Input.SetRigOffset(new Vector3(0, 1.5, -2.75));
     this.setMotionModePhysical();
+    this.setCameraModeThirdPerson();
     this.inVR = false;
   }
 
