@@ -508,7 +508,7 @@ export class EnvironmentModifier {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof TerrainEntity || hitInfo.entity instanceof MeshEntity) {
-                    (globalThis as any).CancelPlacing();
+                    (globalThis as any).cancelPlacing();
                 }
             }
         }
