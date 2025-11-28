@@ -877,6 +877,13 @@ export class UIManager {
           \`;
           
           mainToolbar.ExecuteJavaScript(jsCommand, '');
+
+          const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-CANVAS-ID');
+          if (vrToolbarHTMLId) {
+            const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId);
+            vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
+          }
+
           Logging.Log('UIManager: Sent UI Settings initialization command to UI space');
         } catch (error) {
           Logging.LogError('UIManager: Error in delayed UI Settings initialization: ' + (error instanceof Error ? error.message : String(error)));
@@ -1030,7 +1037,7 @@ export class UIManager {
         undefined, // No parent (will be positioned in world space)
         new Vector3(-0.3, 1.5, 0.2), // Position in world space (left hand area)
         Quaternion.FromEulerAngles(0, 45, 0), // Slight angle toward user
-        Vector3.one, // Scale of 1
+        new Vector3(0.01, 0.01, 0.01), // Scale of 0.01
         false, // Not using size mode
         vrToolbarCanvasId,
         'VRToolbar',
