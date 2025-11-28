@@ -36,6 +36,11 @@ export class EnvironmentModifier {
       this.processGripPress();
     };
 
+    // Define global callback for processing trigger press
+    (globalThis as any).processTriggerPress = () => {
+      this.processTriggerPress();
+    };
+
     // Define global callback for setting interaction mode
     (globalThis as any).setInteractionMode = (mode: string) => {
       this.setInteractionMode(mode);
