@@ -991,7 +991,7 @@ export class UIManager {
     if (UIManager.instance) {
       UIManager.instance.enableVRToolbar();
     } else {
-      console.log('⚠️ UIManager: Cannot enable VR toolbar - UIManager not initialized');
+      Logging.Log('⚠️ UIManager: Cannot enable VR toolbar - UIManager not initialized');
     }
   }
 
@@ -1002,24 +1002,24 @@ export class UIManager {
     if (UIManager.instance) {
       UIManager.instance.disableVRToolbar();
     } else {
-      console.log('⚠️ UIManager: Cannot disable VR toolbar - UIManager not initialized');
+      Logging.Log('⚠️ UIManager: Cannot disable VR toolbar - UIManager not initialized');
     }
   }
 
   // VR Toolbar methods
   public createVRToolbar(): void {
     if (this.vrToolbar) {
-      console.log('VR toolbar already exists');
+      Logging.Log('VR toolbar already exists');
       return;
     }
 
-    console.log('Creating VR toolbar...');
+    Logging.Log('Creating VR toolbar...');
     
     try {
       const vrToolbarCanvasId = UUID.NewUUID().ToString();
       
       if (!vrToolbarCanvasId) {
-        console.error('Failed to generate VR toolbar canvas ID');
+        Logging.LogError('Failed to generate VR toolbar canvas ID');
         return;
       }
       
@@ -1039,7 +1039,7 @@ export class UIManager {
       this.vrToolbar = vrToolbarCanvas; // Store reference for enable/disable
       
     } catch (error) {
-      console.error('Error creating VR toolbar:', error);
+      Logging.LogError('Error creating VR toolbar: ' + error);
     }
   }
 
@@ -1053,20 +1053,20 @@ export class UIManager {
     try {
       const vrToolbarCanvasId = WorldStorage.GetItem('VR-TOOLBAR-CANVAS-ID');
       if (!vrToolbarCanvasId) {
-        console.error('VR toolbar canvas ID not found');
+        Logging.LogError('VR toolbar canvas ID not found');
         return;
       }
       
       const vrToolbarCanvas = Entity.Get(vrToolbarCanvasId) as CanvasEntity;
       if (!vrToolbarCanvas) {
-        console.error('Failed to find VR toolbar canvas');
+        Logging.LogError('Failed to find VR toolbar canvas');
         return;
       }
       
       const vrToolbarHTMLId = UUID.NewUUID().ToString();
       
       if (!vrToolbarHTMLId) {
-        console.error('Failed to generate VR toolbar HTML ID');
+        Logging.LogError('Failed to generate VR toolbar HTML ID');
         return;
       }
       
@@ -1077,12 +1077,12 @@ export class UIManager {
       WorldStorage.SetItem('VR-TOOLBAR-HTML-ID', vrToolbarHTMLId);
       
     } catch (error) {
-      console.error('Error setting up VR toolbar HTML entity:', error);
+      Logging.LogError('Error setting up VR toolbar HTML entity: ' + error);
     }
   }
 
   private finishVRToolbarSetup(): void {
-    console.log('Finishing VR toolbar setup...');
+    Logging.Log('Finishing VR toolbar setup...');
     
     setTimeout(() => {
       (globalThis as any).finishVRToolbarCreation();
@@ -1090,32 +1090,32 @@ export class UIManager {
   }
 
   private finishVRToolbarCreation(): void {
-    console.log('Finalizing VR toolbar creation...');
+    Logging.Log('Finalizing VR toolbar creation...');
     
     try {
       const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-HTML-ID');
       if (!vrToolbarHTMLId) {
-        console.error('VR toolbar HTML ID not found');
+        Logging.LogError('VR toolbar HTML ID not found');
         return;
       }
       
       const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId) as HTMLEntity;
       if (!vrToolbarHTMLEntity) {
-        console.error('VR toolbar HTML entity not found');
+        Logging.LogError('VR toolbar HTML entity not found');
         return;
       }
       
       // Load the tools HTML page
       vrToolbarHTMLEntity.LoadFromURL('ui/build/index.html');
       
-      console.log('VR toolbar created and positioned successfully');
+      Logging.Log('VR toolbar created and positioned successfully');
     } catch (error) {
-      console.error('Error finalizing VR toolbar creation:', error);
+      Logging.LogError('Error finalizing VR toolbar creation: ' + error);
     }
   }
 
   private handleVRToolbarMessage(msg: string): void {
-    console.log('VR toolbar message:', msg);
+    Logging.Log('VR toolbar message: ' + msg);
     
     try {
       const data = JSON.parse(msg);
@@ -1123,22 +1123,22 @@ export class UIManager {
       switch (data.action) {
         case 'vrToggleFly':
           // Handle VR fly toggle
-          console.log('VR toggle fly mode');
+          Logging.Log('VR toggle fly mode');
           break;
         case 'vrTeleport':
           // Handle VR teleport
-          console.log('VR teleport action');
+          Logging.Log('VR teleport action');
           break;
         case 'vrObjectManipulation':
           // Handle VR object manipulation
-          console.log('VR object manipulation');
+          Logging.Log('VR object manipulation');
           break;
         default:
-          console.log('Unknown VR toolbar action:', data.action);
+          Logging.Log('Unknown VR toolbar action: ' + data.action);
           break;
       }
     } catch (error) {
-      console.error('Error parsing VR toolbar message:', error);
+      Logging.LogError('Error parsing VR toolbar message: ' + error);
     }
   }
 
@@ -1148,13 +1148,13 @@ export class UIManager {
     } else {
       this.vrToolbar.SetActive(true);
     }
-    console.log('VR toolbar enabled');
+    Logging.Log('VR toolbar enabled');
   }
 
   public disableVRToolbar(): void {
     if (this.vrToolbar) {
       this.vrToolbar.SetActive(false);
     }
-    console.log('VR toolbar disabled');
+    Logging.Log('VR toolbar disabled');
   }
 }
