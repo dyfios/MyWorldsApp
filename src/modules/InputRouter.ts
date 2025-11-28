@@ -286,7 +286,7 @@ export class InputRouter {
         // console and settings
     }
     else {
-      (globalThis as any).messageEditToolbar('CONTEXT_MENU_TOGGLE_MENU');
+      (globalThis as any).toggleVRToolbar();
     }
   }
 
