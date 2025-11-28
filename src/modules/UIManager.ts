@@ -108,6 +108,10 @@ export class UIManager {
       this.finishVRToolbarCreation();
     };
 
+    (globalThis as any).finishVRToolbarContainerSetup = () => {
+      this.finishVRToolbarContainerSetup();
+    };
+
     (globalThis as any).handleVRToolbarMessage = (msg: string) => {
       this.handleVRToolbarMessage(msg);
     };
@@ -1044,6 +1048,40 @@ export class UIManager {
     Logging.Log('Creating VR toolbar...');
     
     try {
+      var containerId = UUID.NewUUID().ToString();
+
+      if (!containerId) {
+        Logging.LogError('Failed to generate VR toolbar container ID');
+        return;
+      }
+
+      WorldStorage.SetItem("VR-TOOLBAR-CONTAINER-ID", containerId);
+
+      ContainerEntity.Create(null, Vector3.zero, Quaternion.identity,
+        new Vector3(0.1, 0.1, 0.1), false, null, containerId, "FinishVRToolbarContainerSetup");
+    } catch (error) {
+      Logging.LogError('Error creating VR toolbar container: ' + error);
+    }
+  }
+
+  public finishVRToolbarContainerSetup(): void {
+    Logging.Log('Finishing VR toolbar container setup...');
+
+    try {
+      const containerId = WorldStorage.GetItem('VR-TOOLBAR-CONTAINER-ID');
+      if (!containerId) {
+        Logging.LogError('VR toolbar container ID not found');
+        return;
+      }
+
+      const container = Entity.Get(containerId) as ContainerEntity;
+      if (!container) {
+        Logging.LogError('Failed to find VR toolbar container');
+        return;
+      }
+
+      container.SetVisibility(true);
+
       const vrToolbarCanvasId = UUID.NewUUID().ToString();
       
       if (!vrToolbarCanvasId) {
@@ -1055,14 +1093,14 @@ export class UIManager {
       
       // Create canvas entity for the VR toolbar
       const vrToolbarCanvas = CanvasEntity.Create(
-        undefined, // No parent (will be positioned in world space)
-        new Vector3(-0.3, 1.5, 0.2), // Position in world space (left hand area)
-        Quaternion.FromEulerAngles(0, 45, 0), // Slight angle toward user
-        new Vector3(0.01, 0.01, 0.01), // Scale of 0.01
-        false, // Not using size mode
+        container,
+        new Vector3(0, 1, 0.79),
+        new Quaternion(0.3827, 0, 0, 0.9239),
+        new Vector3(0.0038, 0.003, 0.004),
+        false,
         vrToolbarCanvasId,
         'VRToolbar',
-        'finishVRToolbarPanelSetup' // Global callback function
+        'finishVRToolbarPanelSetup'
       );
       
       this.vrToolbar = vrToolbarCanvas; // Store reference for enable/disable
@@ -1096,7 +1134,7 @@ export class UIManager {
       vrToolbarCanvas.MakeWorldCanvas();
       vrToolbarCanvas.SetVisibility(true);
       vrToolbarCanvas.SetSize(new Vector2(1000, 1000));
-      Input.AddLeftHandFollower(vrToolbarCanvas);
+      Input.AddLeftHandFollower(vrToolbarCanvas.GetParent() as BaseEntity);
       
       const vrToolbarHTMLId = UUID.NewUUID().ToString();
       
