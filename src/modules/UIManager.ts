@@ -1063,6 +1063,10 @@ export class UIManager {
         Logging.LogError('Failed to find VR toolbar canvas');
         return;
       }
+
+      vrToolbarCanvas.SetInteractionState(InteractionState.Static);
+      vrToolbarCanvas.MakeWorldCanvas();
+      vrToolbarCanvas.SetVisibility(true);
       
       const vrToolbarHTMLId = UUID.NewUUID().ToString();
       
