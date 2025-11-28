@@ -1105,6 +1105,8 @@ export class UIManager {
         Logging.LogError('VR toolbar HTML entity not found');
         return;
       }
+
+      vrToolbarHTMLEntity.SetInteractionState(InteractionState.Static);      
       
       // Load the tools HTML page
       vrToolbarHTMLEntity.LoadFromURL('ui/build/index.html');
@@ -1122,15 +1124,15 @@ export class UIManager {
       const data = JSON.parse(msg);
       
       switch (data.action) {
-        case 'vrToggleFly':
+        case 'ToggleFly':
           // Handle VR fly toggle
           Logging.Log('VR toggle fly mode');
           break;
-        case 'vrTeleport':
+        case 'Teleport':
           // Handle VR teleport
           Logging.Log('VR teleport action');
           break;
-        case 'vrObjectManipulation':
+        case 'ObjectManipulation':
           // Handle VR object manipulation
           Logging.Log('VR object manipulation');
           break;
