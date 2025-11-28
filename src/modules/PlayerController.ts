@@ -20,6 +20,7 @@ export class PlayerController {
   public internalCharacterEntity: CharacterEntity;
   public motionMode: MotionMode = MotionMode.Physical;
   public inVehicle: boolean = false;
+  public inVR: boolean = false;
   public activeVehicle: AutomobileEntity | AirplaneEntity | null = null;
   private maintenanceFunctionID: UUID | null = null;
   // private cameraMode: 'firstPerson' | 'thirdPerson' = 'thirdPerson'; // Reserved for future camera mode switching
@@ -46,6 +47,16 @@ export class PlayerController {
   }
 
   maintenance(): void {
+    if (this.inVR) {
+      if (!Input.IsVR) {
+        this.enterNonVRMode();
+      }
+    } else {
+      if (Input.IsVR) {
+        this.enterVRMode();
+      }
+    }
+    
     if (this.inVehicle && this.activeVehicle != null) {
       // Update player position to match vehicle position
       this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
@@ -269,6 +280,7 @@ export class PlayerController {
 
   enterVRMode(): void {
     Input.AddRigFollower((globalThis as any).playerController.internalCharacterEntity);
+    this.inVR = true;
   }
 
   setMotionSpeed(speed: number): void {
@@ -288,6 +300,7 @@ export class PlayerController {
     Input.SetAvatarEntityByTag((globalThis as any).playerController.internalCharacterEntity.tag);
     Input.SetRigOffset(new Vector3(0, 1.5, -2.75));
     this.setMotionModePhysical();
+    this.inVR = false;
   }
 
   jump(amount: number): void {
