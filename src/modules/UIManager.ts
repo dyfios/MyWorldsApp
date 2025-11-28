@@ -1070,12 +1070,12 @@ export class UIManager {
         Logging.LogError('Failed to generate VR toolbar HTML ID');
         return;
       }
+
+      WorldStorage.SetItem('VR-TOOLBAR-HTML-ID', vrToolbarHTMLId);
       
       HTMLEntity.Create(vrToolbarCanvas, new Vector2(0, 0),
         new Vector2(1, 1), vrToolbarHTMLId, 'VRToolbar', 'handleVRToolbarMessage',
         'finishVRToolbarCreation');
-        
-      WorldStorage.SetItem('VR-TOOLBAR-HTML-ID', vrToolbarHTMLId);
       
     } catch (error) {
       Logging.LogError('Error setting up VR toolbar HTML entity: ' + error);
