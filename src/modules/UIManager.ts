@@ -1058,7 +1058,7 @@ export class UIManager {
       WorldStorage.SetItem("VR-TOOLBAR-CONTAINER-ID", containerId);
 
       ContainerEntity.Create(null, Vector3.zero, Quaternion.identity,
-        new Vector3(0.1, 0.1, 0.1), false, null, containerId, "FinishVRToolbarContainerSetup");
+        new Vector3(0.1, 0.1, 0.1), false, null, containerId, "finishVRToolbarContainerSetup");
     } catch (error) {
       Logging.LogError('Error creating VR toolbar container: ' + error);
     }
