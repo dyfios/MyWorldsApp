@@ -1022,6 +1022,8 @@ export class UIManager {
         Logging.LogError('Failed to generate VR toolbar canvas ID');
         return;
       }
+
+      WorldStorage.SetItem('VR-TOOLBAR-CANVAS-ID', vrToolbarCanvasId);
       
       // Create canvas entity for the VR toolbar
       const vrToolbarCanvas = CanvasEntity.Create(
@@ -1035,7 +1037,6 @@ export class UIManager {
         'finishVRToolbarPanelSetup' // Global callback function
       );
       
-      WorldStorage.SetItem('VR-TOOLBAR-CANVAS-ID', vrToolbarCanvasId);
       this.vrToolbar = vrToolbarCanvas; // Store reference for enable/disable
       
     } catch (error) {
