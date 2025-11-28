@@ -685,6 +685,7 @@ export class UIManager {
     }
 
     this.createEditToolbar();
+    this.createVRToolbar();
     this.isInitialized = true;
     Logging.Log('Edit toolbar initialized');
   }
