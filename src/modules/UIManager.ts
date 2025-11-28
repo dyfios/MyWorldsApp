@@ -1095,6 +1095,8 @@ export class UIManager {
       vrToolbarCanvas.SetInteractionState(InteractionState.Static);
       vrToolbarCanvas.MakeWorldCanvas();
       vrToolbarCanvas.SetVisibility(true);
+      vrToolbarCanvas.SetSize(new Vector2(1000, 1000));
+      Input.AddLeftHandFollower(vrToolbarCanvas);
       
       const vrToolbarHTMLId = UUID.NewUUID().ToString();
       
