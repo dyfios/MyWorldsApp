@@ -30,6 +30,9 @@ export interface QueryParams {
   worldMetadata?: WorldMetadata | string;
   worldAddress?: string;
   
+  // Client type for authentication
+  client?: string; // "full", "lite"
+  
   // Avatar settings as JSON structure
   avatarSettings?: AvatarSettings;
   
@@ -52,7 +55,7 @@ export class ProcessQueryParams {
       
       // Common query parameters to check
       const commonParams = [
-        'worldType', 'worldMetadata', 'worldAddress', 'avatarSettings', 'userPosition'
+        'worldType', 'worldMetadata', 'worldAddress', 'client', 'avatarSettings', 'userPosition'
       ];
       Logging.Log('📊 Step 1b: Starting to check common parameters: ' + commonParams.join(', '));
       

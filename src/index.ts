@@ -18,6 +18,7 @@ export { REST } from './api/REST';
 // Modules
 export { ClientContext, Modules } from './modules/ClientContext';
 export { Identity } from './modules/Identity';
+export type { WebVerseClientType, AuthErrorCallback } from './modules/Identity';
 export { ConfigurationModule } from './modules/ConfigurationModule';
 export { EntityManager, EntityPlacement } from './modules/EntityManager';
 export { InputRouter } from './modules/InputRouter';

@@ -1,9 +1,26 @@
 /**
- * Identity Module for WebVerse HTML Panel Login
+ * Identity Module for WebVerse Authentication
  * 
- * This module handles user authentication using WebVerse HTML panels
- * to display login interfaces and process authentication responses.
+ * This module handles user authentication for both WebVerse variants:
+ * 
+ * 1. **WebVerse Full (Native)**: Uses an HTML entity to display an OAuth login page.
+ *    - Opens: https://search-dev.worldhub.me/login.html?client=full
+ *    - User authenticates via Google OAuth
+ *    - Login page calls postWorldMessage with auth token
+ *    - Token is extracted and stored for MQTT/API authentication
+ * 
+ * 2. **WebVerse Lite (WebGL)**: Uses session cookie-based token generation.
+ *    - Calls WorldHub ID API: POST /auth/generate-app-token
+ *    - Session cookie is automatically included
+ *    - Returns app token for MQTT/API authentication
  */
+
+/**
+ * WebVerse client types
+ * - 'full': Full WebVerse client (Native) - uses OAuth HTML panel
+ * - 'lite': WebVerse Lite (WebGL) - uses session cookie authentication
+ */
+export type WebVerseClientType = 'full' | 'lite';
 
 /**
  * Interface for login context data
@@ -27,18 +44,85 @@ interface MyWorldsTopLevelContext {
 }
 
 /**
- * Identity management class for WebVerse HTML panel authentication
+ * Interface for WebGL auth API response
+ */
+interface AuthTokenResponse {
+    success: boolean;
+    token?: string;
+    userId?: string;
+    username?: string;
+    error?: string;
+}
+
+/**
+ * Auth error callback type
+ */
+export type AuthErrorCallback = (error: string, canRetry: boolean) => void;
+
+/**
+ * Identity management class for WebVerse authentication
+ * Supports both Native (OAuth HTML panel) and WebGL (session cookie) flows
  */
 export class Identity {
   private readonly MW_TOP_LEVEL_CONTEXT_KEY = "MW_TOP_LEVEL_CONTEXT";
   private readonly LOGIN_CANVAS_ID_KEY = "LOGIN-CANVAS-ID";
   private readonly LOGIN_PANEL_ID_KEY = "LOGIN-PANEL-ID";
 
+  // API endpoints
+  private readonly AUTH_API_URL = 'https://id-dev.worldhub.me';
+  private readonly NATIVE_LOGIN_URL = 'https://search-dev.worldhub.me/login.html';
+
   private loginCallbackFunction?: () => void;
+  private authErrorCallback?: AuthErrorCallback;
+  private clientType: WebVerseClientType = 'lite';
 
   constructor() {
     this.loginCallbackFunction = undefined;
+    this.authErrorCallback = undefined;
+    this.detectClientTypeFromQueryParams();
     this.setupGlobalCallbacks();
+  }
+
+  /**
+   * Detect client type from URL query parameters
+   * Looks for ?client=full or ?client=lite
+   * Defaults to lite if not specified
+   */
+  private detectClientTypeFromQueryParams(): void {
+    try {
+      const clientParam = World.GetQueryParam('client');
+      if (clientParam) {
+        if (clientParam === 'full' || clientParam === 'lite') {
+          this.clientType = clientParam as WebVerseClientType;
+          Logging.Log(`🔐 Identity: Client type detected from query param: ${this.clientType}`);
+        } else {
+          Logging.LogWarning(`⚠️ Identity: Unknown client type '${clientParam}', defaulting to lite`);
+          this.clientType = 'lite';
+        }
+      } else {
+        Logging.Log('🔐 Identity: No client type in query params, defaulting to lite');
+        this.clientType = 'lite';
+      }
+    } catch (error: any) {
+      Logging.LogWarning('⚠️ Identity: Failed to read client query param: ' + (error.message || error));
+      this.clientType = 'lite';
+    }
+  }
+
+  /**
+   * Set the client type for authentication
+   * @param clientType The WebVerse client type ('webverse-native' or 'webverse-webgl')
+   */
+  public setClientType(clientType: WebVerseClientType): void {
+    this.clientType = clientType;
+    Logging.Log(`🔐 Identity: Client type set to ${clientType}`);
+  }
+
+  /**
+   * Get the current client type
+   */
+  public getClientType(): WebVerseClientType {
+    return this.clientType;
   }
 
   /**
@@ -55,9 +139,19 @@ export class Identity {
       this.finishLoginPanelSetup();
     };
 
-    // Define global callback for handling user login messages
+    // Define global callback for handling user login messages (Native OAuth flow)
     (globalThis as any).handleUserLoginMessage = (msg: string) => {
       this.handleUserLoginMessage(msg);
+    };
+
+    // Define global callback for WebGL auth token response
+    (globalThis as any).onAuthTokenResponse = (response: string) => {
+      this.onAuthTokenResponse(response);
+    };
+
+    // Define global callback for WebGL auth token error
+    (globalThis as any).onAuthTokenError = (error: string) => {
+      this.onAuthTokenError(error);
     };
   }
 
@@ -125,7 +219,10 @@ export class Identity {
       loginPanel.SetInteractionState(InteractionState.Static);
       
       if (typeof loginPanel.LoadFromURL === 'function') {
-        loginPanel.LoadFromURL('https://id.worldhub.me:35526/login');
+        // Load the Native OAuth login page with client parameter
+        const loginUrl = `${this.NATIVE_LOGIN_URL}?client=full`;
+        Logging.Log(`🔐 Identity: Loading Native OAuth login page: ${loginUrl}`);
+        loginPanel.LoadFromURL(loginUrl);
       }
       
       Logging.Log('✓ Login panel setup completed');
@@ -138,6 +235,23 @@ export class Identity {
   handleUserLoginMessage(msg: string): void {
     Logging.Log('🎯 Identity: handleUserLoginMessage invoked with: ' + msg);
     try {
+      // Try to parse as JSON first (new Native OAuth format)
+      // Format: {"type": "auth_complete", "token": "xxx"}
+      if (msg.startsWith('{')) {
+        try {
+          const authData = JSON.parse(msg);
+          if (authData.type === 'auth_complete' && authData.token) {
+            Logging.Log('🔐 Identity: Received Native OAuth auth_complete message');
+            this.handleNativeAuthComplete(authData.token, authData.userId, authData.username);
+            return;
+          }
+        } catch (parseError) {
+          // Not valid JSON, fall through to legacy format check
+          Logging.Log('🔐 Identity: Message is not JSON, checking legacy format');
+        }
+      }
+
+      // Legacy format: WHID.AUTH.COMPLETE(userID,userTag,token,expiration)
       if (!msg.startsWith('WHID.AUTH.COMPLETE')) {
         return;
       }
@@ -162,42 +276,9 @@ export class Identity {
         return;
       }
       
-      let mwTopLevelContext = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
-      if (!mwTopLevelContext) {
-        mwTopLevelContext = {};
-      }
-      
-      mwTopLevelContext.userID = msgParams[0];
-      mwTopLevelContext.userTag = msgParams[1];
-      mwTopLevelContext.token = msgParams[2];
-      mwTopLevelContext.tokenExpiration = msgParams[3];
-      
-      Context.DefineContext('MW_TOP_LEVEL_CONTEXT', mwTopLevelContext);
-      
-      const loginCanvasId = WorldStorage.GetItem('LOGIN-CANVAS-ID');
-      if (loginCanvasId) {
-        const loginCanvas = Entity.Get(loginCanvasId);
-        if (loginCanvas) {
-          loginCanvas.SetInteractionState(InteractionState.Hidden);
-        }
-      }
-      
-      Logging.Log('User login completed successfully');
-      Logging.Log('User ID: ' + mwTopLevelContext.userID);
-      Logging.Log('User Tag: ' + mwTopLevelContext.userTag);
-      
-      // Now that login is complete, trigger entity template loading and show main UI
-      Logging.Log('🔄 Showing main UI after login...');
-      (globalThis as any).enableEditToolbar();
-      if (this.loginCallbackFunction) {
-          this.loginCallbackFunction();
-      }
-      /*Logging.Log('🔄 Triggering entity templates request after successful login...');
-      if (typeof (globalThis as any).triggerEntityTemplatesAfterLogin === 'function') {
-        (globalThis as any).triggerEntityTemplatesAfterLogin();
-      } else {
-        Logging.LogError('triggerEntityTemplatesAfterLogin function not available');
-      }*/
+      // Store authentication data using the common handler
+      this.storeAuthenticationData(msgParams[0], msgParams[1], msgParams[2], msgParams[3]);
+      this.onLoginSuccess();
       
     } catch (error: any) {
       Logging.LogError('❌ Error in handleUserLoginMessage: ' + (error.message || error));
@@ -205,12 +286,183 @@ export class Identity {
   }
 
   /**
-   * Start the user login process by creating a login canvas
+   * Handle Native OAuth auth_complete message
+   */
+  private handleNativeAuthComplete(token: string, userId?: string, username?: string): void {
+    Logging.Log('🔐 Identity: Processing Native OAuth authentication');
+    
+    // For Native OAuth, we may not have all user details immediately
+    // The token is the primary authentication credential
+    const userID = userId || 'native-user';
+    const userTag = username || 'Native User';
+    
+    this.storeAuthenticationData(userID, userTag, token, '');
+    this.onLoginSuccess();
+  }
+
+  /**
+   * Handle WebGL session-based auth token response
+   */
+  private onAuthTokenResponse(response: string): void {
+    Logging.Log('🎯 Identity: onAuthTokenResponse callback invoked');
+    try {
+      const data: AuthTokenResponse = JSON.parse(response);
+      
+      if (data.success && data.token) {
+        Logging.Log('✅ Identity: WebGL auth successful for user: ' + (data.username || 'unknown'));
+        
+        const userID = data.userId || '';
+        const userTag = data.username || '';
+        const token = data.token;
+        
+        this.storeAuthenticationData(userID, userTag, token, '');
+        this.onLoginSuccess();
+      } else {
+        const errorMsg = data.error || 'No token received';
+        Logging.Log('ℹ️ Identity: User not authenticated - ' + errorMsg);
+        
+        // Notify user about auth status
+        this.notifyAuthError('Not logged in: ' + errorMsg, true);
+        
+        // Continue as guest - invoke callback anyway
+        if (this.loginCallbackFunction) {
+          this.loginCallbackFunction();
+        }
+      }
+    } catch (error: any) {
+      const errorMsg = 'Failed to parse auth response: ' + (error.message || error);
+      Logging.LogError('❌ Identity: ' + errorMsg);
+      
+      // Notify user about the error
+      this.notifyAuthError(errorMsg, true);
+      
+      // Continue as guest on error
+      if (this.loginCallbackFunction) {
+        this.loginCallbackFunction();
+      }
+    }
+  }
+
+  /**
+   * Handle WebGL auth token request error
+   */
+  private onAuthTokenError(error: string): void {
+    const errorMsg = 'Authentication request failed: ' + error;
+    Logging.LogWarning('⚠️ Identity: ' + errorMsg);
+    
+    // Notify user about the error
+    this.notifyAuthError(errorMsg, true);
+    
+    Logging.Log('ℹ️ Identity: Continuing as guest');
+    // Continue as guest on error
+    if (this.loginCallbackFunction) {
+      this.loginCallbackFunction();
+    }
+  }
+
+  /**
+   * Notify about authentication error
+   * @param message Error message to display
+   * @param canRetry Whether the user can retry authentication
+   */
+  private notifyAuthError(message: string, canRetry: boolean): void {
+    Logging.LogWarning('🔐 Identity: Auth notification - ' + message);
+    
+    // Call custom error callback if provided
+    if (this.authErrorCallback) {
+      this.authErrorCallback(message, canRetry);
+    }
+    
+    // Also send to UI via global message handler if available
+    if (typeof (globalThis as any).handleToolbarMessage === 'function') {
+      const notification = JSON.stringify({
+        type: 'auth_notification',
+        message: message,
+        canRetry: canRetry,
+        isError: true
+      });
+      (globalThis as any).handleToolbarMessage('AUTH.NOTIFICATION(' + notification + ')');
+    }
+  }
+
+  /**
+   * Set a custom error callback for auth failures
+   * @param callback Function to call when auth fails
+   */
+  public setAuthErrorCallback(callback: AuthErrorCallback): void {
+    this.authErrorCallback = callback;
+  }
+
+  /**
+   * Store authentication data in context
+   */
+  private storeAuthenticationData(userID: string, userTag: string, token: string, tokenExpiration: string): void {
+    let mwTopLevelContext = Context.GetContext('MW_TOP_LEVEL_CONTEXT') as MyWorldsTopLevelContext;
+    if (!mwTopLevelContext) {
+      mwTopLevelContext = {};
+    }
+    
+    mwTopLevelContext.userID = userID;
+    mwTopLevelContext.userTag = userTag;
+    mwTopLevelContext.token = token;
+    mwTopLevelContext.tokenExpiration = tokenExpiration;
+    
+    Context.DefineContext('MW_TOP_LEVEL_CONTEXT', mwTopLevelContext);
+    
+    Logging.Log('✅ Identity: Authentication data stored');
+    Logging.Log('   User ID: ' + userID);
+    Logging.Log('   User Tag: ' + userTag);
+  }
+
+  /**
+   * Common login success handler
+   */
+  private onLoginSuccess(): void {
+    // Hide login canvas if visible
+    const loginCanvasId = WorldStorage.GetItem('LOGIN-CANVAS-ID');
+    if (loginCanvasId) {
+      const loginCanvas = Entity.Get(loginCanvasId);
+      if (loginCanvas) {
+        loginCanvas.SetInteractionState(InteractionState.Hidden);
+      }
+    }
+    
+    Logging.Log('🎉 Identity: User login completed successfully');
+    
+    // Show main UI after login
+    Logging.Log('🔄 Identity: Showing main UI after login...');
+    (globalThis as any).enableEditToolbar();
+    
+    // Invoke callback if provided
+    if (this.loginCallbackFunction) {
+      this.loginCallbackFunction();
+    }
+  }
+
+  /**
+   * Start the user login process
+   * Uses different flows based on client type:
+   * - Native: Creates HTML panel with OAuth login page
+   * - WebGL: Attempts session-based token generation, falls back to guest mode
    */
   public startUserLogin(onLoggedIn: () => void): void {
-      Logging.Log("Starting User Login...");
+      Logging.Log(`🔐 Identity: Starting user login for client type: ${this.clientType}`);
 
       this.loginCallbackFunction = onLoggedIn;
+
+      if (this.clientType === 'full') {
+        this.startNativeOAuthLogin();
+      } else {
+        this.startWebGLSessionAuth();
+      }
+  }
+
+  /**
+   * Start Native OAuth login flow
+   * Creates an HTML panel that loads the OAuth login page
+   */
+  private startNativeOAuthLogin(): void {
+      Logging.Log("🔐 Identity: Starting Native OAuth login flow...");
 
       const loginContext: LoginContext = {};
       const loginCanvasId = UUID.NewUUID().ToString();
@@ -233,6 +485,53 @@ export class Identity {
           "LoginCanvas",
           "finishLoginCanvasSetup" // callback when creation is complete
       );
+  }
+
+  /**
+   * Start WebGL session-based authentication
+   * Attempts to get an app token using the shared session cookie
+   * Falls back to guest mode if not authenticated
+   */
+  private startWebGLSessionAuth(): void {
+      Logging.Log("🔐 Identity: Starting Lite session-based authentication...");
+
+      const tokenEndpoint = `${this.AUTH_API_URL}/auth/generate-app-token`;
+      const requestBody = JSON.stringify({ client: 'lite' });
+
+      Logging.Log(`🌐 Identity: POST ${tokenEndpoint}`);
+
+      // Use HTTPNetworking.Post for the token request
+      // Note: WebVerse should handle credentials automatically via session cookies
+      HTTPNetworking.Post(
+        tokenEndpoint,
+        requestBody,
+        'application/json',
+        'onAuthTokenResponse'
+      );
+  }
+
+  /**
+   * Initialize authentication on startup
+   * This is the main entry point for authentication that should be called
+   * when WebVerse starts up.
+   * 
+   * @param clientType The WebVerse client type
+   * @param onComplete Callback when auth initialization is complete (success or guest mode)
+   */
+  public initializeAuth(clientType: WebVerseClientType, onComplete: () => void): void {
+      Logging.Log(`🔐 Identity: Initializing authentication for ${clientType}...`);
+      
+      this.setClientType(clientType);
+      
+      // Check if already logged in
+      if (this.isLoggedIn()) {
+        Logging.Log('✅ Identity: Already authenticated');
+        onComplete();
+        return;
+      }
+
+      // Start the appropriate auth flow
+      this.startUserLogin(onComplete);
   }
 
   /**
