@@ -319,15 +319,32 @@ export class Identity {
   /**
    * Handle WebGL session-based auth token response
    */
-  private onAuthTokenResponse(response: string): void {
+  private onAuthTokenResponse(response: any): void {
     Logging.Log('🎯 Identity: onAuthTokenResponse callback invoked');
-    Logging.Log('🎯 Identity: Raw response: ' + response);
+    Logging.Log('🎯 Identity: Response type: ' + typeof response);
+    Logging.Log('🎯 Identity: Response keys: ' + (response ? Object.keys(response).join(', ') : 'null'));
+    
     try {
-      const data: AuthTokenResponse = JSON.parse(response);
-      Logging.Log('🎯 Identity: Parsed response: ' + JSON.stringify(data));
+      // Response may be an object with 'body' property or a raw string
+      let responseBody: string;
+      if (response && typeof response === 'object' && response.body) {
+        responseBody = response.body;
+        Logging.Log('🎯 Identity: Using response.body');
+      } else if (typeof response === 'string') {
+        responseBody = response;
+        Logging.Log('🎯 Identity: Using response as string');
+      } else {
+        responseBody = JSON.stringify(response);
+        Logging.Log('🎯 Identity: Stringified response object');
+      }
+      
+      Logging.Log('🎯 Identity: Response body: ' + responseBody);
+      
+      const data: AuthTokenResponse = JSON.parse(responseBody);
+      Logging.Log('🎯 Identity: Parsed data: ' + JSON.stringify(data));
       
       if (data.success && data.token) {
-        Logging.Log('✅ Identity: WebGL auth successful for user: ' + (data.username || 'unknown'));
+        Logging.Log('✅ Identity: Lite auth successful for user: ' + (data.username || 'unknown'));
         
         const userID = data.userId || '';
         const userTag = data.username || '';
@@ -350,7 +367,7 @@ export class Identity {
     } catch (error: any) {
       const errorMsg = 'Failed to parse auth response: ' + (error.message || error);
       Logging.LogError('❌ Identity: ' + errorMsg);
-      Logging.LogError('❌ Identity: Response was: ' + response);
+      Logging.LogError('❌ Identity: Raw response was: ' + JSON.stringify(response));
       
       // Notify user about the error
       this.notifyAuthError(errorMsg, true);
