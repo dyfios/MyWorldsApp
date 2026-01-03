@@ -164,6 +164,11 @@ export class Identity {
     (globalThis as any).onAuthTokenError = (error: string) => {
       this.onAuthTokenError(error);
     };
+
+    // Define global debug function to inspect auth state
+    (globalThis as any).debugAuthState = () => {
+      this.debugAuthState();
+    };
   }
 
   finishLoginCanvasSetup(): void {
@@ -316,8 +321,10 @@ export class Identity {
    */
   private onAuthTokenResponse(response: string): void {
     Logging.Log('🎯 Identity: onAuthTokenResponse callback invoked');
+    Logging.Log('🎯 Identity: Raw response: ' + response);
     try {
       const data: AuthTokenResponse = JSON.parse(response);
+      Logging.Log('🎯 Identity: Parsed response: ' + JSON.stringify(data));
       
       if (data.success && data.token) {
         Logging.Log('✅ Identity: WebGL auth successful for user: ' + (data.username || 'unknown'));
@@ -343,6 +350,7 @@ export class Identity {
     } catch (error: any) {
       const errorMsg = 'Failed to parse auth response: ' + (error.message || error);
       Logging.LogError('❌ Identity: ' + errorMsg);
+      Logging.LogError('❌ Identity: Response was: ' + response);
       
       // Notify user about the error
       this.notifyAuthError(errorMsg, true);
@@ -513,15 +521,26 @@ export class Identity {
       const requestBody = JSON.stringify({ client: 'lite' });
 
       Logging.Log(`🌐 Identity: POST ${tokenEndpoint}`);
+      Logging.Log(`🌐 Identity: Request body: ${requestBody}`);
+      Logging.Log(`🌐 Identity: Callback function name: onAuthTokenResponse`);
 
       // Use HTTPNetworking.Post for the token request
       // Note: WebVerse should handle credentials automatically via session cookies
-      HTTPNetworking.Post(
-        tokenEndpoint,
-        requestBody,
-        'application/json',
-        'onAuthTokenResponse'
-      );
+      try {
+        HTTPNetworking.Post(
+          tokenEndpoint,
+          requestBody,
+          'application/json',
+          'onAuthTokenResponse'
+        );
+        Logging.Log('🌐 Identity: HTTPNetworking.Post called successfully');
+      } catch (error: any) {
+        Logging.LogError('❌ Identity: HTTPNetworking.Post failed: ' + (error.message || error));
+        // Continue as guest on error
+        if (this.loginCallbackFunction) {
+          this.loginCallbackFunction();
+        }
+      }
   }
 
   /**
@@ -595,6 +614,27 @@ export class Identity {
       WorldStorage.SetItem(this.LOGIN_PANEL_ID_KEY, "");
       
       Logging.Log("User logged out");
+  }
+
+  /**
+   * Debug method to inspect current authentication state
+   * Call from console: globalThis.debugAuthState()
+   */
+  public debugAuthState(): void {
+      Logging.Log('=== 🔐 Identity Debug State ===');
+      Logging.Log('Client Type: ' + this.clientType);
+      Logging.Log('Is Logged In: ' + this.isLoggedIn());
+      
+      const user = this.getCurrentUser();
+      if (user) {
+        Logging.Log('User ID: ' + (user.userID || 'not set'));
+        Logging.Log('User Tag: ' + (user.userTag || 'not set'));
+        Logging.Log('Token: ' + (user.token ? user.token.substring(0, 20) + '...' : 'not set'));
+        Logging.Log('Token Expiration: ' + (user.tokenExpiration || 'not set'));
+      } else {
+        Logging.Log('No user context found');
+      }
+      Logging.Log('===============================');
   }
 
 
