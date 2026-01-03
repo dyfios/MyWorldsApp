@@ -321,10 +321,26 @@ export class Identity {
    */
   private onAuthTokenResponse(response: any): void {
     Logging.Log('🎯 Identity: onAuthTokenResponse callback invoked');
-    Logging.Log('🎯 Identity: Response type: ' + typeof response);
-    Logging.Log('🎯 Identity: Response keys: ' + (response ? Object.keys(response).join(', ') : 'null'));
     
     try {
+      Logging.Log('🎯 Identity: Response type: ' + typeof response);
+      
+      // Handle null/undefined response
+      if (response === null || response === undefined) {
+        Logging.Log('ℹ️ Identity: Empty response received (likely 401/not authenticated)');
+        this.handleGuestMode('No session - not authenticated');
+        return;
+      }
+      
+      Logging.Log('🎯 Identity: Response keys: ' + (typeof response === 'object' ? Object.keys(response).join(', ') : 'N/A'));
+      
+      // Check for HTTP error status
+      if (response.status && response.status >= 400) {
+        Logging.Log('ℹ️ Identity: HTTP error status: ' + response.status + ' ' + (response.statusText || ''));
+        this.handleGuestMode('HTTP ' + response.status + ' - not authenticated');
+        return;
+      }
+      
       // Response may be an object with 'body' property or a raw string
       let responseBody: string;
       if (response && typeof response === 'object' && response.body) {
@@ -336,6 +352,13 @@ export class Identity {
       } else {
         responseBody = JSON.stringify(response);
         Logging.Log('🎯 Identity: Stringified response object');
+      }
+      
+      // Handle empty body
+      if (!responseBody || responseBody === '{}' || responseBody === 'null') {
+        Logging.Log('ℹ️ Identity: Empty response body - not authenticated');
+        this.handleGuestMode('Empty response - not authenticated');
+        return;
       }
       
       Logging.Log('🎯 Identity: Response body: ' + responseBody);
@@ -355,27 +378,36 @@ export class Identity {
       } else {
         const errorMsg = data.error || 'No token received';
         Logging.Log('ℹ️ Identity: User not authenticated - ' + errorMsg);
-        
-        // Notify user about auth status
-        this.notifyAuthError('Not logged in: ' + errorMsg, true);
-        
-        // Continue as guest - invoke callback anyway
-        if (this.loginCallbackFunction) {
-          this.loginCallbackFunction();
-        }
+        this.handleGuestMode(errorMsg);
       }
     } catch (error: any) {
       const errorMsg = 'Failed to parse auth response: ' + (error.message || error);
       Logging.LogError('❌ Identity: ' + errorMsg);
-      Logging.LogError('❌ Identity: Raw response was: ' + JSON.stringify(response));
       
-      // Notify user about the error
-      this.notifyAuthError(errorMsg, true);
-      
-      // Continue as guest on error
-      if (this.loginCallbackFunction) {
-        this.loginCallbackFunction();
+      try {
+        Logging.LogError('❌ Identity: Raw response was: ' + JSON.stringify(response));
+      } catch (e) {
+        Logging.LogError('❌ Identity: Could not stringify response');
       }
+      
+      this.handleGuestMode(errorMsg);
+    }
+  }
+
+  /**
+   * Handle guest mode - continue without authentication
+   */
+  private handleGuestMode(reason: string): void {
+    Logging.Log('👤 Identity: Continuing as guest - ' + reason);
+    
+    // Notify about guest mode (not an error, just informational)
+    if (this.authErrorCallback) {
+      this.authErrorCallback('Guest mode: ' + reason, true);
+    }
+    
+    // Continue - invoke callback
+    if (this.loginCallbackFunction) {
+      this.loginCallbackFunction();
     }
   }
 
@@ -539,20 +571,28 @@ export class Identity {
 
       Logging.Log(`🌐 Identity: POST ${tokenEndpoint}`);
       Logging.Log(`🌐 Identity: Request body: ${requestBody}`);
-      Logging.Log(`🌐 Identity: Callback function name: onAuthTokenResponse`);
 
-      // Use HTTPNetworking.Post for the token request
-      // Note: WebVerse should handle credentials automatically via session cookies
+      // Use HTTPNetworking.Fetch with credentials to ensure cookies are sent
       try {
-        HTTPNetworking.Post(
+        const fetchOptions = {
+          method: 'POST',
+          body: requestBody,
+          credentials: 'include',  // Important: send cookies cross-origin
+          headers: ['Content-Type: application/json'],
+          mode: 'cors'
+        };
+        
+        Logging.Log('🌐 Identity: Using Fetch with credentials: include');
+        
+        HTTPNetworking.Fetch(
           tokenEndpoint,
-          requestBody,
-          'application/json',
+          fetchOptions as any,
           'onAuthTokenResponse'
         );
-        Logging.Log('🌐 Identity: HTTPNetworking.Post called successfully');
+        
+        Logging.Log('🌐 Identity: HTTPNetworking.Fetch called successfully');
       } catch (error: any) {
-        Logging.LogError('❌ Identity: HTTPNetworking.Post failed: ' + (error.message || error));
+        Logging.LogError('❌ Identity: HTTPNetworking.Fetch failed: ' + (error.message || error));
         // Continue as guest on error
         if (this.loginCallbackFunction) {
           this.loginCallbackFunction();
