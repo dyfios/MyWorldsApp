@@ -90,7 +90,16 @@ export class Identity {
    */
   private detectClientTypeFromQueryParams(): void {
     try {
+      // Check if World API is available
+      if (typeof World === 'undefined' || typeof World.GetQueryParam !== 'function') {
+        Logging.Log('🔐 Identity: World.GetQueryParam not available, defaulting to lite');
+        this.clientType = 'lite';
+        return;
+      }
+
       const clientParam = World.GetQueryParam('client');
+      Logging.Log('🔐 Identity: Raw client query param value: ' + (clientParam === null ? 'null' : `"${clientParam}"`));
+      
       if (clientParam) {
         if (clientParam === 'full' || clientParam === 'lite') {
           this.clientType = clientParam as WebVerseClientType;
@@ -107,6 +116,8 @@ export class Identity {
       Logging.LogWarning('⚠️ Identity: Failed to read client query param: ' + (error.message || error));
       this.clientType = 'lite';
     }
+    
+    Logging.Log(`🔐 Identity: Final client type set to: ${this.clientType}`);
   }
 
   /**
@@ -442,17 +453,20 @@ export class Identity {
   /**
    * Start the user login process
    * Uses different flows based on client type:
-   * - Native: Creates HTML panel with OAuth login page
-   * - WebGL: Attempts session-based token generation, falls back to guest mode
+   * - full: Creates HTML panel with OAuth login page
+   * - lite: Attempts session-based token generation, falls back to guest mode
    */
   public startUserLogin(onLoggedIn: () => void): void {
-      Logging.Log(`🔐 Identity: Starting user login for client type: ${this.clientType}`);
+      Logging.Log(`🔐 Identity: startUserLogin called`);
+      Logging.Log(`🔐 Identity: Current client type is: ${this.clientType}`);
 
       this.loginCallbackFunction = onLoggedIn;
 
       if (this.clientType === 'full') {
+        Logging.Log('🔐 Identity: Using FULL (Native OAuth) login flow');
         this.startNativeOAuthLogin();
       } else {
+        Logging.Log('🔐 Identity: Using LITE (session-based) login flow');
         this.startWebGLSessionAuth();
       }
   }
