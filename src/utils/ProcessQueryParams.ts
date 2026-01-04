@@ -66,7 +66,7 @@ export class ProcessQueryParams {
           Logging.Log('📊 Step 1c.' + (index + 1) + 'a: World.GetQueryParam returned: ' + (value || 'null'));
           
           if (value !== null) {
-            const decodedValue = value.replace(/%22/g, '"'); // Decode encoded quotes
+            const decodedValue = value.replace('%22', '"'); // Decode encoded quotes
             // Convert to appropriate type based on parameter name
             if (key === 'avatarSettings') {
               try {
