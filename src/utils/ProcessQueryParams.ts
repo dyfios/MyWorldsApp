@@ -66,24 +66,17 @@ export class ProcessQueryParams {
           Logging.Log('📊 Step 1c.' + (index + 1) + 'a: World.GetQueryParam returned: ' + (value || 'null'));
           
           if (value !== null) {
-            // Properly decode all URL-encoded characters
-            let decodedValue: string;
-            Logging.Log('🔧 NEW CODE v2 - Raw value before decode: ' + value);
-            try {
-              decodedValue = decodeURIComponent(value);
-              Logging.Log('🔧 NEW CODE v2 - After decodeURIComponent: ' + decodedValue);
-            } catch (decodeError) {
-              Logging.LogWarning('⚠️ decodeURIComponent failed, using manual decode');
-              // Fallback: manually replace common encoded characters
-              decodedValue = value
-                .replace(/%22/g, '"')
-                .replace(/%7B/g, '{')
-                .replace(/%7D/g, '}')
-                .replace(/%3A/g, ':')
-                .replace(/%2C/g, ',')
-                .replace(/%20/g, ' ');
-              Logging.Log('📊 Manually decoded value: ' + decodedValue);
-            }
+            // Manually decode URL-encoded characters (decodeURIComponent not available in JINT)
+            const decodedValue = value
+              .split('%22').join('"')
+              .split('%7B').join('{')
+              .split('%7D').join('}')
+              .split('%3A').join(':')
+              .split('%2C').join(',')
+              .split('%20').join(' ')
+              .split('%5B').join('[')
+              .split('%5D').join(']');
+            Logging.Log('🔧 Decoded value: ' + decodedValue);
             // Convert to appropriate type based on parameter name
             if (key === 'avatarSettings') {
               try {
