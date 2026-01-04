@@ -66,7 +66,23 @@ export class ProcessQueryParams {
           Logging.Log('📊 Step 1c.' + (index + 1) + 'a: World.GetQueryParam returned: ' + (value || 'null'));
           
           if (value !== null) {
-            const decodedValue = decodeURIComponent(value); // Properly decode all URL-encoded characters
+            // Properly decode all URL-encoded characters
+            let decodedValue: string;
+            try {
+              decodedValue = decodeURIComponent(value);
+              Logging.Log('📊 Decoded value: ' + decodedValue);
+            } catch (decodeError) {
+              Logging.LogWarning('⚠️ decodeURIComponent failed, using manual decode');
+              // Fallback: manually replace common encoded characters
+              decodedValue = value
+                .replace(/%22/g, '"')
+                .replace(/%7B/g, '{')
+                .replace(/%7D/g, '}')
+                .replace(/%3A/g, ':')
+                .replace(/%2C/g, ',')
+                .replace(/%20/g, ' ');
+              Logging.Log('📊 Manually decoded value: ' + decodedValue);
+            }
             // Convert to appropriate type based on parameter name
             if (key === 'avatarSettings') {
               try {
