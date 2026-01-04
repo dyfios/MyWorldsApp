@@ -68,9 +68,10 @@ export class ProcessQueryParams {
           if (value !== null) {
             // Properly decode all URL-encoded characters
             let decodedValue: string;
+            Logging.Log('🔧 NEW CODE v2 - Raw value before decode: ' + value);
             try {
               decodedValue = decodeURIComponent(value);
-              Logging.Log('📊 Decoded value: ' + decodedValue);
+              Logging.Log('🔧 NEW CODE v2 - After decodeURIComponent: ' + decodedValue);
             } catch (decodeError) {
               Logging.LogWarning('⚠️ decodeURIComponent failed, using manual decode');
               // Fallback: manually replace common encoded characters
