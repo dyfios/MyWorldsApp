@@ -2,7 +2,7 @@ export default {
   root: '.',
   build: {
     outDir: 'dist',
-    target: 'es2020',
+    target: 'es2017',  // ES2017 supports classes, async/await, but transpiles optional chaining
     lib: {
       entry: 'src/index.ts',
       name: 'MyWorldsClient',
