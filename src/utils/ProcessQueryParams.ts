@@ -75,7 +75,8 @@ export class ProcessQueryParams {
               .split('%2C').join(',')
               .split('%20').join(' ')
               .split('%5B').join('[')
-              .split('%5D').join(']');
+              .split('%5D').join(']')
+              .split('%2F').join('/');  // Forward slash
             Logging.Log('🔧 Decoded value: ' + decodedValue);
             // Convert to appropriate type based on parameter name
             if (key === 'avatarSettings') {
