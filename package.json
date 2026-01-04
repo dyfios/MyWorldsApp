@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && node scripts/fix-unicode.js",
     "dev": "vite",
     "clean": "rimraf dist",
     "prebuild": "npm run clean",

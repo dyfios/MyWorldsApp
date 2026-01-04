@@ -3,6 +3,7 @@ export default {
   esbuild: {
     target: 'es2016',  // Ensure esbuild transforms optional chaining, nullish coalescing, etc.
     legalComments: 'none',  // Remove comments that might contain modern syntax
+    charset: 'ascii',  // Convert non-ASCII characters to escape sequences
   },
   build: {
     outDir: 'dist',
