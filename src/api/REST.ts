@@ -9,6 +9,7 @@ export class REST {
   private baseUrl: string;
 
   constructor(baseUrl: string = '/api') {
+    Logging.Log('🔧 REST constructor called with baseUrl: ' + baseUrl);
     this.baseUrl = baseUrl;
   }
 
