@@ -278,7 +278,15 @@ export class ProcessQueryParams {
    * Get world address
    */
   getWorldAddress(): string | undefined {
-    return this.get('worldAddress') as string;
+    let address = this.get('worldAddress') as string;
+    if (address) {
+      // Handle protocol-relative URLs (//example.com) - add https:
+      if (address.startsWith('//')) {
+        address = 'https:' + address;
+        Logging.Log('🔧 Fixed protocol-relative URL: ' + address);
+      }
+    }
+    return address;
   }
 
   /**
