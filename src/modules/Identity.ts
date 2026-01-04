@@ -599,26 +599,18 @@ export class Identity {
 
       // Use HTTPNetworking.Fetch
       try {
-        Logging.Log('🌐 Identity: Using Fetch with full options object');
+        Logging.Log('🌐 Identity: Using Fetch with POST options (no headers field)');
         
-        // Build complete options object with all fields to avoid null errors
-        const fetchOptions = {
+        // Build options without headers field
+        const fetchOptions: any = {
           method: 'POST',
           body: requestBody,
-          cache: '',
-          credentials: 'include',
-          headers: [],  // Empty array instead of undefined
-          keepalive: false,
-          mode: 'cors',
-          priority: '',
-          redirect: '',
-          referrer: '',
-          referrerPolicy: ''
+          credentials: 'include'
         };
         
         HTTPNetworking.Fetch(
           tokenEndpoint,
-          fetchOptions as any,
+          fetchOptions,
           'onAuthTokenResponse'
         );
         
