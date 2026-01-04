@@ -30,6 +30,9 @@ export interface QueryParams {
   worldMetadata?: WorldMetadata | string;
   worldAddress?: string;
   
+  // Client type for authentication
+  client?: string; // "full", "lite"
+  
   // Avatar settings as JSON structure
   avatarSettings?: AvatarSettings;
   
@@ -52,7 +55,7 @@ export class ProcessQueryParams {
       
       // Common query parameters to check
       const commonParams = [
-        'worldType', 'worldMetadata', 'worldAddress', 'avatarSettings', 'userPosition'
+        'worldType', 'worldMetadata', 'worldAddress', 'client', 'avatarSettings', 'userPosition'
       ];
       Logging.Log('📊 Step 1b: Starting to check common parameters: ' + commonParams.join(', '));
       
@@ -63,37 +66,49 @@ export class ProcessQueryParams {
           Logging.Log('📊 Step 1c.' + (index + 1) + 'a: World.GetQueryParam returned: ' + (value || 'null'));
           
           if (value !== null) {
+            // Manually decode URL-encoded characters (decodeURIComponent not available in JINT)
+            const decodedValue = value
+              .split('%22').join('"')
+              .split('%7B').join('{')
+              .split('%7D').join('}')
+              .split('%3A').join(':')
+              .split('%2C').join(',')
+              .split('%20').join(' ')
+              .split('%5B').join('[')
+              .split('%5D').join(']')
+              .split('%2F').join('/');  // Forward slash
+            Logging.Log('🔧 Decoded value: ' + decodedValue);
             // Convert to appropriate type based on parameter name
             if (key === 'avatarSettings') {
               try {
-                this.params[key] = JSON.parse(value) as AvatarSettings;
+                this.params[key] = JSON.parse(decodedValue) as AvatarSettings;
                 Logging.Log('📊 Step 1c.' + (index + 1) + 'b: Avatar settings parsed: ' + JSON.stringify(this.params[key]));
               } catch (error) {
-                Logging.LogError('❌ Invalid JSON for avatarSettings: ' + value);
+                Logging.LogError('❌ Invalid JSON for avatarSettings: ' + decodedValue);
                 this.params[key] = {}; // Default to empty object
               }
             } else if (key === 'userPosition') {
               try {
-                this.params[key] = JSON.parse(value) as UserPosition;
+                this.params[key] = JSON.parse(decodedValue) as UserPosition;
                 Logging.Log('📊 Step 1c.' + (index + 1) + 'b: User position parsed: ' + JSON.stringify(this.params[key]));
               } catch (error) {
-                Logging.LogError('❌ Invalid JSON for userPosition: ' + value);
+                Logging.LogError('❌ Invalid JSON for userPosition: ' + decodedValue);
                 this.params[key] = { x: 0, y: 0, z: 0 }; // Default to origin
               }
             } else if (key === 'worldMetadata') {
               try {
-                this.params[key] = JSON.parse(value) as WorldMetadata;
+                this.params[key] = JSON.parse(decodedValue) as WorldMetadata;
                 Logging.Log('📊 Step 1c.' + (index + 1) + 'b: World metadata parsed: ' + JSON.stringify(this.params[key]));
               } catch (error) {
-                Logging.LogError('❌ Invalid JSON for worldMetadata: ' + value);
-                this.params[key] = value; // Keep as string if JSON parsing fails
+                Logging.LogError('❌ Invalid JSON for worldMetadata: ' + decodedValue);
+                this.params[key] = decodedValue; // Keep as string if JSON parsing fails
               }
-            } else if (value.toLowerCase() === 'true') {
+            } else if (decodedValue.toLowerCase() === 'true') {
               this.params[key] = true;
-            } else if (value.toLowerCase() === 'false') {
+            } else if (decodedValue.toLowerCase() === 'false') {
               this.params[key] = false;
             } else {
-              this.params[key] = value;
+              this.params[key] = decodedValue;
             }
             
             if (key !== 'avatarSettings' && key !== 'userPosition' && key !== 'worldMetadata') {
@@ -264,7 +279,21 @@ export class ProcessQueryParams {
    * Get world address
    */
   getWorldAddress(): string | undefined {
-    return this.get('worldAddress') as string;
+    let address = this.get('worldAddress') as string;
+    Logging.Log('🔧 getWorldAddress raw value: ' + address);
+    if (address) {
+      // Check for encoded slashes that weren't decoded
+      if (address.indexOf('%2F') >= 0) {
+        address = address.split('%2F').join('/');
+        Logging.Log('🔧 Decoded %2F in getWorldAddress: ' + address);
+      }
+      // Handle protocol-relative URLs (//example.com) - add https:
+      if (address.startsWith('//')) {
+        address = 'https:' + address;
+        Logging.Log('🔧 Fixed protocol-relative URL: ' + address);
+      }
+    }
+    return address;
   }
 
   /**

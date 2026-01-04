@@ -66,7 +66,7 @@ const ChatConsole = ({
       isInputActive: () => isInputActive,
       isHistoryVisible: () => isHistoryVisible
     };
-  }, [addMessage, messages, isInputActive, isHistoryVisible]);
+  }, [addMessage, messages, isInputActive, isHistoryVisible, handleOpenInput, handleCloseInput, handleOpenHistory, handleCloseHistory]);
 
   // Handle opening input
   const handleOpenInput = useCallback(() => {

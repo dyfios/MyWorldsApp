@@ -16,7 +16,6 @@ function App() {
   const [selectedButtonId, setSelectedButtonId] = useState(null);
   const [isChatActive, setIsChatActive] = useState(false);
 
-  // Initialize UI Settings hook
   const uiSettings = useUISettings();
 
   // API: Add a button
@@ -163,7 +162,7 @@ function App() {
     }
   }, [buttons]);
 
-  // Expose APIs globally for demonstration
+  // Expose APIs globally
   React.useEffect(() => {
     window.buttonDockAPI = {
       addButton,
@@ -231,6 +230,17 @@ function App() {
       addTool: uiSettings.addTool,
       removeTool: uiSettings.removeTool,
       clearTools: uiSettings.clearTools
+    };
+
+    // Expose UI Settings API globally
+    window.UISettingsAPI = {
+      isWorldTypeSupported: uiSettings.isWorldTypeSupported,
+      addTab: uiSettings.addUISettingsTab,
+      getSettings: uiSettings.getSettings,
+      updateSettings: uiSettings.updateSettings,
+      requestSettings: uiSettings.requestSettings,
+      onSettingsChange: uiSettings.onSettingsChange,
+      resetSettings: uiSettings.resetSettings
     };
 
     // Expose initializeUISettings directly to window for WebVerse access
@@ -309,7 +319,6 @@ function App() {
       }
     }, 1000);
 
-    // Initialize UI Settings
     setTimeout(() => {
       uiSettings.initialize();
     }, 500);

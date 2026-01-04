@@ -9,6 +9,7 @@ export class REST {
   private baseUrl: string;
 
   constructor(baseUrl: string = '/api') {
+    Logging.Log('🔧 REST constructor called with baseUrl: ' + baseUrl);
     this.baseUrl = baseUrl;
   }
 
@@ -120,11 +121,11 @@ export class REST {
   }
 
   sendGetEntityInstancesRequest(worldId: string, userId: string, userToken: string, onComplete: string): void {
-    this.get('/list-entity-instances', {
+    this.post(`/api/world/${worldId}/list-entity-instances`, {
       'world-id': worldId,
       'user-id': userId,
       'user-token': userToken
-    }, onComplete);
+    }, "application/json", onComplete);
   }
 
   sendGetRegionInfoRequest(regionIdx: Vector2Int, userId: string, userToken: string, onComplete: string): void {
@@ -137,11 +138,11 @@ export class REST {
   }
 
   sendGetEntityTemplatesRequest(worldId: string, userId: string, userToken: string, onComplete: string): void {
-    this.get('/list-entity-templates', {
+    this.post(`/api/world/${worldId}/list-entity-templates`, {
       'world-id': worldId,
       'user-id': userId,
       'user-token': userToken
-    }, onComplete);
+    }, "application/json", onComplete);
   }
 
   sendWorldManifestRequest(onComplete: string): void {
@@ -161,7 +162,7 @@ export class REST {
   }
 
   async sendAddEntityInstanceRequest(data: EntityPlacementData): Promise<EntityData> {
-    return this.post('/entity/instance', data, "application/json");
+    return this.post('/entity/instance', data, "application/json", "");
   }
 
   private get(endpoint: string, params: any, onComplete: string): void {
@@ -182,37 +183,13 @@ export class REST {
     HTTPNetworking.Fetch(url, onComplete);
   }
 
-  private async post(endpoint: string, data: any, dataType: string): Promise<any> {
+  private async post(endpoint: string, data: any,
+    dataType: string, onComplete: string): Promise<any> {
     const url = this.baseUrl + endpoint;
     
-    return new Promise((resolve, reject) => {
-      const requestId = this.generateRequestId();
-      const onComplete = `onHTTPPostComplete_${requestId}`;
-      const onError = `onHTTPPostError_${requestId}`;
+    Logging.Log('🌐 REST POST request to: ' + url + ' with data: ' + JSON.stringify(data));
 
-      HTTPNetworking.Post(url, data, dataType, onComplete);
-
-      // Store callbacks globally for HTTPNetworking to call
-      (globalThis as any)[onComplete] = (response: any) => {
-        try {
-          const data = JSON.parse(response.body);
-          // Clean up callbacks
-          delete (globalThis as any)[onComplete];
-          delete (globalThis as any)[onError];
-          resolve(data);
-        } catch (error) {
-          delete (globalThis as any)[onComplete];
-          delete (globalThis as any)[onError];
-          reject(new Error('Failed to parse response JSON'));
-        }
-      };
-
-      (globalThis as any)[onError] = (error: any) => {
-        delete (globalThis as any)[onComplete];
-        delete (globalThis as any)[onError];
-        reject(new Error(`HTTP error! ${error.message || 'Unknown error'}`));
-      };
-    });
+    HTTPNetworking.Post(url, JSON.stringify(data), dataType, onComplete);
   }
 
   private async delete(endpoint: string): Promise<void> {
