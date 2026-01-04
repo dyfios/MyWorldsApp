@@ -599,11 +599,26 @@ export class Identity {
 
       // Use HTTPNetworking.Fetch
       try {
-        Logging.Log('🌐 Identity: Using simple Fetch (GET, no options)');
+        Logging.Log('🌐 Identity: Using Fetch with full options object');
         
-        // Try simple GET fetch first to see if basic networking works
+        // Build complete options object with all fields to avoid null errors
+        const fetchOptions = {
+          method: 'POST',
+          body: requestBody,
+          cache: '',
+          credentials: 'include',
+          headers: [],  // Empty array instead of undefined
+          keepalive: false,
+          mode: 'cors',
+          priority: '',
+          redirect: '',
+          referrer: '',
+          referrerPolicy: ''
+        };
+        
         HTTPNetworking.Fetch(
           tokenEndpoint,
+          fetchOptions as any,
           'onAuthTokenResponse'
         );
         
