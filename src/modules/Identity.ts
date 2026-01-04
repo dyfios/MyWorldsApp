@@ -597,19 +597,13 @@ export class Identity {
       Logging.Log(`🌐 Identity: POST ${tokenEndpoint}`);
       Logging.Log(`🌐 Identity: Request body: ${requestBody}`);
 
-      // Use HTTPNetworking.Fetch with credentials to ensure cookies are sent
+      // Use HTTPNetworking.Fetch
       try {
-        // Simplest possible options
-        const fetchOptions = {
-          method: 'POST',
-          body: requestBody
-        };
+        Logging.Log('🌐 Identity: Using simple Fetch (GET, no options)');
         
-        Logging.Log('🌐 Identity: Using Fetch with minimal options');
-        
+        // Try simple GET fetch first to see if basic networking works
         HTTPNetworking.Fetch(
           tokenEndpoint,
-          fetchOptions as any,
           'onAuthTokenResponse'
         );
         
