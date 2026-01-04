@@ -15,11 +15,16 @@ export class MyWorld {
 
   constructor() {
     try {
-      Logging.Log('🚀 Step 0b1: Creating ClientContext...');
-      this.context = new ClientContext();
-      Logging.Log('🚀 Step 0b2: Creating ProcessQueryParams...');
+      // Parse query params FIRST to get worldAddress for REST API
+      Logging.Log('🚀 Step 0b1: Creating ProcessQueryParams...');
       this.queryParams = new ProcessQueryParams();
-      Logging.Log('🚀 Step 0b3: MyWorld constructor completed successfully');
+      Logging.Log('🚀 Step 0b2: Parsing query params to get worldAddress...');
+      this.queryParams.parse();
+      const worldAddress = this.queryParams.getWorldAddress();
+      Logging.Log('🚀 Step 0b3: worldAddress = ' + (worldAddress || 'undefined'));
+      Logging.Log('🚀 Step 0b4: Creating ClientContext with worldAddress...');
+      this.context = new ClientContext(worldAddress);
+      Logging.Log('🚀 Step 0b5: MyWorld constructor completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ Error in MyWorld constructor: ' + errorMessage);
@@ -34,10 +39,10 @@ export class MyWorld {
     try {
       Logging.Log('🌐 Launching MyWorld Client...');
 
-      // 1. Parse query parameters
-      Logging.Log('📊 Step 1: Starting query parameter parsing...');
-      const params = this.queryParams.parse();
-      Logging.Log('✓ Query parameters processed successfully');
+      // 1. Query parameters already parsed in constructor
+      Logging.Log('📊 Step 1: Query parameters already parsed in constructor');
+      const params = this.queryParams.getAll();
+      Logging.Log('✓ Query parameters available');
 
       // 2. Trigger login via Identity module (non-blocking)
       Logging.Log('🔐 Step 2: Starting user login process (async)...');

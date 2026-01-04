@@ -30,10 +30,10 @@ export class Modules {
   worldRendering: WorldRendererFactory;
   environmentModifier: EnvironmentModifier;
 
-  constructor() {
+  constructor(worldAddress?: string) {
     try {
-      Logging.Log('⚙️ Step 3a: Creating REST API module...');
-      this.api = new REST();
+      Logging.Log('⚙️ Step 3a: Creating REST API module with worldAddress: ' + (worldAddress || 'undefined'));
+      this.api = new REST(worldAddress);
       Logging.Log('⚙️ Step 3b: Creating Configuration module...');
       this.config = new ConfigurationModule();
       Logging.Log('⚙️ Step 3c: Creating Identity module...');
@@ -98,8 +98,8 @@ export class Modules {
 export class ClientContext {
   modules: Modules;
 
-  constructor() {
-    this.modules = new Modules();
+  constructor(worldAddress?: string) {
+    this.modules = new Modules(worldAddress);
   }
 
   /**
