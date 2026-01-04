@@ -597,24 +597,19 @@ export class Identity {
       Logging.Log(`🌐 Identity: POST ${tokenEndpoint}`);
       Logging.Log(`🌐 Identity: Request body: ${requestBody}`);
 
-      // Use HTTPNetworking.Fetch
+      // Use HTTPNetworking.Post - simpler API that avoids header issues
+      // Since we're on the same domain (worldhub.me), cookies should be sent automatically
       try {
-        Logging.Log('🌐 Identity: Using Fetch with POST options (no headers field)');
+        Logging.Log('🌐 Identity: Using HTTPNetworking.Post');
         
-        // Build options without headers field
-        const fetchOptions: any = {
-          method: 'POST',
-          body: requestBody,
-          credentials: 'include'
-        };
-        
-        HTTPNetworking.Fetch(
+        HTTPNetworking.Post(
           tokenEndpoint,
-          fetchOptions,
+          requestBody,
+          'application/json',
           'onAuthTokenResponse'
         );
         
-        Logging.Log('🌐 Identity: HTTPNetworking.Fetch called successfully');
+        Logging.Log('🌐 Identity: HTTPNetworking.Post called successfully');
       } catch (error: any) {
         Logging.LogError('❌ Identity: HTTPNetworking.Fetch failed: ' + (error.message || error));
         // Continue as guest on error
