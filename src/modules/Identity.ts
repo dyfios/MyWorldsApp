@@ -599,15 +599,13 @@ export class Identity {
 
       // Use HTTPNetworking.Fetch with credentials to ensure cookies are sent
       try {
-        // Try without headers first to debug
+        // Simplest possible options
         const fetchOptions = {
           method: 'POST',
-          body: requestBody,
-          credentials: 'include',
-          mode: 'cors'
+          body: requestBody
         };
         
-        Logging.Log('🌐 Identity: Using Fetch with credentials: include (no custom headers)');
+        Logging.Log('🌐 Identity: Using Fetch with minimal options');
         
         HTTPNetworking.Fetch(
           tokenEndpoint,
