@@ -73,11 +73,11 @@ export class REST {
   }
 
   sendGetEntityInstancesRequest(worldId: string, userId: string, userToken: string, onComplete: string): void {
-    this.post(`/api/world/${worldId}/list-entity-instances`, {
+    this.post(`/api/world/${worldId}/list-entity-instances`, JSON.stringify({
       'world-id': worldId,
       'user-id': userId,
       'user-token': userToken
-    }, "application/json", onComplete);
+    }), "application/json", onComplete);
   }
 
   sendGetRegionInfoRequest(regionIdx: Vector2Int, userId: string, userToken: string, onComplete: string): void {
@@ -90,11 +90,11 @@ export class REST {
   }
 
   sendGetEntityTemplatesRequest(worldId: string, userId: string, userToken: string, onComplete: string): void {
-    this.post(`/api/world/${worldId}/list-entity-templates`, {
+    this.post(`/api/world/${worldId}/list-entity-templates`, JSON.stringify({
       'world-id': worldId,
       'user-id': userId,
       'user-token': userToken
-    }, "application/json", onComplete);
+    }), "application/json", onComplete);
   }
 
   sendWorldManifestRequest(onComplete: string): void {
