@@ -1,8 +1,12 @@
 export default {
   root: '.',
+  esbuild: {
+    target: 'es2016',  // Ensure esbuild transforms optional chaining, nullish coalescing, etc.
+    legalComments: 'none',  // Remove comments that might contain modern syntax
+  },
   build: {
     outDir: 'dist',
-    target: 'es2017',  // ES2017 supports classes, async/await, but transpiles optional chaining
+    target: 'es2016',  // ES2016 - more conservative for JINT compatibility
     lib: {
       entry: 'src/index.ts',
       name: 'MyWorldsClient',
@@ -22,7 +26,7 @@ export default {
       ]
     },
     sourcemap: true,
-    minify: 'terser'
+    minify: 'esbuild'  // Use esbuild minification to strip comments
   },
   resolve: {
     alias: {
