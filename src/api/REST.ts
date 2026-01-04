@@ -141,7 +141,7 @@ export class REST {
     
     Logging.Log('🌐 REST POST request to: ' + url + ' with data: ' + JSON.stringify(data));
 
-    HTTPNetworking.Post(url, data, dataType, onComplete);
+    HTTPNetworking.Post(url, JSON.stringify(data), dataType, onComplete);
   }
 
   private async delete(endpoint: string): Promise<void> {
