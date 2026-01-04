@@ -1,13 +1,11 @@
+import babel from '@rollup/plugin-babel';
+
 export default {
   root: '.',
-  esbuild: {
-    target: 'es2016',  // Ensure esbuild transforms optional chaining, nullish coalescing, etc.
-    legalComments: 'none',  // Remove comments that might contain modern syntax
-    charset: 'ascii',  // Convert non-ASCII characters to escape sequences
-  },
+  esbuild: false,  // Disable esbuild completely - let Babel handle all JS transforms
   build: {
     outDir: 'dist',
-    target: 'es2016',  // ES2016 - more conservative for JINT compatibility
+    target: 'esnext',
     lib: {
       entry: 'src/index.ts',
       name: 'MyWorldsClient',
@@ -16,6 +14,27 @@ export default {
     },
     rollupOptions: {
       external: [],
+      plugins: [
+        babel({
+          babelHelpers: 'bundled',
+          presets: [
+            '@babel/preset-typescript',
+            ['@babel/preset-env', {
+              targets: {
+                ie: '11'
+              },
+              useBuiltIns: false,
+              modules: false
+            }]
+          ],
+          plugins: [
+            '@babel/plugin-transform-optional-chaining',
+            '@babel/plugin-transform-nullish-coalescing-operator'
+          ],
+          extensions: ['.js', '.ts'],
+          exclude: 'node_modules/**'
+        })
+      ],
       output: [
         {
           format: 'es'
@@ -27,7 +46,12 @@ export default {
       ]
     },
     sourcemap: true,
-    minify: 'esbuild'  // Use esbuild minification to strip comments
+    minify: 'terser',  // Use terser to strip comments
+    terserOptions: {
+      format: {
+        comments: false  // Remove all comments
+      }
+    }
   },
   resolve: {
     alias: {
