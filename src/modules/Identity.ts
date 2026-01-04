@@ -95,16 +95,6 @@ export class Identity {
     this.setupGlobalCallbacks();
   }
 
-  // Helper to get config (persisted on globalThis)
-  private getConfig() {
-    return getIdentityConfig();
-  }
-
-  // Helper to get/set state (persisted on globalThis)
-  private getState() {
-    return getIdentityState();
-  }
-
   /**
    * Detect client type from URL query parameters
    * Looks for ?client=full or ?client=lite
