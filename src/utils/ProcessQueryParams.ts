@@ -280,7 +280,13 @@ export class ProcessQueryParams {
    */
   getWorldAddress(): string | undefined {
     let address = this.get('worldAddress') as string;
+    Logging.Log('🔧 getWorldAddress raw value: ' + address);
     if (address) {
+      // Check for encoded slashes that weren't decoded
+      if (address.indexOf('%2F') >= 0) {
+        address = address.split('%2F').join('/');
+        Logging.Log('🔧 Decoded %2F in getWorldAddress: ' + address);
+      }
       // Handle protocol-relative URLs (//example.com) - add https:
       if (address.startsWith('//')) {
         address = 'https:' + address;
