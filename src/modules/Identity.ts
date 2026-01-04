@@ -80,6 +80,15 @@ const IDENTITY_GLOBALS = {
   clientType: 'lite' as WebVerseClientType
 };
 
+// Standalone helper functions that don't rely on 'this'
+function getIdentityConfig() {
+  return (globalThis as any).__identityConfig || IDENTITY_GLOBALS;
+}
+
+function getIdentityState() {
+  return (globalThis as any).__identityState;
+}
+
 export class Identity {
   constructor() {
     this.detectClientTypeFromQueryParams();
@@ -88,12 +97,12 @@ export class Identity {
 
   // Helper to get config (persisted on globalThis)
   private getConfig() {
-    return (globalThis as any).__identityConfig || IDENTITY_GLOBALS;
+    return getIdentityConfig();
   }
 
   // Helper to get/set state (persisted on globalThis)
   private getState() {
-    return (globalThis as any).__identityState;
+    return getIdentityState();
   }
 
   /**
@@ -102,7 +111,7 @@ export class Identity {
    * Defaults to lite if not specified
    */
   private detectClientTypeFromQueryParams(): void {
-    const state = this.getState();
+    const state = getIdentityState();
     try {
       // Check if World API is available
       if (typeof World === 'undefined' || typeof World.GetQueryParam !== 'function') {
@@ -139,7 +148,7 @@ export class Identity {
    * @param clientType The WebVerse client type ('webverse-native' or 'webverse-webgl')
    */
   public setClientType(clientType: WebVerseClientType): void {
-    this.getState().clientType = clientType;
+    getIdentityState().clientType = clientType;
     Logging.Log(`🔐 Identity: Client type set to ${clientType}`);
   }
 
@@ -147,7 +156,7 @@ export class Identity {
    * Get the current client type
    */
   public getClientType(): WebVerseClientType {
-    return this.getState().clientType;
+    return getIdentityState().clientType;
   }
 
   /**
@@ -250,7 +259,7 @@ export class Identity {
       
       if (typeof loginPanel.LoadFromURL === 'function') {
         // Load the Native OAuth login page with client parameter
-        const config = this.getConfig();
+        const config = getIdentityConfig();
         const loginUrl = `${config.NATIVE_LOGIN_URL}?client=full`;
         Logging.Log(`🔐 Identity: Loading Native OAuth login page: ${loginUrl}`);
         loginPanel.LoadFromURL(loginUrl);
@@ -413,7 +422,7 @@ export class Identity {
    * Handle guest mode - continue without authentication
    */
   private handleGuestMode(reason: string): void {
-    const state = this.getState();
+    const state = getIdentityState();
     Logging.Log('👤 Identity: Continuing as guest - ' + reason);
     
     // Notify about guest mode (not an error, just informational)
@@ -431,7 +440,7 @@ export class Identity {
    * Handle WebGL auth token request error
    */
   private onAuthTokenError(error: string): void {
-    const state = this.getState();
+    const state = getIdentityState();
     const errorMsg = 'Authentication request failed: ' + error;
     Logging.LogWarning('⚠️ Identity: ' + errorMsg);
     
@@ -451,7 +460,7 @@ export class Identity {
    * @param canRetry Whether the user can retry authentication
    */
   private notifyAuthError(message: string, canRetry: boolean): void {
-    const state = this.getState();
+    const state = getIdentityState();
     Logging.LogWarning('🔐 Identity: Auth notification - ' + message);
     
     // Call custom error callback if provided
@@ -476,7 +485,7 @@ export class Identity {
    * @param callback Function to call when auth fails
    */
   public setAuthErrorCallback(callback: AuthErrorCallback): void {
-    this.getState().authErrorCallback = callback;
+    getIdentityState().authErrorCallback = callback;
   }
 
   /**
@@ -504,7 +513,7 @@ export class Identity {
    * Common login success handler
    */
   private onLoginSuccess(): void {
-    const state = this.getState();
+    const state = getIdentityState();
     // Hide login canvas if visible
     const loginCanvasId = WorldStorage.GetItem('LOGIN-CANVAS-ID');
     if (loginCanvasId) {
@@ -533,7 +542,7 @@ export class Identity {
    * - lite: Attempts session-based token generation, falls back to guest mode
    */
   public startUserLogin(onLoggedIn: () => void): void {
-      const state = this.getState();
+      const state = getIdentityState();
       Logging.Log(`🔐 Identity: startUserLogin called`);
       Logging.Log(`🔐 Identity: Current client type is: ${state.clientType}`);
 
@@ -553,7 +562,7 @@ export class Identity {
    * Creates an HTML panel that loads the OAuth login page
    */
   private startNativeOAuthLogin(): void {
-      const config = this.getConfig();
+      const config = getIdentityConfig();
       Logging.Log("🔐 Identity: Starting Native OAuth login flow...");
 
       const loginContext: LoginContext = {};
@@ -585,8 +594,8 @@ export class Identity {
    * Falls back to guest mode if not authenticated
    */
   private startWebGLSessionAuth(): void {
-      const config = this.getConfig();
-      const state = this.getState();
+      const config = getIdentityConfig();
+      const state = getIdentityState();
       Logging.Log("🔐 Identity: Starting Lite session-based authentication...");
 
       Logging.Log(`🔐 Identity: AUTH_API_URL = ${config.AUTH_API_URL}`);
@@ -654,7 +663,7 @@ export class Identity {
    * @returns The user's authentication data or null if not logged in
    */
   public getCurrentUser(): MyWorldsTopLevelContext | null {
-      const config = this.getConfig();
+      const config = getIdentityConfig();
       return Context.GetContext(config.MW_TOP_LEVEL_CONTEXT_KEY) as MyWorldsTopLevelContext || null;
   }
 
@@ -689,7 +698,7 @@ export class Identity {
    * Log out the current user
    */
   public logout(): void {
-      const config = this.getConfig();
+      const config = getIdentityConfig();
       // Clear the context
       Context.DefineContext(config.MW_TOP_LEVEL_CONTEXT_KEY, {});
       
@@ -705,7 +714,7 @@ export class Identity {
    * Call from console: globalThis.debugAuthState()
    */
   public debugAuthState(): void {
-      const state = this.getState();
+      const state = getIdentityState();
       Logging.Log('=== 🔐 Identity Debug State ===');
       Logging.Log('Client Type: ' + state.clientType);
       Logging.Log('Is Logged In: ' + this.isLoggedIn());
