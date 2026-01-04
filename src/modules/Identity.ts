@@ -63,24 +63,37 @@ export type AuthErrorCallback = (error: string, canRetry: boolean) => void;
  * Identity management class for WebVerse authentication
  * Supports both Native (OAuth HTML panel) and WebGL (session cookie) flows
  */
+// Global storage keys for Identity module (WebVerse doesn't preserve 'this' context)
+const IDENTITY_GLOBALS = {
+  MW_TOP_LEVEL_CONTEXT_KEY: 'MW_TOP_LEVEL_CONTEXT',
+  LOGIN_CANVAS_ID_KEY: 'LOGIN-CANVAS-ID',
+  LOGIN_PANEL_ID_KEY: 'LOGIN-PANEL-ID',
+  AUTH_API_URL: 'https://id-dev.worldhub.me',
+  NATIVE_LOGIN_URL: 'https://search-dev.worldhub.me/login.html'
+};
+
+// Store on globalThis for persistence across WebVerse calls
+(globalThis as any).__identityConfig = IDENTITY_GLOBALS;
+(globalThis as any).__identityState = (globalThis as any).__identityState || {
+  loginCallbackFunction: undefined as (() => void) | undefined,
+  authErrorCallback: undefined as AuthErrorCallback | undefined,
+  clientType: 'lite' as WebVerseClientType
+};
+
 export class Identity {
-  private readonly MW_TOP_LEVEL_CONTEXT_KEY = "MW_TOP_LEVEL_CONTEXT";
-  private readonly LOGIN_CANVAS_ID_KEY = "LOGIN-CANVAS-ID";
-  private readonly LOGIN_PANEL_ID_KEY = "LOGIN-PANEL-ID";
-
-  // API endpoints
-  private readonly AUTH_API_URL = 'https://id-dev.worldhub.me';
-  private readonly NATIVE_LOGIN_URL = 'https://search-dev.worldhub.me/login.html';
-
-  private loginCallbackFunction?: () => void;
-  private authErrorCallback?: AuthErrorCallback;
-  private clientType: WebVerseClientType = 'lite';
-
   constructor() {
-    this.loginCallbackFunction = undefined;
-    this.authErrorCallback = undefined;
     this.detectClientTypeFromQueryParams();
     this.setupGlobalCallbacks();
+  }
+
+  // Helper to get config (persisted on globalThis)
+  private getConfig() {
+    return (globalThis as any).__identityConfig || IDENTITY_GLOBALS;
+  }
+
+  // Helper to get/set state (persisted on globalThis)
+  private getState() {
+    return (globalThis as any).__identityState;
   }
 
   /**
@@ -89,11 +102,12 @@ export class Identity {
    * Defaults to lite if not specified
    */
   private detectClientTypeFromQueryParams(): void {
+    const state = this.getState();
     try {
       // Check if World API is available
       if (typeof World === 'undefined' || typeof World.GetQueryParam !== 'function') {
         Logging.Log('🔐 Identity: World.GetQueryParam not available, defaulting to lite');
-        this.clientType = 'lite';
+        state.clientType = 'lite';
         return;
       }
 
@@ -102,22 +116,22 @@ export class Identity {
       
       if (clientParam) {
         if (clientParam === 'full' || clientParam === 'lite') {
-          this.clientType = clientParam as WebVerseClientType;
-          Logging.Log(`🔐 Identity: Client type detected from query param: ${this.clientType}`);
+          state.clientType = clientParam as WebVerseClientType;
+          Logging.Log(`🔐 Identity: Client type detected from query param: ${state.clientType}`);
         } else {
           Logging.LogWarning(`⚠️ Identity: Unknown client type '${clientParam}', defaulting to lite`);
-          this.clientType = 'lite';
+          state.clientType = 'lite';
         }
       } else {
         Logging.Log('🔐 Identity: No client type in query params, defaulting to lite');
-        this.clientType = 'lite';
+        state.clientType = 'lite';
       }
     } catch (error: any) {
       Logging.LogWarning('⚠️ Identity: Failed to read client query param: ' + (error.message || error));
-      this.clientType = 'lite';
+      state.clientType = 'lite';
     }
     
-    Logging.Log(`🔐 Identity: Final client type set to: ${this.clientType}`);
+    Logging.Log(`🔐 Identity: Final client type set to: ${state.clientType}`);
   }
 
   /**
@@ -125,7 +139,7 @@ export class Identity {
    * @param clientType The WebVerse client type ('webverse-native' or 'webverse-webgl')
    */
   public setClientType(clientType: WebVerseClientType): void {
-    this.clientType = clientType;
+    this.getState().clientType = clientType;
     Logging.Log(`🔐 Identity: Client type set to ${clientType}`);
   }
 
@@ -133,7 +147,7 @@ export class Identity {
    * Get the current client type
    */
   public getClientType(): WebVerseClientType {
-    return this.clientType;
+    return this.getState().clientType;
   }
 
   /**
@@ -236,7 +250,8 @@ export class Identity {
       
       if (typeof loginPanel.LoadFromURL === 'function') {
         // Load the Native OAuth login page with client parameter
-        const loginUrl = `${this.NATIVE_LOGIN_URL}?client=full`;
+        const config = this.getConfig();
+        const loginUrl = `${config.NATIVE_LOGIN_URL}?client=full`;
         Logging.Log(`🔐 Identity: Loading Native OAuth login page: ${loginUrl}`);
         loginPanel.LoadFromURL(loginUrl);
       }
@@ -398,16 +413,17 @@ export class Identity {
    * Handle guest mode - continue without authentication
    */
   private handleGuestMode(reason: string): void {
+    const state = this.getState();
     Logging.Log('👤 Identity: Continuing as guest - ' + reason);
     
     // Notify about guest mode (not an error, just informational)
-    if (this.authErrorCallback) {
-      this.authErrorCallback('Guest mode: ' + reason, true);
+    if (state.authErrorCallback) {
+      state.authErrorCallback('Guest mode: ' + reason, true);
     }
     
     // Continue - invoke callback
-    if (this.loginCallbackFunction) {
-      this.loginCallbackFunction();
+    if (state.loginCallbackFunction) {
+      state.loginCallbackFunction();
     }
   }
 
@@ -415,6 +431,7 @@ export class Identity {
    * Handle WebGL auth token request error
    */
   private onAuthTokenError(error: string): void {
+    const state = this.getState();
     const errorMsg = 'Authentication request failed: ' + error;
     Logging.LogWarning('⚠️ Identity: ' + errorMsg);
     
@@ -423,8 +440,8 @@ export class Identity {
     
     Logging.Log('ℹ️ Identity: Continuing as guest');
     // Continue as guest on error
-    if (this.loginCallbackFunction) {
-      this.loginCallbackFunction();
+    if (state.loginCallbackFunction) {
+      state.loginCallbackFunction();
     }
   }
 
@@ -434,11 +451,12 @@ export class Identity {
    * @param canRetry Whether the user can retry authentication
    */
   private notifyAuthError(message: string, canRetry: boolean): void {
+    const state = this.getState();
     Logging.LogWarning('🔐 Identity: Auth notification - ' + message);
     
     // Call custom error callback if provided
-    if (this.authErrorCallback) {
-      this.authErrorCallback(message, canRetry);
+    if (state.authErrorCallback) {
+      state.authErrorCallback(message, canRetry);
     }
     
     // Also send to UI via global message handler if available
@@ -458,7 +476,7 @@ export class Identity {
    * @param callback Function to call when auth fails
    */
   public setAuthErrorCallback(callback: AuthErrorCallback): void {
-    this.authErrorCallback = callback;
+    this.getState().authErrorCallback = callback;
   }
 
   /**
@@ -486,6 +504,7 @@ export class Identity {
    * Common login success handler
    */
   private onLoginSuccess(): void {
+    const state = this.getState();
     // Hide login canvas if visible
     const loginCanvasId = WorldStorage.GetItem('LOGIN-CANVAS-ID');
     if (loginCanvasId) {
@@ -502,8 +521,8 @@ export class Identity {
     (globalThis as any).enableEditToolbar();
     
     // Invoke callback if provided
-    if (this.loginCallbackFunction) {
-      this.loginCallbackFunction();
+    if (state.loginCallbackFunction) {
+      state.loginCallbackFunction();
     }
   }
 
@@ -514,12 +533,13 @@ export class Identity {
    * - lite: Attempts session-based token generation, falls back to guest mode
    */
   public startUserLogin(onLoggedIn: () => void): void {
+      const state = this.getState();
       Logging.Log(`🔐 Identity: startUserLogin called`);
-      Logging.Log(`🔐 Identity: Current client type is: ${this.clientType}`);
+      Logging.Log(`🔐 Identity: Current client type is: ${state.clientType}`);
 
-      this.loginCallbackFunction = onLoggedIn;
+      state.loginCallbackFunction = onLoggedIn;
 
-      if (this.clientType === 'full') {
+      if (state.clientType === 'full') {
         Logging.Log('🔐 Identity: Using FULL (Native OAuth) login flow');
         this.startNativeOAuthLogin();
       } else {
@@ -533,6 +553,7 @@ export class Identity {
    * Creates an HTML panel that loads the OAuth login page
    */
   private startNativeOAuthLogin(): void {
+      const config = this.getConfig();
       Logging.Log("🔐 Identity: Starting Native OAuth login flow...");
 
       const loginContext: LoginContext = {};
@@ -543,7 +564,7 @@ export class Identity {
           return;
       }
 
-      WorldStorage.SetItem(this.LOGIN_CANVAS_ID_KEY, loginCanvasId);
+      WorldStorage.SetItem(config.LOGIN_CANVAS_ID_KEY, loginCanvasId);
 
       // Create login canvas
       loginContext.loginCanvas = CanvasEntity.Create(
@@ -564,9 +585,13 @@ export class Identity {
    * Falls back to guest mode if not authenticated
    */
   private startWebGLSessionAuth(): void {
+      const config = this.getConfig();
+      const state = this.getState();
       Logging.Log("🔐 Identity: Starting Lite session-based authentication...");
 
-      const tokenEndpoint = `${this.AUTH_API_URL}/auth/generate-app-token`;
+      Logging.Log(`🔐 Identity: AUTH_API_URL = ${config.AUTH_API_URL}`);
+
+      const tokenEndpoint = `${config.AUTH_API_URL}/auth/generate-app-token`;
       const requestBody = JSON.stringify({ client: 'lite' });
 
       Logging.Log(`🌐 Identity: POST ${tokenEndpoint}`);
@@ -594,8 +619,8 @@ export class Identity {
       } catch (error: any) {
         Logging.LogError('❌ Identity: HTTPNetworking.Fetch failed: ' + (error.message || error));
         // Continue as guest on error
-        if (this.loginCallbackFunction) {
-          this.loginCallbackFunction();
+        if (state.loginCallbackFunction) {
+          state.loginCallbackFunction();
         }
       }
   }
@@ -629,7 +654,8 @@ export class Identity {
    * @returns The user's authentication data or null if not logged in
    */
   public getCurrentUser(): MyWorldsTopLevelContext | null {
-      return Context.GetContext(this.MW_TOP_LEVEL_CONTEXT_KEY) as MyWorldsTopLevelContext || null;
+      const config = this.getConfig();
+      return Context.GetContext(config.MW_TOP_LEVEL_CONTEXT_KEY) as MyWorldsTopLevelContext || null;
   }
 
   /**
@@ -663,12 +689,13 @@ export class Identity {
    * Log out the current user
    */
   public logout(): void {
+      const config = this.getConfig();
       // Clear the context
-      Context.DefineContext(this.MW_TOP_LEVEL_CONTEXT_KEY, {});
+      Context.DefineContext(config.MW_TOP_LEVEL_CONTEXT_KEY, {});
       
       // Clear storage items
-      WorldStorage.SetItem(this.LOGIN_CANVAS_ID_KEY, "");
-      WorldStorage.SetItem(this.LOGIN_PANEL_ID_KEY, "");
+      WorldStorage.SetItem(config.LOGIN_CANVAS_ID_KEY, "");
+      WorldStorage.SetItem(config.LOGIN_PANEL_ID_KEY, "");
       
       Logging.Log("User logged out");
   }
@@ -678,8 +705,9 @@ export class Identity {
    * Call from console: globalThis.debugAuthState()
    */
   public debugAuthState(): void {
+      const state = this.getState();
       Logging.Log('=== 🔐 Identity Debug State ===');
-      Logging.Log('Client Type: ' + this.clientType);
+      Logging.Log('Client Type: ' + state.clientType);
       Logging.Log('Is Logged In: ' + this.isLoggedIn());
       
       const user = this.getCurrentUser();
