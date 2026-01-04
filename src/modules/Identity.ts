@@ -599,11 +599,12 @@ export class Identity {
 
       // Use HTTPNetworking.Fetch with credentials to ensure cookies are sent
       try {
+        // Headers format: alternating name/value pairs as separate strings
         const fetchOptions = {
           method: 'POST',
           body: requestBody,
-          credentials: 'include',  // Important: send cookies cross-origin
-          headers: ['Content-Type: application/json'],
+          credentials: 'include',
+          headers: ['Content-Type', 'application/json'],  // Name and value as separate array elements
           mode: 'cors'
         };
         
