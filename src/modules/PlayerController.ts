@@ -19,6 +19,10 @@ export enum MotionMode {
 export class PlayerController {
   public internalCharacterEntity: CharacterEntity;
   public motionMode: MotionMode = MotionMode.Physical;
+  public inVehicle: boolean = false;
+  public inVR: boolean = false;
+  public activeVehicle: AutomobileEntity | AirplaneEntity | null = null;
+  private maintenanceFunctionID: UUID | null = null;
   // private cameraMode: 'firstPerson' | 'thirdPerson' = 'thirdPerson'; // Reserved for future camera mode switching
 
   constructor(initialPosition: Vector3, characterName: string, characterId: string | undefined) {
@@ -27,12 +31,47 @@ export class PlayerController {
     this.internalCharacterEntity = CharacterEntity.Create(null, initialPosition,
       Quaternion.identity, Vector3.one, false, characterName, characterId,
       "onPlayerCharacterEntityLoaded");
+    this.startMaintenance();
   }
 
-   /**
+  startMaintenance(): void {
+    Logging.Log('Starting PlayerController maintenance interval function');
+    this.maintenanceFunctionID = Time.SetInterval("playercontroller_maintenance();", 0.03);
+  }
+
+  stopMaintenance(): void {
+    if (this.maintenanceFunctionID != null) {
+      Time.StopInterval(this.maintenanceFunctionID.ToString());
+      this.maintenanceFunctionID = null;
+    }
+  }
+
+  maintenance(): void {
+    if (this.inVR) {
+      if (!Input.IsVR) {
+        this.enterNonVRMode();
+      }
+    } else {
+      if (Input.IsVR) {
+        this.enterVRMode();
+      }
+    }
+
+    if (this.inVehicle && this.activeVehicle != null) {
+      // Update player position to match vehicle position
+      this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
+    }
+  }
+
+  /**
    * Setup global callback functions for WebVerse entity loading
-   */
+  */
   private setupGlobalCallbacks(): void {
+    // Define global callback for player controller maintenance
+    (globalThis as any).playercontroller_maintenance = () => {
+      this.maintenance();
+    };
+    
     // Define global callback for character entity loading completion
     (globalThis as any).onPlayerCharacterEntityLoaded = (entity: any) => {
       this.onPlayerCharacterEntityLoaded(entity);
@@ -56,6 +95,21 @@ export class PlayerController {
     // Define global callback for starting vehicle engine
     (globalThis as any).startVehicleEngine = () => {
       this.startVehicleEngine();
+    };
+
+    // Define global callback for stopping vehicle engine
+    (globalThis as any).stopVehicleEngine = () => {
+      this.stopVehicleEngine();
+    };
+
+    // Define global callback for pitching vehicle up
+    (globalThis as any).pitchVehicleUp = () => {
+      this.pitchVehicleUp();
+    };
+
+    // Define global callback for pitching vehicle down
+    (globalThis as any).pitchVehicleDown = () => {
+      this.pitchVehicleDown();
     };
 
     // Define global callback for moving vehicle forward
@@ -88,6 +142,36 @@ export class PlayerController {
       this.stopSteeringVehicle();
     };
 
+    // Define global callback for rolling vehicle left
+    (globalThis as any).rollVehicleLeft = () => {
+      this.rollVehicleLeft();
+    };
+
+    // Define global callback for rolling vehicle right
+    (globalThis as any).rollVehicleRight = () => {
+      this.rollVehicleRight();
+    };
+
+    // Define global callback for throttling vehicle up
+    (globalThis as any).throttleVehicleUp = () => {
+      this.throttleVehicleUp();
+    };
+
+    // Define global callback for throttling vehicle down
+    (globalThis as any).throttleVehicleDown = () => {
+      this.throttleVehicleDown();
+    };
+
+    // Define global callback for yawing vehicle left
+    (globalThis as any).yawVehicleLeft = () => {
+      this.yawVehicleLeft();
+    };
+
+    // Define global callback for yawing vehicle right
+    (globalThis as any).yawVehicleRight = () => {
+      this.yawVehicleRight();
+    };
+
     // Define global callback for pausing for UI
     (globalThis as any).pauseForUI = () => {
       this.pauseForUI();
@@ -96,6 +180,41 @@ export class PlayerController {
     // Define global callback for unpausing for UI
     (globalThis as any).unpauseForUI = () => {
       this.unpauseForUI();
+    };
+
+    // Define global callback for setting camera mode to first person
+    (globalThis as any).setCameraModeFirstPerson = () => {
+      this.setCameraModeFirstPerson();
+    };
+
+    // Define global callback for setting camera mode to third person
+    (globalThis as any).setCameraModeThirdPerson = () => {
+      this.setCameraModeThirdPerson();
+    };
+
+    // Define global callback for setting motion speed
+    (globalThis as any).setMotionSpeed = (speed: number) => {
+      this.setMotionSpeed(speed);
+    };
+
+    // Define global callback for setting look speed
+    (globalThis as any).setLookSpeed = (sensitivity: number) => {
+      this.setLookSpeed(sensitivity);
+    };
+
+    // Define global callback for setting flying mode
+    (globalThis as any).setFlyingMode = (enabled: boolean) => {
+      this.setFlyingMode(enabled);
+    };
+
+    // Define global callback for setting character position
+    (globalThis as any).setCharacterPosition = (newPosition: Vector3) => {
+      this.setCharacterPosition(newPosition);
+    };
+
+    // Define global callback for setting motion mode to free
+    (globalThis as any).setMotionModeFree = () => {
+      this.setMotionModeFree();
     };
   }
 
@@ -149,15 +268,43 @@ export class PlayerController {
     (globalThis as any).playerController.motionMode = MotionMode.Physical;
   }
 
+  setCameraModeFirstPerson(): void {
+    Camera.SetPosition(new Vector3(0, 0.79, 0), true);
+    this.internalCharacterEntity.SetVisibility(false, false);
+  }
+
+  setCameraModeThirdPerson(): void {
+    Camera.SetPosition(new Vector3(0, 1.5, -2.75), true);
+    this.internalCharacterEntity.SetVisibility(true, false);
+  }
+
   enterVRMode(): void {
     Input.AddRigFollower((globalThis as any).playerController.internalCharacterEntity);
+    this.inVR = true;
+    Input.gravityEnabled = false; // Rig handles gravity in VR
+    this.internalCharacterEntity.SetVisibility(false, false);
+  }
+
+  setMotionSpeed(speed: number): void {
+    Input.movementSpeed = speed * 4;
+  }
+
+  setLookSpeed(sensitivity: number): void {
+    Input.lookSpeed = sensitivity / 10;
+  }
+
+  setFlyingMode(enabled: boolean): void {
+    Input.gravityEnabled = !enabled;
   }
 
   enterNonVRMode(): void {
     (globalThis as any).playerController.internalCharacterEntity.PlaceCameraOn();
     Input.SetAvatarEntityByTag((globalThis as any).playerController.internalCharacterEntity.tag);
     Input.SetRigOffset(new Vector3(0, 1.5, -2.75));
+    this.internalCharacterEntity.SetRotation(Quaternion.identity, true, false);
     this.setMotionModePhysical();
+    this.setCameraModeThirdPerson();
+    this.inVR = false;
   }
 
   jump(amount: number): void {
@@ -165,56 +312,48 @@ export class PlayerController {
   }
 
   placePlayerInAutomobileEntity(automobileEntity: AutomobileEntity): void {
-    var context = Context.GetContext("THIRD_PERSON_CHARACTER_CONTROLLER");
-
-    context.characterEntity.SetParent(automobileEntity);
-    context.characterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
-    context.characterEntity.SetRotation(Quaternion.identity, true, false);
-    context.characterEntity.SetInteractionState(InteractionState.Static);
-    context.characterEntity.fixHeight = false;
-    context.characterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, false, null));
-    context.characterEntity.SetVisibility(false, false);
-    context.inVehicle = true;
-    (globalThis as any).playerController.activeVehicle = automobileEntity;
-
-    Context.DefineContext("THIRD_PERSON_CHARACTER_CONTROLLER", context);
+    this.internalCharacterEntity.SetParent(automobileEntity);
+    this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
+    this.internalCharacterEntity.SetRotation(Quaternion.identity, true, false);
+    this.internalCharacterEntity.SetInteractionState(InteractionState.Static);
+    this.internalCharacterEntity.fixHeight = false;
+    this.internalCharacterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, false, null));
+    this.internalCharacterEntity.SetVisibility(false, false);
+    this.inVehicle = true;
+    this.activeVehicle = automobileEntity;
+    Input.wasdMotionEnabled = false;
   }
 
   placePlayerInAirplaneEntity(airplaneEntity: AirplaneEntity): void {
-    var context = Context.GetContext("THIRD_PERSON_CHARACTER_CONTROLLER");
-
-    context.characterEntity.SetParent(airplaneEntity);
-    context.characterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
-    context.characterEntity.SetRotation(Quaternion.identity, true, false);
-    context.characterEntity.SetInteractionState(InteractionState.Static);
-    context.characterEntity.fixHeight = false;
-    context.characterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, false, null));
-    context.characterEntity.SetVisibility(false, false);
-    context.inVehicle = true;
-    (globalThis as any).playerController.activeVehicle = airplaneEntity;
-
-    Context.DefineContext("THIRD_PERSON_CHARACTER_CONTROLLER", context);
-  };
+    this.internalCharacterEntity.SetParent(airplaneEntity);
+    this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
+    this.internalCharacterEntity.SetRotation(Quaternion.identity, true, false);
+    this.internalCharacterEntity.SetInteractionState(InteractionState.Static);
+    this.internalCharacterEntity.fixHeight = false;
+    this.internalCharacterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, false, null));
+    this.internalCharacterEntity.SetVisibility(false, false);
+    this.inVehicle = true;
+    this.activeVehicle = airplaneEntity;
+    Input.wasdMotionEnabled = false;
+  }
 
   exitVehicle(): void {
-    var context = Context.GetContext("THIRD_PERSON_CHARACTER_CONTROLLER");
-    if (context.inVehicle && (globalThis as any).playerController.activeVehicle != null) {
-        var vehiclePosition = (globalThis as any).playerController.activeVehicle.GetPosition(false);
-        context.characterEntity.SetParent(null);
-        context.characterEntity.SetPosition(new Vector3(
+    if (this.inVehicle && this.activeVehicle != null) {
+        var vehiclePosition = this.activeVehicle.GetPosition(false);
+        this.internalCharacterEntity.SetParent(null);
+        this.internalCharacterEntity.SetPosition(new Vector3(
             vehiclePosition.x, vehiclePosition.y + 2, vehiclePosition.z), true, false);
-        context.characterEntity.SetRotation(Quaternion.identity, true, false);
-        context.characterEntity.SetInteractionState(InteractionState.Physical);
-        context.characterEntity.fixHeight = true;
-        context.characterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, true, null));
-        context.characterEntity.SetVisibility(true, false);
-        context.inVehicle = false;
-        (globalThis as any).playerController.activeVehicle = null;
-        Context.DefineContext("THIRD_PERSON_CHARACTER_CONTROLLER", context);
+        this.internalCharacterEntity.SetRotation(Quaternion.identity, true, false);
+        this.internalCharacterEntity.SetInteractionState(InteractionState.Physical);
+        this.internalCharacterEntity.fixHeight = true;
+        this.internalCharacterEntity.SetPhysicalProperties(new EntityPhysicalProperties(null, null, null, true, null));
+        this.internalCharacterEntity.SetVisibility(true, false);
+        this.inVehicle = false;
+        this.activeVehicle = null;
         // Place the camera on the character.
-        context.characterEntity.PlaceCameraOn();
-        Context.DefineContext("THIRD_PERSON_CHARACTER_CONTROLLER", context);
+        this.internalCharacterEntity.PlaceCameraOn();
         Camera.SetPosition(new Vector3(0, 1.5, -2.75), true);
+        Input.wasdMotionEnabled = true;
     }
     else {
         Logging.LogError("[ThirdPersonCharacter] Cannot exit vehicle, not in a vehicle.");
@@ -222,47 +361,137 @@ export class PlayerController {
   }
 
   startVehicleEngine(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.engineStartStop = true;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.engineStartStop = true;
+      } else if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.StartEngine();
+      }
+    }
+  }
+
+  stopVehicleEngine(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+
+      } else if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.StopEngine();
+      }
+    }
+  }
+
+  pitchVehicleUp(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.pitch += 1;
+      }
+    }
+  }
+
+  pitchVehicleDown(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.pitch -= 1;
+      }
     }
   }
 
   moveVehicleForward(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.brake = 0;
-        (globalThis as any).playerController.activeVehicle.throttle = 1;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.brake = 0;
+        this.activeVehicle.throttle = 1;
+      }
     }
   }
 
   moveVehicleBackward(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.brake = 1;
-        (globalThis as any).playerController.activeVehicle.throttle = 0;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.brake = 1;
+        this.activeVehicle.throttle = 0;
+      }
     }
   }
 
   stopMovingVehicle(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.brake = 0;
-        (globalThis as any).playerController.activeVehicle.throttle = 0;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.brake = 0;
+        this.activeVehicle.throttle = 0;
+      }
     }
   }
 
   steerVehicleLeft(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.steer = -1;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.steer = -1;
+      }
     }
   }
 
   steerVehicleRight(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.steer = 1;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.steer = 1;
+      }
     }
   }
 
   stopSteeringVehicle(): void {
-    if ((globalThis as any).playerController.activeVehicle != null) {
-        (globalThis as any).playerController.activeVehicle.steer = 0;
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AutomobileEntity) {
+        this.activeVehicle.steer = 0;
+      }
+    }
+  }
+
+  rollVehicleLeft(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.roll -= 1;
+      }
+    }
+  }
+
+  rollVehicleRight(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.roll += 1;
+      }
+    }
+  }
+
+  throttleVehicleUp(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.throttle += 1;
+      }
+    }
+  }
+
+  throttleVehicleDown(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.throttle -= 1;
+      }
+    }
+  }
+
+  yawVehicleLeft(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.yaw -= 1;
+      }
+    }
+  }
+
+  yawVehicleRight(): void {
+    if (this.activeVehicle != null) {
+      if (this.activeVehicle instanceof AirplaneEntity) {
+        this.activeVehicle.yaw += 1;
+      }
     }
   }
 

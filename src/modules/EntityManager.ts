@@ -4,9 +4,12 @@
 
 import { Position, Rotation } from '../types/config';
 import { EntityData } from '../types/entity';
+import { ScriptEngine } from './ScriptEngine';
+import { VOSSynchronizer } from './VOSSynchronizer';
+import { TiledSurfaceRenderer } from './WorldRendererFactory';
 
 export class EntityPlacement {
-  public placingEntity: any = null;
+  public placingEntity: BaseEntity | null = null;
   public entityType: string | null = null;
   public modelOffset: Vector3 | null = null;
   public placingOffset: Vector3 | null = null;
@@ -18,8 +21,15 @@ export class EntityPlacement {
   public instanceID: string | null = null;
   public orientationIndex: number = 0;
   public scripts: { [key: string]: any } = {};
+  public wheels: any = null;
+  public mass: number = 0;
   public modelRotation: Quaternion | null = null;
   public modelPath: string | null = null;
+  public entityBeingPlaced: boolean = false;
+  public gridEnabled: boolean = true;
+  public gridSize: number = 1;
+  public rotationIncrement: number = 90;
+  public keepSpawning: boolean = true;
 
   constructor() {
     // Store this instance in WebVerse Context
@@ -38,11 +48,12 @@ export class EntityPlacement {
    */
   private setupGlobalCallbacks(): void {
     // Define global callback for character entity loading completion
-    (globalThis as any).startPlacing = (entityToPlace: MeshEntity, entityType: string,
+    (globalThis as any).startPlacing = (entityToPlace: BaseEntity, entityType: string,
       entityIndex: number, variantIndex: number, entityID: string, variantID: string,
-      modelPath: string, instanceId: string) => {
+      modelPath: string, wheels: any, mass: number,
+      scripts: { [key: string]: any }, instanceId: string) => {
       this.startPlacing(entityToPlace, entityType, entityIndex, variantIndex, entityID,
-        variantID, modelPath, instanceId);
+        variantID, modelPath, wheels, mass, scripts, instanceId);
     };
 
     (globalThis as any).stopPlacing = () => {
@@ -64,20 +75,14 @@ export class EntityPlacement {
     (globalThis as any).placementUpdate = () => {
       this.placementUpdate();
     };
+
+    (globalThis as any).rotateOneStep = (axis: string, negative: boolean) => {
+      this.rotateOneStep(axis, negative);
+    };
   }
 
   private setupPlacementUpdateInterval(): void {
-    // Use WebVerse Time.SetInterval for placement updates
-    Time.SetInterval(`
-      var entityPlacementComponent = Context.GetContext("ENTITY_PLACEMENT_COMPONENT");
-      if (entityPlacementComponent == null) {
-        Logging.LogError("[EntityPlacer] Unable to get entity placement component.");
-      } else {
-        globalThis.placementUpdate();
-        globalThis.entityPlacementComponent.placementLocked = false;
-        Context.DefineContext("ENTITY_PLACEMENT_COMPONENT", entityPlacementComponent);
-      }`,
-      0.1);
+    Time.SetInterval(`globalThis.placementUpdate();`, 0.1);
   }
 
   placementUpdate(): void {
@@ -97,41 +102,31 @@ export class EntityPlacement {
       return;
     }
 
-    let gridEnabled = false;
-    if (WorldStorage.GetItem("ENTITY-GRID-ENABLED") === "TRUE") {
-      gridEnabled = true;
-    }
-
-    let gridSize = parseFloat(WorldStorage.GetItem("ENTITY-GRID-SIZE") || "1");
-    if (gridSize <= 0) {
-      gridSize = 1;
-    }
-
     const hitInfo = Input.GetPointerRaycast(Vector3.forward);
     if (hitInfo != null && hitInfo.entity != null) {
       if (hitInfo.entity !== this.placingEntity) {
         let gridSnappedPosition: Vector3;
         
-        if (gridEnabled) {
+        if (this.gridEnabled) {
           gridSnappedPosition = new Vector3(
-            Math.round(hitInfo.hitPoint.x / gridSize) * gridSize + this.modelOffset.x,
-            Math.round(hitInfo.hitPoint.y / gridSize) * gridSize + this.modelOffset.y,
-            Math.round(hitInfo.hitPoint.z / gridSize) * gridSize + this.modelOffset.z
+            Math.round(hitInfo.hitPoint.x / this.gridSize) * this.gridSize + this.modelOffset.x,
+            Math.round(hitInfo.hitPoint.y / this.gridSize) * this.gridSize + this.modelOffset.y,
+            Math.round(hitInfo.hitPoint.z / this.gridSize) * this.gridSize + this.modelOffset.z
           );
 
           // Adjust position based on surface normal
           if (hitInfo.hitPointNormal.x >= normalPlacementThreshold) {
-            gridSnappedPosition.x += gridSize;
+            gridSnappedPosition.x += this.gridSize;
           } else if (hitInfo.hitPointNormal.x <= -normalPlacementThreshold) {
-            gridSnappedPosition.x -= gridSize;
+            gridSnappedPosition.x -= this.gridSize;
           }
           
           if (hitInfo.hitPointNormal.y <= -normalPlacementThreshold) {
-            gridSnappedPosition.y -= gridSize;
+            gridSnappedPosition.y -= this.gridSize;
           }
           
           if (hitInfo.hitPointNormal.z <= -normalPlacementThreshold) {
-            gridSnappedPosition.z -= gridSize;
+            gridSnappedPosition.z -= this.gridSize;
           }
         } else {
           gridSnappedPosition = new Vector3(
@@ -147,30 +142,26 @@ export class EntityPlacement {
   }
 
   startPlacing(
-    entityToPlace: any,
+    entityToPlace: BaseEntity,
     entityType: string,
     entityIndex: number,
     variantIndex: number,
     entityID: string,
     variantID: string,
     modelPath: string,
+    wheels: any,
+    mass: number,
+    scripts: { [key: string]: any },
     instanceID: string,
     offset?: Vector3,
     rotation?: Quaternion,
-    scripts?: { [key: string]: any },
     placementOffset?: Vector3
   ): void {
-    WorldStorage.SetItem("TERRAIN-EDIT-LAYER", "-1");
+    //WorldStorage.SetItem("TERRAIN-EDIT-LAYER", "-1");
     
-    const entityPlacementComponent = Context.GetContext("ENTITY_PLACEMENT_COMPONENT") as EntityPlacement;
-    if (entityPlacementComponent == null) {
-      Logging.LogError("[EntityPlacer] Unable to get context.");
-      return;
-    }
+    this.exitDeleteMode();
     
-    entityPlacementComponent.exitDeleteMode();
-    
-    if (entityPlacementComponent.placingEntity != null) {
+    if (this.placingEntity != null) {
       Logging.LogWarning("[EntityPlacer] Placing Entity already assigned. Placing Entity must be stopped.");
       return;
     }
@@ -180,88 +171,105 @@ export class EntityPlacement {
       return;
     }
     
-    entityPlacementComponent.entityType = entityType;
-    entityPlacementComponent.modelOffset = offset || Vector3.zero;
-    entityPlacementComponent.modelRotation = rotation || Quaternion.identity;
-    entityPlacementComponent.placingOffset = placementOffset || Vector3.zero;
-    entityPlacementComponent.placingEntity = entityToPlace;
-    entityPlacementComponent.placementLocked = true;
-    entityPlacementComponent.entityIndex = entityIndex;
-    entityPlacementComponent.variantIndex = variantIndex;
-    entityPlacementComponent.entityID = entityID;
-    entityPlacementComponent.variantID = variantID;
-    entityPlacementComponent.modelPath = modelPath;
-    entityPlacementComponent.instanceID = instanceID;
-    entityPlacementComponent.orientationIndex = 0;
-    entityPlacementComponent.scripts = scripts || {};
+    this.entityType = entityType;
+    this.modelOffset = offset || Vector3.zero;
+    this.modelRotation = rotation || Quaternion.identity;
+    this.placingOffset = placementOffset || Vector3.zero;
+    this.placingEntity = entityToPlace;
+    this.placementLocked = true;
+    this.entityIndex = entityIndex;
+    this.variantIndex = variantIndex;
+    this.entityID = entityID;
+    this.variantID = variantID;
+    this.modelPath = modelPath;
+    this.instanceID = instanceID;
+    this.orientationIndex = 0;
+    this.scripts = scripts || {};
+    this.wheels = wheels;
+    this.mass = mass;
     
-    Context.DefineContext("ENTITY_PLACEMENT_COMPONENT", entityPlacementComponent);
     entityToPlace.SetHighlight(true);
-    WorldStorage.SetItem("ENTITY-BEING-PLACED", "TRUE");
     // Input.TurnLocomotionMode = Input.VRTurnLocomotionMode.None; // VR-specific, commented out
   }
 
   stopPlacing(): void {
-    // const configModule = Context.GetContext("CONFIGURATION_MODULE");
-    // const identityModule = Context.GetContext("IDENTITY_MODULE");
-    const worldRenderingModule = Context.GetContext("WORLD_RENDERING_MODULE");
-    
-    if (worldRenderingModule == null) {
-      Logging.LogError("[EntityPlacer] Unable to get renderer context.");
-      return;
-    }
-    
-    let keepSpawning = false;
-    if (WorldStorage.GetItem("ENTITY-KEEP-SPAWNING") === "TRUE") {
-      keepSpawning = true;
-    }
-
     if (this.placingEntity == null) {
-      if (keepSpawning === true && this.entityType && this.entityIndex !== null && 
-          this.variantIndex !== null && this.entityID && this.variantID) {
-        // const instanceUUID = UUID.NewUUID().ToString();
-        // Would call MW_Entity_LoadEntity here - integrated with EntityManager
-        Logging.Log("[EntityPlacer] Would spawn new entity for keep spawning mode");
+      if (this.keepSpawning === true && this.entityType && this.entityIndex !== null && 
+        this.variantIndex !== null && this.entityID && this.variantID) {
+        const instanceID = UUID.NewUUID().ToString();
+        (globalThis as any).loadEntity(this.entityIndex, this.variantIndex, instanceID,
+          this.entityIndex + "." + this.variantIndex + "." + instanceID, this.entityID, this.variantID,
+          null, this.entityType, Vector3.zero, Quaternion.identity, Vector3.one, this.modelPath,
+          [ this.modelPath ], this.wheels, this.mass, AutomobileType.Default, this.scripts, true);
       }
       return;
     }
     
-    if (this.placementLocked === true) {
-      return;
-    }
+    //if (this.placementLocked === true) {
+    //  return;
+    //}
     
-    const tlc = Context.GetContext("MW_TOP_LEVEL_CONTEXT");
-    const pos = this.placingEntity.GetPosition(false);
-    // const rot = this.placingEntity.GetRotation(false);
-    // const regionPos = pos;
+    const pos: Vector3 = (globalThis as any).tiledsurfacerenderer_getWorldPositionForRenderedPosition(this.placingEntity.GetPosition(false));
+    const rot: Quaternion = this.placingEntity.GetRotation(false);
+    const terrainIndex = (globalThis as any).tiledsurfacerenderer_getRegionIndexForWorldPos(pos);
+    const regionPos = (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos(pos, terrainIndex);
 
     // Send REST request to add entity instance
-    if (tlc && this.instanceID && this.entityID && this.variantID) {
-      // This would integrate with your REST module
+    if (this.instanceID && this.entityID && this.variantID) {
+      var tsr = (globalThis as any).tiledsurfacerenderer as TiledSurfaceRenderer;
+      const userId = this.getUserId();
+      const userToken = this.getUserToken();
+      if (tsr) {
+        tsr.restClient.sendPositionEntityRequest(terrainIndex, this.entityID, this.variantID,
+          this.instanceID, regionPos, rot, userId, userToken, "onCompleteCallback");
+        var wsync = (globalThis as any).wsync_instance as VOSSynchronizer;
+        wsync.SendEntityAddUpdate(tsr.regionSynchronizers[terrainIndex.x + '.' + terrainIndex.y],
+          this.instanceID, regionPos, rot);
+      }
       Logging.Log(`[EntityPlacer] Placing entity at position: ${pos.x}, ${pos.y}, ${pos.z}`);
     }
     
     // Handle scripts if present
     if (this.scripts != null && Object.keys(this.scripts).length > 0) {
-      // Script integration would go here
       Logging.Log("[EntityPlacer] Adding scripts to placed entity");
+      ((globalThis as any).scriptEngine as ScriptEngine).addScriptEntity(this.placingEntity, this.scripts);
+
+      ((globalThis as any).scriptEngine as ScriptEngine).runOnCreateScript(this.placingEntity);
+
+      if (this.scripts["0_25_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_25IntervalScript(this.placingEntity, this.scripts["0_25_update"]);
+      }
+
+      if (this.scripts["0_5_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_5IntervalScript(this.placingEntity, this.scripts["0_5_update"]);
+      }
+
+      if (this.scripts["1_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add1_0IntervalScript(this.placingEntity, this.scripts["1_0_update"]);
+      }
+
+      if (this.scripts["2_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add2_0IntervalScript(this.placingEntity, this.scripts["2_0_update"]);
+      }
     }
 
     // Finalize placement
+    this.placingEntity.SetParent((globalThis as any).tiledsurfacerenderer.getTerrainTileForIndex(terrainIndex));
     this.placingEntity.SetHighlight(false);
     if (this.placingEntity instanceof AutomobileEntity || this.placingEntity instanceof AirplaneEntity) {
       this.placingEntity.SetInteractionState(InteractionState.Physical);
     }
     this.placingEntity = null;
     
-    if (keepSpawning === true && this.entityID && this.variantID) {
-      // const instanceUUID = UUID.NewUUID().ToString();
-      // Would spawn new entity for continued placement
-      Logging.Log("[EntityPlacer] Would spawn new entity for continued placement");
+    if (this.keepSpawning === true && this.entityID && this.variantID) {
+      const instanceID = UUID.NewUUID().ToString();
+      (globalThis as any).loadEntity(this.entityIndex, this.variantIndex, instanceID,
+        this.entityIndex + "." + this.variantIndex + "." + instanceID, this.entityID, this.variantID,
+        null, this.entityType, Vector3.zero, Quaternion.identity, Vector3.one, this.modelPath,
+        [ this.modelPath ], this.wheels, this.mass, AutomobileType.Default, this.scripts, true);
     }
 
-    Context.DefineContext("ENTITY_PLACEMENT_COMPONENT", this);
-    WorldStorage.SetItem("ENTITY-BEING-PLACED", "FALSE");
+    this.entityBeingPlaced = false;
     // Input.TurnLocomotionMode = Input.VRTurnLocomotionMode.Snap; // VR-specific, commented out
   }
 
@@ -271,8 +279,7 @@ export class EntityPlacement {
       this.placingEntity = null;
     }
 
-    Context.DefineContext("ENTITY_PLACEMENT_COMPONENT", this);
-    WorldStorage.SetItem("ENTITY-BEING-PLACED", "FALSE");
+    this.entityBeingPlaced = false;
     // Input.TurnLocomotionMode = Input.VRTurnLocomotionMode.Snap; // VR-specific, commented out
   }
   
@@ -326,7 +333,7 @@ export class EntityPlacement {
     }
     
     const currentRot = this.placingEntity.GetEulerRotation(false);
-    let rotIncrement = parseFloat(WorldStorage.GetItem("ENTITY-ROTATION-INCREMENT") || "90");
+    let rotIncrement = this.rotationIncrement;
     
     if (negative) {
       rotIncrement = -rotIncrement;
@@ -350,12 +357,59 @@ export class EntityPlacement {
         return;
     }
   }
+
+  /**
+ * Get user ID for API requests
+ * @returns User ID from Identity module if authenticated
+ */
+  private getUserId(): string {
+    // Access Identity from global context if available
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      if (contextUser && contextUser.userID) {
+        return contextUser.userID;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user ID from context: ' + error);
+    }
+
+    // Return empty string if not authenticated (no fallback)
+    return "";
+  }
+
+  /**
+   * Get user token for API requests
+   * @returns User token from Identity module or fallback value
+   */
+  private getUserToken(): string {
+    // Access Identity from global context if available
+    try {
+      const contextUser = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+      if (contextUser && contextUser.token) {
+        return contextUser.token;
+      }
+    } catch (error) {
+      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user token from context: ' + error);
+    }
+
+    // Return empty string if not authenticated (no fallback)
+    return "";
+  }
 }
 
 export class EntityManager {
   entityPlacement: EntityPlacement;
   private entities: Map<string, EntityData> = new Map();
   private worldStorage: Map<string, any> = new Map();
+
+  private currentEntityIndex: string = "";
+  private currentVariantIndex: string = "";
+  private currentEntityId: string = "";
+  private currentVariantId: string = "";
+  private currentModelPath: string = "";
+  private currentWheels: any | undefined = undefined;
+  private currentMass: number | undefined = undefined;
+  private currentScripts: string | undefined = undefined;
 
   constructor() {
     this.entityPlacement = new EntityPlacement();
@@ -371,8 +425,62 @@ export class EntityManager {
       this.onMeshEntityLoadedGeneric(entity);
     };
 
+    (globalThis as any).onMeshEntityLoadedGenericPlacing = (entity: any) => {
+      this.onMeshEntityLoadedGenericPlacing(entity);
+    };
+
+    (globalThis as any).onAutomobileEntityLoadedGeneric = (entity: AutomobileEntity) => {
+      this.onAutomobileEntityLoadedGeneric(entity);
+    };
+
+    (globalThis as any).onAutomobileEntityLoadedGenericPlacing = (entity: AutomobileEntity) => {
+      this.onAutomobileEntityLoadedGenericPlacing(entity);
+    };
+
     (globalThis as any).triggerEntityInstancesAfterTemplates = () => {
       this.triggerEntityInstancesAfterTemplates();
+    };
+
+    (globalThis as any).loadEntity = (
+      entityIndex: string,
+      variantIndex: string,
+      instanceId: string,
+      instanceTag: string | undefined,
+      entityId: string,
+      variantId: string,
+      entityParent: string | undefined,
+      type: string,
+      position: Vector3,
+      rotation: Quaternion,
+      scale: Vector3,
+      meshObject: string,
+      meshResources: string[],
+      wheels: any | undefined,
+      mass: number | undefined,
+      autoType: AutomobileType | undefined,
+      scripts: string | undefined,
+      placingEntity: boolean | undefined
+    ): string => {
+      return this.loadEntity(
+        entityIndex,
+        variantIndex,
+        instanceId,
+        instanceTag,
+        entityId,
+        variantId,
+        entityParent,
+        type,
+        position,
+        rotation,
+        scale,
+        meshObject,
+        meshResources,
+        wheels,
+        mass,
+        autoType,
+        scripts,
+        placingEntity
+      );
     };
   }
 
@@ -380,6 +488,8 @@ export class EntityManager {
    * Load an entity into the world
    */
   loadEntity(
+    entityIndex: string | null,
+    variantIndex: string | null,
     instanceId: string,
     instanceTag: string | undefined,
     entityId: string,
@@ -391,30 +501,60 @@ export class EntityManager {
     scale: Vector3 = new Vector3(1, 1, 1),
     meshObject: string,
     meshResources: string[],
-    wheels: AutomobileEntityWheel[] | undefined = undefined,
+    wheels: any | undefined = undefined,
     mass: number | undefined = undefined,
     autoType: AutomobileType | undefined = undefined,
-    scripts: string | undefined = undefined
+    scripts: string | undefined = undefined,
+    placingEntity: boolean = false
   ): string {
     let parentEntity = null;
     if (entityParent != null && entityParent != undefined && entityParent !== "" && entityParent != "null") {
       parentEntity = Entity.Get(entityParent);
     }
-if (entityId == null || variantId == null || scale == null) {
+    if (entityId == null || variantId == null || scale == null) {
 
-}
+    }
+    this.currentEntityIndex = entityIndex || "";
+    this.currentVariantIndex = variantIndex || "";
+    this.currentEntityId = entityId;
+    this.currentVariantId = variantId || "";
+    this.currentModelPath = meshObject;
+    this.currentWheels = wheels;
+    var automobileWheels: AutomobileEntityWheel[] = [];
+    if (wheels != null && wheels != undefined) {
+      for (var wheel in wheels) {
+        automobileWheels.push(new AutomobileEntityWheel(wheels[wheel].name as string, wheels[wheel].radius as number));
+      }
+    }
+    //this.currentWheels = automobileWheels;
+    this.currentMass = mass;
+    this.currentScripts = scripts;
+    if (type == null || type === "") {
+      type = "mesh";
+    }
     switch (type) {
       case 'mesh':
+        var onCompleteCallback = 'onMeshEntityLoadedGeneric';
+        if (placingEntity) {
+          onCompleteCallback = 'onMeshEntityLoadedGenericPlacing';
+        } else {
+          onCompleteCallback = 'onMeshEntityLoadedGeneric';
+        }
         MeshEntity.Create(parentEntity, meshObject, meshResources, position, rotation, instanceId,
-          'onMeshEntityLoadedGeneric', false);
+          onCompleteCallback, false);
         break;
       case 'automobile':
-        if (!wheels || mass === undefined || !autoType) {
+        if (!wheels || mass === undefined || autoType === undefined) {
           throw new Error('Missing automobile parameters: wheels, mass, or autoType');
         }
-        Logging.Log("meshobject " + meshObject);
-        AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, wheels,
-          mass, autoType, instanceId, instanceTag, 'onAutomobileEntityLoadedGeneric', false);
+        if (placingEntity) {
+          AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, automobileWheels,
+            mass, autoType, instanceId, instanceTag, 'onAutomobileEntityLoadedGenericPlacing', false);
+          break;
+        } else {
+          AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, automobileWheels,
+            mass, autoType, instanceId, instanceTag, 'onAutomobileEntityLoadedGeneric', false);
+        }
         break;
       case 'airplane':
         if (mass === undefined) {
@@ -427,10 +567,6 @@ if (entityId == null || variantId == null || scale == null) {
       default:
         throw new Error(`Unknown entity type: ${type}`);
     }
-
-    Logging.Log("scripts " + scripts);
-
-    this.finishLoadingPlacingEntity(instanceId);
 
     return instanceId;
   }
@@ -451,33 +587,77 @@ if (entityId == null || variantId == null || scale == null) {
   }
 
   /**
-   * Finish loading and placing an entity
-   */
-  finishLoadingPlacingEntity(entityId: string): void {
-    const metadata = this.worldStorage.get(entityId);
-    if (!metadata) {
-      Logging.LogWarning(`No metadata found for entity ${entityId}`);
-      return;
-    }
-
-    // Snap to terrain
-    this.snapEntityToTerrain(entityId);
-
-    // Add to script engine (would integrate with ScriptEngine module)
-    Logging.Log(`Entity ${entityId} loading complete`);
-  }
-
-  /**
    * Finish loading a placed entity
    */
   finishLoadingPlacedEntity(entityId: string): void {
     Logging.Log(`Entity ${entityId} placement complete`);
   }
 
-  onMeshEntityLoadedGeneric(entity: any): void {
+  onMeshEntityLoadedGeneric(entity: MeshEntity): void {
     Logging.Log(`✓ Mesh entity loaded successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
+    var scripts = this.currentScripts as any;
+    if (scripts != null) {
+      ((globalThis as any).scriptEngine as ScriptEngine).addScriptEntity(entity, scripts);
+
+      ((globalThis as any).scriptEngine as ScriptEngine).runOnCreateScript(entity);
+
+      if (scripts["0_25_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_25IntervalScript(entity, scripts["0_25_update"]);
+      }
+      if (scripts["0_5_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_5IntervalScript(entity, scripts["0_5_update"]);
+      }
+      if (scripts["1_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add1_0IntervalScript(entity, scripts["1_0_update"]);
+      }
+      if (scripts["2_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add2_0IntervalScript(entity, scripts["2_0_update"]);
+      }
+    }
+  }
+
+  onMeshEntityLoadedGenericPlacing(entity: MeshEntity): void {
+    Logging.Log(`✓ Mesh entity loaded for placement successfully: ${entity.id}`);
+    entity.SetInteractionState(InteractionState.Static);
+    entity.SetVisibility(true);
+    var scripts = this.currentScripts;
+    (globalThis as any).startPlacing(entity, "mesh", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
+      this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, scripts, entity.id);
+  }
+
+  onAutomobileEntityLoadedGeneric(entity: AutomobileEntity): void {
+    Logging.Log(`✓ Automobile entity loaded successfully: ${entity.id}`);
+    entity.SetInteractionState(InteractionState.Static);
+    entity.SetVisibility(true);
+    var scripts = this.currentScripts as any;
+    if (scripts != null) {
+      ((globalThis as any).scriptEngine as ScriptEngine).addScriptEntity(entity, scripts);
+      ((globalThis as any).scriptEngine as ScriptEngine).runOnCreateScript(entity);
+
+      if (scripts["0_25_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_25IntervalScript(entity, scripts["0_25_update"]);
+      }
+      if (scripts["0_5_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add0_5IntervalScript(entity, scripts["0_5_update"]);
+      }
+      if (scripts["1_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add1_0IntervalScript(entity, scripts["1_0_update"]);
+      }
+      if (scripts["2_0_update"] != null) {
+        ((globalThis as any).scriptEngine as ScriptEngine).add2_0IntervalScript(entity, scripts["2_0_update"]);
+      }
+    }
+  }
+
+  onAutomobileEntityLoadedGenericPlacing(entity: AutomobileEntity): void {
+    Logging.Log(`✓ Automobile entity loaded for placement successfully: ${entity.id}`);
+    entity.SetInteractionState(InteractionState.Static);
+    entity.SetVisibility(true);
+    var scripts = this.currentScripts;
+    (globalThis as any).startPlacing(entity, "automobile", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
+      this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, scripts, entity.id);
   }
 
   triggerEntityInstancesAfterTemplates(): void {

@@ -38,6 +38,11 @@ const PopupMenu = ({
         filtered.push(newTab);
       }
       
+      // If this is the first iframe tab being added, set it as active
+      if (filtered.length === 1) {
+        setActiveTabId(newTab.id);
+      }
+      
       return [...filtered, settingsTab];
     });
     
@@ -97,21 +102,130 @@ const PopupMenu = ({
 
   // API: Send message to active iframe
   const sendMessageToTab = useCallback((tabId, message) => {
+    console.log('sendMessageToTab called with: ' + JSON.stringify({ tabId, messageType: message.type }));
+    console.log('Available tabs: ' + JSON.stringify(tabs.map(t => ({ id: t.id, name: t.name, type: t.type }))));
+    
     const tab = tabs.find(t => t.id === tabId);
     if (!tab || tab.type !== 'iframe') {
-      console.warn('Cannot send message: tab not found or not an iframe');
+      console.warn('Cannot send message: tab not found or not an iframe ' + JSON.stringify({ tabId, tab }));
       return false;
     }
 
     const iframe = document.querySelector(`iframe[data-tab-id="${tabId}"]`);
-    if (iframe && iframe.contentWindow) {
-      iframe.contentWindow.postMessage({
-        source: 'myworlds-popup-menu',
-        type: 'message',
-        data: message
-      }, '*');
-      return true;
+    console.log('sendMessageToTab debug: ' + JSON.stringify({ 
+      tabId, 
+      iframe: !!iframe, 
+      contentWindow: iframe ? !!iframe.contentWindow : false,
+      readyState: iframe ? iframe.readyState : 'no-iframe',
+      src: iframe ? iframe.src : 'no-iframe'
+    }));
+    
+    if (iframe) {
+      // Try multiple approaches to send the message
+      if (iframe.contentWindow) {
+        try {
+          // If message already has the correct structure, send it directly
+          if (message.type && message.data) {
+            iframe.contentWindow.postMessage({
+              source: 'myworlds-popup-menu',
+              type: message.type,
+              data: message.data
+            }, '*');
+          } else {
+            // Fallback for other message types
+            iframe.contentWindow.postMessage({
+              source: 'myworlds-popup-menu',
+              type: 'message',
+              data: message
+            }, '*');
+          }
+          console.log('Message sent successfully via contentWindow');
+          return true;
+        } catch (error) {
+          console.warn('Error sending message via contentWindow:', error);
+        }
+      }
+      
+      // Fallback: wait for iframe to load if it's not ready
+      if (!iframe.contentWindow || iframe.readyState !== 'complete') {
+        console.log('Iframe not ready, waiting for load...');
+        
+        const sendWhenReady = () => {
+          try {
+            // If message already has the correct structure, send it directly
+            if (message.type && message.data) {
+              iframe.contentWindow.postMessage({
+                source: 'myworlds-popup-menu',
+                type: message.type,
+                data: message.data
+              }, '*');
+            } else {
+              // Fallback for other message types
+              iframe.contentWindow.postMessage({
+                source: 'myworlds-popup-menu',
+                type: 'message',
+                data: message
+              }, '*');
+            }
+            console.log('Message sent successfully after load');
+            return true;
+          } catch (error) {
+            console.warn('Error sending message after load:', error);
+            return false;
+          }
+        };
+        
+        // If iframe has a contentWindow but document might not be ready
+        if (iframe.contentWindow) {
+          setTimeout(sendWhenReady, 100);
+          return true;
+        }
+        
+        // If no contentWindow, wait for iframe load event
+        iframe.addEventListener('load', sendWhenReady, { once: true });
+        return true;
+      }
+    } else {
+      console.warn('Iframe not found in DOM for tabId:', tabId);
+      console.log('All iframes in DOM: ' + JSON.stringify(Array.from(document.querySelectorAll('iframe')).map(iframe => ({
+        dataTabId: iframe.getAttribute('data-tab-id'),
+        src: iframe.src,
+        title: iframe.title
+      }))));
+      
+      // Retry after a short delay to allow React to render the iframe
+      setTimeout(() => {
+        console.log('Retrying sendMessageToTab after render delay...');
+        const retryIframe = document.querySelector(`iframe[data-tab-id="${tabId}"]`);
+        if (retryIframe && retryIframe.contentWindow) {
+          try {
+            // If message already has the correct structure, send it directly
+            if (message.type && message.data) {
+              retryIframe.contentWindow.postMessage({
+                source: 'myworlds-popup-menu',
+                type: message.type,
+                data: message.data
+              }, '*');
+            } else {
+              // Fallback for other message types
+              retryIframe.contentWindow.postMessage({
+                source: 'myworlds-popup-menu',
+                type: 'message',
+                data: message
+              }, '*');
+            }
+            console.log('Message sent successfully on retry');
+          } catch (error) {
+            console.warn('Error sending message on retry:', error);
+          }
+        } else {
+          console.warn('Retry failed - iframe still not found or ready');
+        }
+      }, 500);
+      
+      return true; // Return true since we're attempting a retry
     }
+    
     return false;
   }, [tabs]);
 
@@ -178,6 +292,25 @@ const PopupMenu = ({
     return () => window.removeEventListener('message', handleMessage);
   }, [tabs, onMessage]);
 
+  // Debug: Log when tabs change
+  useEffect(() => {
+    console.log('PopupMenu tabs changed: ' + JSON.stringify(tabs.map(t => ({ id: t.id, name: t.name, type: t.type }))));
+    
+    // Also log if popup menu is open
+    console.log('PopupMenu isOpen: ' + isOpen);
+    
+    // Check if iframes exist in DOM after tabs change
+    setTimeout(() => {
+      const allIframes = Array.from(document.querySelectorAll('iframe'));
+      console.log('All iframes in DOM after tabs update: ' + JSON.stringify(allIframes.map(iframe => ({
+        dataTabId: iframe.getAttribute('data-tab-id'),
+        src: iframe.src,
+        title: iframe.title,
+        display: iframe.style.display
+      }))));
+    }, 10);
+  }, [tabs, isOpen]);
+
   // Expose API globally
   useEffect(() => {
     window.popupMenuAPI = {
@@ -193,7 +326,7 @@ const PopupMenu = ({
       getActiveTab: () => activeTabId,
       onTabMessage,
       offTabMessage,
-      sendMessageToTab,
+      sendMessageToTab: (tabId, msg) => sendMessageToTab(tabId, msg),
       // Settings APIs
       setQuality: (value) => {
         if (['Low', 'Med', 'High'].includes(value)) {
@@ -231,18 +364,36 @@ const PopupMenu = ({
 
   const activeTab = tabs.find(tab => tab.id === activeTabId);
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="popup-menu-overlay" onClick={closeMenu}>
+    <div className="popup-menu-overlay" 
+         onClick={isOpen ? closeMenu : undefined}
+         style={{
+           display: isOpen ? 'flex' : 'block',
+           position: isOpen ? 'fixed' : 'absolute',
+           left: isOpen ? '0' : '-9999px',
+           top: isOpen ? '0' : '-9999px',
+           right: isOpen ? '0' : 'auto',
+           bottom: isOpen ? '0' : 'auto',
+           width: isOpen ? '100%' : '100px',
+           height: isOpen ? '100%' : '100px',
+           backgroundColor: isOpen ? 'rgba(0, 0, 0, 0.8)' : 'transparent',
+           alignItems: isOpen ? 'center' : 'flex-start',
+           justifyContent: isOpen ? 'center' : 'flex-start',
+           zIndex: isOpen ? 1000 : -1
+         }}>
       <div 
         className="popup-menu-container" 
         ref={menuRef}
         onClick={(e) => e.stopPropagation()}
+        style={{
+          width: isOpen ? '90%' : '100px',
+          height: isOpen ? '80%' : '100px',
+          maxWidth: isOpen ? '1200px' : '100px',
+          opacity: isOpen ? 1 : 0,
+          pointerEvents: isOpen ? 'auto' : 'none'
+        }}
       >
-        <div className="popup-menu-header">
+        <div className="popup-menu-header" style={{ display: isOpen ? 'flex' : 'none' }}>
           <div className="popup-menu-tabs">
             {tabs.map((tab) => (
               <button
@@ -264,18 +415,26 @@ const PopupMenu = ({
         </div>
 
         <div className="popup-menu-content">
-          {activeTab && activeTab.type === 'iframe' && (
+          {/* All iframes - always rendered */}
+          {tabs.filter(tab => tab.type === 'iframe').map(tab => (
             <iframe
-              key={activeTab.id}
-              data-tab-id={activeTab.id}
-              src={activeTab.url}
+              key={tab.id}
+              data-tab-id={tab.id}
+              src={tab.url}
               className="popup-menu-iframe"
-              title={activeTab.name}
+              title={tab.name}
               sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+              style={{ 
+                display: activeTab && activeTab.id === tab.id && isOpen ? 'block' : 'none',
+                width: '100%',
+                height: '100%',
+                border: 'none'
+              }}
             />
-          )}
-          
-          {activeTab && activeTab.type === 'settings' && (
+          ))}
+
+          {/* Settings content */}
+          {activeTab && activeTab.type === 'settings' && isOpen && (
             <div className="popup-menu-settings">
               <h2>Settings</h2>
               

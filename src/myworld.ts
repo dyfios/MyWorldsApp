@@ -11,12 +11,13 @@ import { UIManager } from './modules/UIManager';
 export class MyWorld {
   private context: ClientContext;
   private queryParams: ProcessQueryParams;
-  private renderIntervalId: any = null;
 
   constructor() {
     try {
-      // Parse query params FIRST to get worldAddress for REST API
-      Logging.Log('🚀 Step 0b1: Creating ProcessQueryParams...');
+      (globalThis as any).startRenderLoop = this.startRenderLoop.bind(this);
+      Logging.Log('🚀 Step 0b1: Creating ClientContext...');
+      this.context = new ClientContext();
+      Logging.Log('🚀 Step 0b2: Creating ProcessQueryParams...');
       this.queryParams = new ProcessQueryParams();
       Logging.Log('🚀 Step 0b2: Parsing query params to get worldAddress...');
       this.queryParams.parse();
@@ -52,6 +53,15 @@ export class MyWorld {
       await this.context.initializeModules();
       Logging.Log('✓ Modules initialized successfully');
 
+      // 2a. Start login process after modules are initialized
+      Logging.Log('🔐 Step 2a: Initiating login with Identity module...');
+      if (this.context.modules.identity) {
+        this.context.modules.identity.StartLogin();
+        Logging.Log('✓ Login process started');
+      } else {
+        Logging.LogError('❌ Identity module not available for login');
+      }
+
       // 4. Load world configuration
       Logging.Log('🌍 Step 4: Loading world configuration...');
       const worldUri = params.worldUri as string | undefined;
@@ -64,32 +74,23 @@ export class MyWorld {
       await this.context.modules.sync.connectToSynchronizers();
       Logging.Log('✓ Connected to synchronizers successfully');
 
-      // 6. Instantiate and load world renderers
-      Logging.Log('🎨 Step 6: Creating and loading world renderers...');
-      await this.context.modules.worldRendering.createAndLoadRenderers();
-      // Ensure WorldRendererFactory is available in context after renderers are loaded
-      Logging.Log('🔍 Storing WorldRendererFactory in context. Type: ' + typeof this.context.modules.worldRendering);
-      Logging.Log('🔍 Available methods: ' + Object.getOwnPropertyNames(Object.getPrototypeOf(this.context.modules.worldRendering)));
+      // 6. Prepare world rendering context (but don't load world data yet)
+      Logging.Log('🎨 Step 6: Preparing world rendering context...');
+      // Note: World renderers will be created after login via startRenderLoop()
       
-      // Store a wrapper object to preserve method bindings
+      // Store a wrapper object to preserve method bindings for when renderers are created
       const worldRendererFactoryWrapper = {
         factory: this.context.modules.worldRendering,
         getStaticSurfaceRenderer: () => this.context.modules.worldRendering.getStaticSurfaceRenderer()
       };
       Context.DefineContext('WorldRendererFactory', worldRendererFactoryWrapper);
-      Logging.Log('✓ World renderers loaded successfully');
-
-      // 7. Activate UI editing tools
-      Logging.Log('🖼️ Step 7: Activating UI editing tools...');
-      this.context.modules.ui.initializeEditToolbar();
-      Logging.Log('✓ UI editing tools activated successfully');
+      Logging.Log('✓ World rendering context prepared');
 
       Logging.Log('🎉 MyWorld Client launched successfully!');
 
-      // Start render loop
-      Logging.Log('🔄 Starting render loop...');
-      await this.startRenderLoop();
-      Logging.Log('✓ Render loop started successfully');
+      // Note: UI activation, world loading and render loop will start after login completes via Identity module
+      Logging.Log('🔄 UI activation, world loading and render loop will start after user authentication completes...');
+      Logging.Log('✓ Startup sequence completed - waiting for authentication');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorDetails = error instanceof Error ? error.stack || error.message : String(error);
@@ -143,6 +144,9 @@ export class MyWorld {
       Logging.Log('🎛️ Calling UIManager.initializeUISettingsForWorldType...');
       UIManager.initializeUISettingsForWorldType(worldType);
       
+      // Initialize default tools for this world type
+      this.initializeDefaultTools(worldType);
+      
       // Also call the global UI Settings initialization function if available (fallback)
       if (typeof (globalThis as any).initializeUISettings === 'function') {
         const success = (globalThis as any).initializeUISettings(worldType);
@@ -154,15 +158,55 @@ export class MyWorld {
       } else {
         Logging.Log('⚠️ UI Settings initialization function not available yet');
         // Retry after a short delay in case the UI hasn't loaded yet
-        setTimeout(() => {
-          if (typeof (globalThis as any).initializeUISettings === 'function') {
-            (globalThis as any).initializeUISettings(worldType);
+        Time.SetTimeout(`
+          if (typeof initializeUISettings === 'function') {
+            initializeUISettings('${worldType}');
           }
-        }, 1000);
+        `, 1000);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ Error initializing UI Settings: ' + errorMessage);
+    }
+  }
+
+  /**
+   * Initialize default tools for supported world types
+   */
+  private initializeDefaultTools(worldType: string): void {
+    try {
+      Logging.Log('🔧 Initializing default tools for world type: ' + worldType);
+      
+      // Add a delay to ensure UI is loaded before adding tools
+      Time.SetTimeout(`
+        try {
+          // Add default tools based on world type
+          if ('${worldType}' === 'mini-world') {
+            // Mini-world tools
+            addTool('Hand', '🔨', 'TOOL.ADD_DOCK_BUTTON(HAND, Hand, 🔨)');
+            Logging.Log('Mini-world tools added successfully');
+          } else if ('${worldType}' === 'planet') {
+            // Planet tools
+            addTool('Hand', this.uiManager.handPath, 'TOOL.ADD_DOCK_BUTTON(HAND, Hand, ${(globalThis as any).uiManager.handPath})');
+            addTool('Square Shovel', this.uiManager.squareShovelx1Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_1, Square Shovel, ${(globalThis as any).uiManager.squareShovelx1Path})');
+            addTool('Square Shovel (2x)', this.uiManager.squareShovelx2Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_2, Square Shovel (2x), ${(globalThis as any).uiManager.squareShovelx2Path})');
+            addTool('Square Shovel (4x)', this.uiManager.squareShovelx4Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_4, Square Shovel (4x), ${(globalThis as any).uiManager.squareShovelx4Path})');
+            addTool('Square Shovel (8x)', this.uiManager.squareShovelx8Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_8, Square Shovel (8x), ${(globalThis as any).uiManager.squareShovelx8Path})');
+            addTool('Sledge Hammer', this.uiManager.sledgeHammerPath, 'TOOL.ADD_DOCK_BUTTON(SLEDGE_HAMMER, Sledge Hammer, ${(globalThis as any).uiManager.sledgeHammerPath})');
+            this.addEditToolbarButton('Hand', this.uiManager.handPath, 'TOOL.DOCK_BUTTON_CLICKED(HAND)');
+            this.addEditToolbarButton('Square Shovel', this.uiManager.squareShovelx1Path, 'TOOL.DOCK_BUTTON_CLICKED(SQUARE_SHOVEL_1)');
+            this.addEditToolbarButton('Sledge Hammer', this.uiManager.sledgeHammerPath, 'TOOL.DOCK_BUTTON_CLICKED(SLEDGE_HAMMER)');
+            Logging.Log('Planet tools added successfully');
+          }
+        } catch (error) {
+          Logging.LogError('Error adding default tools: ' + error);
+        }
+      `, 6000);
+      
+      Logging.Log('✅ Default tools initialization scheduled for world type: ' + worldType);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ Error initializing default tools: ' + errorMessage);
     }
   }
 
@@ -207,9 +251,18 @@ export class MyWorld {
       Logging.Log('🏗️ Step 2: Initializing static surface renderer...');
       await staticRenderer.initialize();
       
-      // Request entity templates
-      Logging.Log('🏗️ Step 3: Requesting entity templates...');
-      staticRenderer.requestEntityTemplates();
+      // Check if user is already logged in
+      const identityModule = this.context.modules.identity;
+      if (identityModule && identityModule.isLoggedIn()) {
+        // User is already logged in, request entity templates immediately
+        Logging.Log('🏗️ Step 3: User already logged in, requesting entity templates...');
+        staticRenderer.requestEntityTemplates();
+      } else {
+        // User not logged in, store reference for later template request
+        Logging.Log('🏗️ Step 3: User not logged in, deferring entity templates request...');
+        (globalThis as any).pendingEntityTemplateRequest = staticRenderer;
+        Logging.Log('⏳ Entity templates will be loaded after user login completes');
+      }
       
       // Register for entity instances trigger after templates complete
       Logging.Log('🏗️ Step 3a: Registering for entity instances trigger...');
@@ -248,59 +301,33 @@ export class MyWorld {
    * Start the render loop
    */
   private async startRenderLoop(): Promise<void> {
+    // Activate UI editing tools after authentication
+    Logging.Log('🖼️ Step 7: Activating UI editing tools after authentication...');
+    this.context.modules.ui.initializeEditToolbar();
+    Logging.Log('✓ UI editing tools activated successfully');
+
+    // Create and load world renderers now that user is authenticated
+    Logging.Log('🎨 Creating and loading world renderers after authentication...');
+    await this.context.modules.worldRendering.createAndLoadRenderers();
+    Logging.Log('✓ World renderers loaded successfully');
+
     // Initialize world type specific settings
     await this.initializeWorldTypeSettings();
     
     // Set up global render function for WebVerse Time API
-    const renderFunctionName = 'myWorldRenderLoop';
+    ///const renderFunctionName = 'myWorldRenderLoop';
     
     // Store reference to this instance for the global function
     (globalThis as any).myWorldInstance = this;
-    
-    // Create global render function
-    (globalThis as any)[renderFunctionName] = () => {
-      try {
-        const deltaTime = 1/60; // Fixed 60 FPS (0.0167 seconds per frame)
-        
-        // Update modules
-        this.context.modules.script.update(deltaTime);
-
-        // Render frame
-        this.context.modules.worldRendering.renderFrame(deltaTime);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        Logging.LogError('❌ Error in render loop: ' + errorMessage);
-      }
-    };
-
-    // Start the interval - 60 FPS = 1/60 seconds = ~0.0167 seconds
-    const intervalSeconds = 1/60;
-    Logging.Log('🔄 Setting up render loop with interval: ' + intervalSeconds + ' seconds');
-    
-    this.renderIntervalId = Time.SetInterval(renderFunctionName, intervalSeconds);
-    
-    if (this.renderIntervalId) {
-      Logging.Log('✓ Render loop started with ID: ' + this.renderIntervalId);
-    } else {
-      Logging.LogError('❌ Failed to start render loop');
-    }
   }
 
   /**
    * Dispose of the client
    */
   dispose(): void {
-    // Stop the render loop
-    if (this.renderIntervalId) {
-      Logging.Log('🔄 Stopping render loop...');
-      Time.StopInterval(this.renderIntervalId.ToString());
-      this.renderIntervalId = null;
-    }
-    
     // Clean up global references
     try {
       delete (globalThis as any).myWorldInstance;
-      delete (globalThis as any).myWorldRenderLoop;
     } catch (error) {
       // Ignore cleanup errors
     }

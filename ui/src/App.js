@@ -4,15 +4,18 @@ import './App.css';
 import ButtonDock from './components/ButtonDock';
 import ChatConsole from './components/ChatConsole';
 import PopupMenu from './components/PopupMenu';
+import LoadingPanel from './components/LoadingPanel';
 import { useUISettings } from './hooks/useUISettings';
 
 function App() {
   const [buttons, setButtons] = useState([]);
+  
+  // Configuration: Maximum number of buttons in dock (configurable limit)
+  const [maxDockButtons, setMaxDockButtons] = useState(9);
 
   const [selectedButtonId, setSelectedButtonId] = useState(null);
   const [isChatActive, setIsChatActive] = useState(false);
 
-  // UI Settings hook
   const uiSettings = useUISettings();
 
   // API: Add a button
@@ -23,9 +26,30 @@ function App() {
       thumbnail,
       onClick
     };
-    setButtons(prev => [...prev, newButton]);
+    
+    setButtons(prev => {
+      const updatedButtons = [...prev, newButton];
+      
+      // If we exceed the maximum number of buttons, remove the first button
+      if (updatedButtons.length > maxDockButtons) {
+        const removedButton = updatedButtons.shift(); // Remove first button
+        console.log(`ButtonDock: Removed oldest button "${removedButton.name}" due to dock limit (${maxDockButtons})`);
+        
+        // If the removed button was selected, clear selection
+        if (selectedButtonId === removedButton.id) {
+          setSelectedButtonId(null);
+          if (typeof postWorldMessage === 'function') {
+            postWorldMessage(`BUTTON.UNSELECTED(NONE)`);
+          }
+        }
+      }
+      
+      console.log(`ButtonDock: Added button "${name}". Dock now has ${updatedButtons.length}/${maxDockButtons} buttons`);
+      return updatedButtons;
+    });
+    
     return newButton.id;
-  }, []);
+  }, [maxDockButtons, selectedButtonId]);
 
   // API: Remove a button
   const removeButton = useCallback((buttonId) => {
@@ -48,15 +72,20 @@ function App() {
 
   // API: Select button
   const selectButton = useCallback((buttonId) => {
+    console.log('ButtonDock: selectButton called with buttonId:', buttonId);
     setSelectedButtonId(buttonId);
     console.log('Button selected:', buttonId);
     
     // Find the button and invoke its onClick if it exists
     const button = buttons.find(btn => btn.id === buttonId);
+    console.log('ButtonDock: Button found:', button ? button.name : 'none', 'onClick:', button ? button.onClick : 'none');
+    
     if (button && button.onClick) {
       // Call postWorldMessage if it exists
       if (typeof window.postWorldMessage === 'function') {
+        console.log('ButtonDock: Executing onClick via postWorldMessage:', button.onClick);
         window.postWorldMessage(button.onClick);
+        console.log('ButtonDock: postWorldMessage called successfully');
       } else {
         console.warn('postWorldMessage is not defined');
       }
@@ -69,8 +98,22 @@ function App() {
     
     const currentIndex = buttons.findIndex(btn => btn.id === selectedButtonId);
     const prevIndex = currentIndex <= 0 ? buttons.length - 1 : currentIndex - 1;
-    setSelectedButtonId(buttons[prevIndex].id);
-    postWorldMessage(`BUTTON.SELECTED(${buttons[prevIndex].name})`);
+    const button = buttons[prevIndex];
+    
+    console.log('ButtonDock: selectPrevious called, button:', button.name);
+    setSelectedButtonId(button.id);
+    postWorldMessage(`BUTTON.SELECTED(${button.name})`);
+    
+    // Execute the button's onClick action
+    if (button.onClick) {
+      console.log('ButtonDock: Executing onClick via selectPrevious:', button.onClick);
+      if (typeof postWorldMessage === 'function') {
+        postWorldMessage(button.onClick);
+        console.log('ButtonDock: onClick executed via postWorldMessage');
+      } else {
+        console.warn('postWorldMessage is not defined');
+      }
+    }
   }, [buttons, selectedButtonId]);
 
   // API: Select next button
@@ -79,15 +122,43 @@ function App() {
     
     const currentIndex = buttons.findIndex(btn => btn.id === selectedButtonId);
     const nextIndex = currentIndex >= buttons.length - 1 ? 0 : currentIndex + 1;
-    setSelectedButtonId(buttons[nextIndex].id);
-    postWorldMessage(`BUTTON.SELECTED(${buttons[nextIndex].name})`);
+    const button = buttons[nextIndex];
+    
+    console.log('ButtonDock: selectNext called, button:', button.name);
+    setSelectedButtonId(button.id);
+    postWorldMessage(`BUTTON.SELECTED(${button.name})`);
+    
+    // Execute the button's onClick action
+    if (button.onClick) {
+      console.log('ButtonDock: Executing onClick via selectNext:', button.onClick);
+      if (typeof postWorldMessage === 'function') {
+        postWorldMessage(button.onClick);
+        console.log('ButtonDock: onClick executed via postWorldMessage');
+      } else {
+        console.warn('postWorldMessage is not defined');
+      }
+    }
   }, [buttons, selectedButtonId]);
 
   // API: Select by number key
   const selectByNumber = useCallback((number) => {
     if (number > 0 && number <= buttons.length) {
-      setSelectedButtonId(buttons[number - 1].id);
-      postWorldMessage(`BUTTON.SELECTED(${buttons[number - 1].name})`);
+      const button = buttons[number - 1];
+      console.log('ButtonDock: selectByNumber called with number:', number, 'button:', button.name);
+      
+      setSelectedButtonId(button.id);
+      postWorldMessage(`BUTTON.SELECTED(${button.name})`);
+      
+      // Execute the button's onClick action, just like selectButton does
+      if (button.onClick) {
+        console.log('ButtonDock: Executing onClick via selectByNumber:', button.onClick);
+        if (typeof postWorldMessage === 'function') {
+          postWorldMessage(button.onClick);
+          console.log('ButtonDock: onClick executed via postWorldMessage');
+        } else {
+          console.warn('postWorldMessage is not defined');
+        }
+      }
     }
   }, [buttons]);
 
@@ -102,7 +173,63 @@ function App() {
       selectNext,
       selectByNumber,
       getButtons: () => buttons,
-      getSelectedButton: () => selectedButtonId
+      getSelectedButton: () => selectedButtonId,
+      // Configuration APIs
+      getMaxButtons: () => maxDockButtons,
+      setMaxButtons: (newMax) => {
+        if (newMax > 0 && newMax <= 50) { // Reasonable limits
+          setMaxDockButtons(newMax);
+          console.log(`ButtonDock: Maximum buttons set to ${newMax}`);
+          
+          // If current buttons exceed new limit, remove excess buttons from the beginning
+          setButtons(prev => {
+            if (prev.length > newMax) {
+              const excess = prev.length - newMax;
+              const removed = prev.slice(0, excess);
+              const remaining = prev.slice(excess);
+              
+              console.log(`ButtonDock: Removed ${excess} buttons due to new limit: ${removed.map(b => b.name).join(', ')}`);
+              
+              // If selected button was removed, clear selection
+              if (removed.some(btn => btn.id === selectedButtonId)) {
+                setSelectedButtonId(null);
+                if (typeof postWorldMessage === 'function') {
+                  postWorldMessage(`BUTTON.UNSELECTED(NONE)`);
+                }
+              }
+              
+              return remaining;
+            }
+            return prev;
+          });
+          
+          return true;
+        } else {
+          console.warn(`ButtonDock: Invalid max buttons value: ${newMax}. Must be between 1 and 50.`);
+          return false;
+        }
+      },
+      getCurrentButtonCount: () => buttons.length,
+      getDockStatus: () => ({
+        current: buttons.length,
+        max: maxDockButtons,
+        isFull: buttons.length >= maxDockButtons
+      })
+    };
+
+    // Expose UI Settings API globally
+    window.UISettingsAPI = {
+      isWorldTypeSupported: uiSettings.isWorldTypeSupported,
+      getSettings: uiSettings.getSettings,
+      updateSettings: uiSettings.updateSettings,
+      initialize: uiSettings.initialize
+    };
+
+    // Expose Tools API globally
+    window.ToolsAPI = {
+      addTool: uiSettings.addTool,
+      removeTool: uiSettings.removeTool,
+      clearTools: uiSettings.clearTools
     };
 
     // Expose UI Settings API globally
@@ -116,10 +243,9 @@ function App() {
       resetSettings: uiSettings.resetSettings
     };
 
-    // Expose the initializeUISettings function globally for WebVerse
+    // Expose initializeUISettings directly to window for WebVerse access
     window.initializeUISettings = uiSettings.initializeUISettings;
-
-  }, [addButton, removeButton, reorderButtons, selectButton, selectPrevious, selectNext, selectByNumber, buttons, selectedButtonId, uiSettings]);
+  }, [addButton, removeButton, reorderButtons, selectButton, selectPrevious, selectNext, selectByNumber, buttons, selectedButtonId, maxDockButtons, uiSettings]);
 
   // Chat event handlers
   const handleChatInputOpen = useCallback(() => {
@@ -193,11 +319,141 @@ function App() {
       }
     }, 1000);
 
-    // Initialize UI Settings when the app loads
     setTimeout(() => {
       uiSettings.initialize();
     }, 500);
   }, [uiSettings]);
+
+  // Register handler for UI Settings messages
+  React.useEffect(() => {
+    let handlerId = null;
+    
+    const registerHandler = () => {
+      if (window.popupMenuAPI && window.popupMenuAPI.onTabMessage) {
+        handlerId = window.popupMenuAPI.onTabMessage((message) => {
+          console.log('Tab message received:', message);
+          
+          // Handle UI Settings specific messages
+          if (message.tabName === 'UI Settings') {
+            switch (message.type) {
+              case 'settings-changed':
+                console.log('UI Settings changed:', message.data);
+                // Send settings changes to the world via postWorldMessage
+                if (typeof postWorldMessage === 'function') {
+                  postWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(message.data)})`);
+                } else {
+                  console.warn('postWorldMessage not available');
+                }
+                break;
+              
+              case 'iframe-ready':
+                console.log('UI Settings iframe is ready');
+                break;
+              
+              default:
+                console.log('Unknown UI Settings message type:', message.type);
+            }
+          }
+          
+          // Handle Tools specific messages
+          else if (message.tabName === 'Tools') {
+            switch (message.type) {
+              case 'tool-clicked':
+                console.log('Tool clicked:', message.data);
+                // Send tool click event to the world via postWorldMessage
+                if (typeof postWorldMessage === 'function' && message.data.onClick) {
+                  postWorldMessage(message.data.onClick);
+                } else {
+                  console.warn('postWorldMessage not available or no onClick defined');
+                }
+                break;
+              
+              case 'iframe-ready':
+                console.log('Tools iframe is ready');
+                break;
+              
+              default:
+                console.log('Unknown Tools message type:', message.type);
+            }
+          }
+        });
+        console.log('Tab message handler registered with ID:', handlerId);
+      }
+    };
+
+    // Try to register immediately, or wait a bit if popupMenuAPI isn't ready yet
+    if (window.popupMenuAPI) {
+      registerHandler();
+    } else {
+      const timeout = setTimeout(registerHandler, 1000);
+      return () => clearTimeout(timeout);
+    }
+
+    // Cleanup function to unregister the handler
+    return () => {
+      if (handlerId && window.popupMenuAPI && window.popupMenuAPI.offTabMessage) {
+        window.popupMenuAPI.offTabMessage(handlerId);
+        console.log('UI Settings message handler unregistered');
+      }
+    };
+  }, []);
+
+  // Double-tap space key to toggle flying mode
+  React.useEffect(() => {
+    let lastSpacePress = 0;
+    let spaceKeyDown = false;
+    const doubleTapThreshold = 300; // milliseconds
+
+    const handleKeyDown = (event) => {
+      // Only handle space key when chat is not active
+      if ((event.code === 'Space' || event.key === ' ') && !isChatActive) {
+        // If key is already down, ignore repeated keydown events
+        if (spaceKeyDown) {
+          event.preventDefault(); // Prevent scroll on held spacebar
+          return;
+        }
+        
+        spaceKeyDown = true;
+        event.preventDefault(); // Prevent scroll
+      }
+    };
+
+    const handleKeyUp = (event) => {
+      // Only handle space key when chat is not active
+      if ((event.code === 'Space' || event.key === ' ') && !isChatActive && spaceKeyDown) {
+        spaceKeyDown = false;
+        
+        const now = Date.now();
+        const timeSinceLastPress = now - lastSpacePress;
+        
+        if (timeSinceLastPress < doubleTapThreshold) {
+          // Double-tap detected - toggle flying via UI Settings
+          console.log('Double-tap space detected - toggling flying via UI Settings');
+          
+          if (uiSettings && typeof uiSettings.toggleFlying === 'function') {
+            uiSettings.toggleFlying();
+          } else {
+            console.warn('UI Settings flying toggle not available');
+          }
+          
+          lastSpacePress = 0; // Reset to prevent triple-tap issues
+        } else {
+          // First tap or too much time passed
+          lastSpacePress = now;
+        }
+      }
+    };
+
+    // Add event listeners to document
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+
+    // Cleanup function
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [isChatActive, uiSettings]);
 
   return (
     <div className="App">
@@ -227,6 +483,8 @@ function App() {
         onOpen={handlePopupMenuOpen}
         onClose={handlePopupMenuClose}
       />
+
+      <LoadingPanel />
     </div>
   );
 }

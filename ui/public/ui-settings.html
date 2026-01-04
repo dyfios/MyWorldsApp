@@ -246,7 +246,10 @@
         <!-- Flying Toggle -->
         <div class="setting-item">
             <div class="toggle-container">
-                <label class="setting-label" style="margin-bottom: 0;">Enable Flying</label>
+                <div>
+                    <label class="setting-label" style="margin-bottom: 4px;">Enable Flying</label>
+                    <div style="font-size: 12px; color: #888; margin-bottom: 0;">Double-tap spacebar to toggle</div>
+                </div>
                 <div class="toggle-switch" id="flyingToggle">
                     <div class="toggle-slider"></div>
                 </div>
@@ -270,6 +273,11 @@
             lookSpeed: 1.0,
             flying: false
         };
+
+        // Double-tap detection for space key
+        let lastSpacePress = 0;
+        let spaceKeyDown = false;
+        const doubleTapThreshold = 300; // milliseconds
 
         // Load settings from localStorage
         function loadSettings() {
@@ -346,6 +354,63 @@
             }
             saveSettings();
             console.log('Flying toggled to:', settings.flying);
+            
+            // Show a brief visual feedback
+            showFlyingFeedback(settings.flying);
+        }
+
+        // Show visual feedback for flying toggle
+        function showFlyingFeedback(isFlying) {
+            // Remove any existing feedback
+            const existingFeedback = document.querySelector('.flying-feedback');
+            if (existingFeedback) {
+                existingFeedback.remove();
+            }
+            
+            // Create feedback element
+            const feedback = document.createElement('div');
+            feedback.className = 'flying-feedback';
+            feedback.textContent = isFlying ? 'Flying Enabled' : 'Flying Disabled';
+            feedback.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: ${isFlying ? '#4CAF50' : '#f44336'};
+                color: white;
+                padding: 10px 20px;
+                border-radius: 20px;
+                font-size: 14px;
+                font-weight: 500;
+                z-index: 10000;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                animation: flyingFeedbackSlide 2s ease-in-out;
+            `;
+            
+            // Add animation keyframes if not already added
+            if (!document.querySelector('#flying-feedback-animation')) {
+                const style = document.createElement('style');
+                style.id = 'flying-feedback-animation';
+                style.textContent = `
+                    @keyframes flyingFeedbackSlide {
+                        0% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+                        15% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                        85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+                        100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // Add to page
+            document.body.appendChild(feedback);
+            
+            // Remove after animation
+            setTimeout(() => {
+                if (feedback.parentNode) {
+                    feedback.remove();
+                }
+            }, 2000);
         }
 
         // Apply loaded settings to UI
@@ -402,6 +467,44 @@
             // Flying toggle
             const flyingToggle = document.getElementById('flyingToggle');
             flyingToggle.addEventListener('click', toggleFlying);
+
+            // Double-tap space key to toggle flying
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
+        }
+
+        // Handle keyboard events for double-tap space detection
+        function handleKeyDown(event) {
+            if (event.code === 'Space' || event.key === ' ') {
+                // If key is already down, ignore repeated keydown events
+                if (spaceKeyDown) {
+                    event.preventDefault(); // Prevent page scroll
+                    return;
+                }
+                
+                spaceKeyDown = true;
+                event.preventDefault(); // Prevent page scroll
+            }
+        }
+
+        // Handle key up events for double-tap space detection
+        function handleKeyUp(event) {
+            if ((event.code === 'Space' || event.key === ' ') && spaceKeyDown) {
+                spaceKeyDown = false;
+                
+                const now = Date.now();
+                const timeSinceLastPress = now - lastSpacePress;
+                
+                if (timeSinceLastPress < doubleTapThreshold) {
+                    // Double-tap detected
+                    console.log('Double-tap space detected - toggling flying');
+                    toggleFlying();
+                    lastSpacePress = 0; // Reset to prevent triple-tap issues
+                } else {
+                    // First tap or too much time passed
+                    lastSpacePress = now;
+                }
+            }
         }
 
         // Handle messages from parent window

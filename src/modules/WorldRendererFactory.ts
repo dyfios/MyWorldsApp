@@ -8,6 +8,7 @@ import { ProcessQueryParams, WorldMetadata } from '../utils/ProcessQueryParams';
 import { EntityManager } from './EntityManager';
 import { DockButtonInfo } from './UIManager';
 import { Identity } from './Identity';
+import { SyncManager } from './SyncManager';
 
 /**
  * Entity instance format received from the server
@@ -47,7 +48,6 @@ export abstract class WorldRendering {
   protected config?: WorldConfig;
 
   abstract initialize(config: WorldConfig): Promise<void>;
-  abstract render(deltaTime: number): void;
   abstract dispose(): void;
 }
 
@@ -216,10 +216,6 @@ export class StaticSurfaceRenderer extends WorldRendering {
     }
 
     Logging.Log('StaticSurfaceRenderer initialized');
-  }
-
-  render(_deltaTime: number): void {
-    // Render static surface
   }
 
   /**
@@ -483,6 +479,8 @@ export class StaticSurfaceRenderer extends WorldRendering {
 
         // Load entity using EntityManager with correct parameters
         const loadedInstanceId = this.entityManager.loadEntity(
+          null,
+          null,
           instanceId,
           instanceTag,
           entityId,
@@ -592,12 +590,12 @@ export class StaticSurfaceRenderer extends WorldRendering {
  * Tiled surface renderer for large terrains
  */
 export class TiledSurfaceRenderer extends WorldRendering {
-  private restClient: REST;
-  private stateServiceClient: REST;
+  public entitiesConfig: any;
+  public restClient: REST;
+  public stateServiceClient: REST;
   private queryParams: ProcessQueryParams;
   private entityManager: EntityManager;
   private worldConfig: any;
-  private entitiesConfig: any;
   private terrainConfig: any;
   private biomesConfig: any;
   private worldAddress: string | undefined;
@@ -608,15 +606,18 @@ export class TiledSurfaceRenderer extends WorldRendering {
   private currentRegion: Vector2Int = new Vector2Int(0, 0);
   private water: WaterEntity | null = null;
   private regionLoadInProgress: boolean = false;
+  private initialWorldLoadInProgress: boolean = true;
+  private initialLoadStartTime: Date | null = null;
   private terrainTiles: { [key: string]: TerrainEntity | string } = {};
   private biomeMap: { [key: string]: any } = {};
   private characterSynchronizer: string | null = null;
-  private regionSynchronizers: { [key: string]: string } = {};
+  public regionSynchronizers: { [key: string]: string } = {};
   private regionSize: number = 512;
   private regionScale: number = 2;
   private numRegions: number = 256; // Number of regions along one axis
   private identityModule: Identity;
   private sun: SunController | null = null;
+  private centerRegion: Vector2Int = new Vector2Int(0, 0);
 
   constructor() {
     super();
@@ -627,6 +628,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
     this.entityManager = new EntityManager();
     this.identityModule = new Identity();
     this.setupGlobalCallbacks();
+    Time.SetTimeout(`this.toggleLoadingPanel(true)`, 1000);
   }
 
   /**
@@ -716,7 +718,9 @@ export class TiledSurfaceRenderer extends WorldRendering {
       }
     }
     var newRegion = this.getRegionIndexForWorldPos(this.getWorldPositionForRenderedPosition(renderedPos));
+    
     if (this.currentRegion != newRegion) {
+      this.checkAndHandleTerrainBoundaries(this.currentRegion, newRegion);
       this.currentRegion = newRegion;
     }
 
@@ -727,8 +731,100 @@ export class TiledSurfaceRenderer extends WorldRendering {
 
     // For now, keep water near user, will want to make more sophisticated
     if (this.water != null) {
-      this.water.SetPosition(new Vector3(
-        renderedPos.x, 127, renderedPos.z), false);
+      if (this.initialWorldLoadInProgress == true) {
+        //this.water.SetInteractionState(InteractionState.Hidden);
+      }
+      else {
+        this.water.SetPosition(new Vector3(
+          renderedPos.x, 127, renderedPos.z), false);
+      }
+    }
+
+    if (this.initialWorldLoadInProgress == true && Object.keys(this.terrainTiles).length >= 9) {
+      // Record the start time the first time we enter this logic block
+      if (this.initialLoadStartTime === null) {
+        this.initialLoadStartTime = (Date as any).now;
+      }
+      
+      const currentTime = (Date as any).now;
+      const loadingTimeElapsed = this.calculateElapsedSeconds(this.initialLoadStartTime!, currentTime);
+      const loadingTimeoutReached = loadingTimeElapsed >= 60; // 60 second timeout
+      
+      if (!this.isAnyTerrainTileLoading() || loadingTimeoutReached) {
+        this.initialWorldLoadInProgress = false;
+        this.water?.SetInteractionState(InteractionState.Static);
+        (globalThis as any).toggleLoadingPanel(false);
+        
+        if (loadingTimeoutReached) {
+          Logging.LogWarning('⏰ TiledSurfaceRenderer: Initial world loading timeout reached (60 seconds) - proceeding despite pending terrain tiles');
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if character has crossed terrain boundaries and shift position if needed
+   * @param oldRegion Previous region index
+   * @param newRegion Current region index
+   */
+  private checkAndHandleTerrainBoundaries(oldRegion: Vector2Int, newRegion: Vector2Int): void {
+    if ((globalThis as any).playerController.internalCharacterEntity == null) {
+      return;
+    }
+
+    const regionSize_meters = this.regionSize * this.regionScale;
+    let shiftNeeded = false;
+    let rotationNeeded = false;
+
+    // Get current character position
+    const renderedPos = (globalThis as any).playerController.internalCharacterEntity.GetPosition(false);
+    const worldPos = this.getWorldPositionForRenderedPosition(renderedPos);
+    let newWorldPos = new Vector3(worldPos.x, worldPos.y, worldPos.z);
+
+    // Check X boundary crossing (horizontal wrapping)
+    // If old region was in first half but new region is in second half (or vice versa), it's a wrap
+    const halfWorld = this.numRegions / 2; // 128
+    
+    if (oldRegion.x < halfWorld && newRegion.x > halfWorld) {
+      // Character wrapped from left side to right side
+      newWorldPos.x -= this.numRegions * regionSize_meters;
+      shiftNeeded = true;
+      Logging.Log(`Character wrapped from left boundary (region ${oldRegion.x}) to right side (region ${newRegion.x})`);
+    } else if (oldRegion.x > halfWorld && newRegion.x < halfWorld) {
+      // Character wrapped from right side to left side
+      newWorldPos.x += this.numRegions * regionSize_meters;
+      shiftNeeded = true;
+      Logging.Log(`Character wrapped from right boundary (region ${oldRegion.x}) to left side (region ${newRegion.x})`);
+    }
+
+    // Check Z boundary crossing (vertical wrapping)  
+    if (oldRegion.y < halfWorld && newRegion.y > halfWorld) {
+      // Character wrapped from front side to back side
+      newWorldPos.z -= this.numRegions * regionSize_meters;
+      shiftNeeded = true;
+      rotationNeeded = true;
+      Logging.Log(`Character wrapped from front boundary (region ${oldRegion.y}) to back side (region ${newRegion.y}) - rotating 180°`);
+    } else if (oldRegion.y > halfWorld && newRegion.y < halfWorld) {
+      // Character wrapped from back side to front side
+      newWorldPos.z += this.numRegions * regionSize_meters;
+      shiftNeeded = true;
+      rotationNeeded = true;
+      Logging.Log(`Character wrapped from back boundary (region ${oldRegion.y}) to front side (region ${newRegion.y}) - rotating 180°`);
+    }
+
+    // Apply rotation for Z-direction crossings
+    if (rotationNeeded) {
+      const currentRotation = (globalThis as any).playerController.internalCharacterEntity.GetRotation(false);
+      const currentEuler = currentRotation.GetEulerAngles();
+      const newRotation = Quaternion.FromEulerAngles(currentEuler.x, currentEuler.y + 180, currentEuler.z);
+      (globalThis as any).playerController.internalCharacterEntity.SetRotation(newRotation, false);
+    }
+
+    // Apply the position shift if needed
+    if (shiftNeeded) {
+      const newRenderedPos = this.getRenderedPositionForWorldPosition(newWorldPos);
+      (globalThis as any).playerController.internalCharacterEntity.SetPosition(newRenderedPos, false);
+      Logging.Log(`Character position shifted from ${renderedPos.x}, ${renderedPos.y}, ${renderedPos.z} to ${newRenderedPos.x}, ${newRenderedPos.y}, ${newRenderedPos.z}`);
     }
   }
 
@@ -759,10 +855,34 @@ export class TiledSurfaceRenderer extends WorldRendering {
       return;
     }
 
+    this.centerRegion = centerRegionIdx;
+
     const neighbors = this.getWrappedNeighbors(centerRegionIdx, this.numRegions);
     for (const neighborIdx of neighbors) {
       if (this.terrainTiles[neighborIdx.x + "." + neighborIdx.y] == null) {
         this.loadRegion(neighborIdx);
+        if (centerRegionIdx.x < 1) {
+          if (neighborIdx.x > 2) {
+            // tile pos x -= numRegions * regionSize
+          }
+        }
+        if (centerRegionIdx.x > this.numRegions - 2) {
+          if (neighborIdx.x < this.numRegions - 3) {
+            // tile pos x += numRegions * regionSize
+          }
+        }
+        if (centerRegionIdx.y < 1) {
+          if (neighborIdx.y > 2) {
+            // tile pos z -= numRegions * regionSize
+            // tile rot y += 180
+          }
+        }
+        if (centerRegionIdx.y > this.numRegions - 2) {
+          if (neighborIdx.y < this.numRegions - 3) {
+            // tile pos z += numRegions * regionSize
+            // tile rot y += 180
+          }
+        }
         return;
       }
     }
@@ -847,6 +967,21 @@ export class TiledSurfaceRenderer extends WorldRendering {
       this.startLoginProcess();
       return;
     }
+
+    // User is authenticated, proceed with manifest loading
+    Logging.Log('✅ TiledSurfaceRenderer: User authenticated, loading world manifests...');
+    
+    try {
+      this.restClient.sendWorldManifestRequest('onWorldManifestReceived');
+      this.restClient.sendWorldEntitiesManifestRequest('onEntitiesManifestReceived');
+      this.restClient.sendWorldTerrainManifestRequest('onTerrainManifestReceived');
+      this.stateServiceClient.sendBiomeManifestRequest('onBiomeManifestReceived');
+      
+      Logging.Log('📤 TiledSurfaceRenderer: World manifest requests sent');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ TiledSurfaceRenderer: Failed to send manifest requests: ' + errorMessage);
+    }
   }
 
   loadRegion(regionIdx: Vector2Int): void {
@@ -904,6 +1039,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
 
   applyEntitiesConfig(): void {
     Logging.Log("Applying Entities Config...");
+    WorldStorage.SetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS", "0");
 
     for (var entity in this.entitiesConfig) {
       if (this.entitiesConfig[entity].id == null) {
@@ -946,6 +1082,19 @@ export class TiledSurfaceRenderer extends WorldRendering {
           this.entitiesConfig[entity].variants[variant].thumbnail =
             this.worldAddress + "/" + this.worldConfig["entities-directory"] + "/"
             + this.entitiesConfig[entity].variants[variant].thumbnail;
+          Time.SetTimeout(`
+            try {
+              addTool('${this.entitiesConfig[entity].variants[variant].display_name}', '${this.entitiesConfig[entity].variants[variant].thumbnail}', 'TOOL.ADD_DOCK_BUTTON(ENTITY.${entity}.${variant}, ${this.entitiesConfig[entity].variants[variant].display_name}, ${this.entitiesConfig[entity].variants[variant].thumbnail})');
+              var numEntityButtons = parseInt(WorldStorage.GetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS"));
+              if (numEntityButtons < 3) {
+                this.addEditToolbarButton('${this.entitiesConfig[entity].variants[variant].display_name}', '${this.entitiesConfig[entity].variants[variant].thumbnail}', 'TOOL.DOCK_BUTTON_CLICKED(ENTITY.${entity}.${variant}, ${this.entitiesConfig[entity].variants[variant].display_name}, ${this.entitiesConfig[entity].variants[variant].thumbnail})');
+                WorldStorage.SetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS", (numEntityButtons + 1).toString());
+              }
+            }
+            catch (error) {
+              Logging.LogError('Error adding entity: ' + error);
+            }
+          `, 6000);
         }
 
         for (var valid_orientation in this.entitiesConfig[entity].variants[variant].valid_orientations) {
@@ -984,6 +1133,8 @@ export class TiledSurfaceRenderer extends WorldRendering {
 
   applyTerrainConfig(): void {
     Logging.Log("Applying Terrain Config...");
+
+    WorldStorage.SetItem("MYWORLDS.DOCKUI.TERRAIN_BUTTONS", "0");
 
     if (this.terrainConfig["grid-size"] === null) {
       Logging.LogError("applyTerrainConfig: Invalid terrain config: missing grid-size");
@@ -1029,6 +1180,20 @@ export class TiledSurfaceRenderer extends WorldRendering {
           this.terrainConfig.layers[terrainLayer].normal_texture = "file://"
             + this.terrainConfig.layers[terrainLayer].normal_texture;
         }
+
+        Time.SetTimeout(`
+          try {
+            addTool('${terrainLayer}', '${this.terrainConfig.layers[terrainLayer].color_texture}', 'TOOL.ADD_DOCK_BUTTON(TERRAIN.${terrainLayer}, ${terrainLayer}, ${this.terrainConfig.layers[terrainLayer].color_texture})');
+            var numTerrainButtons = parseInt(WorldStorage.GetItem("MYWORLDS.DOCKUI.TERRAIN_BUTTONS"));
+            if (numTerrainButtons < 3) {
+              this.addEditToolbarButton('${terrainLayer}', '${this.terrainConfig.layers[terrainLayer].color_texture}', 'TOOL.DOCK_BUTTON_CLICKED(TERRAIN.${terrainLayer}, ${terrainLayer}, ${this.terrainConfig.layers[terrainLayer].color_texture})');
+              WorldStorage.SetItem("MYWORLDS.DOCKUI.TERRAIN_BUTTONS", (numTerrainButtons + 1).toString());
+            }
+          }
+          catch (error) {
+            Logging.LogError('Error adding entity: ' + error);
+          }
+        `, 6000);
       }
     }
 
@@ -1104,7 +1269,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
 
   enableWater(water: WaterEntity): void {
     Logging.Log("Enabling Water...");
-    water.SetInteractionState(InteractionState.Static);
+    water.SetInteractionState(InteractionState.Hidden);
     water.SetVisibility(true);
     this.water = water;
     (globalThis as any).playerController.setMotionModeFree();
@@ -1146,6 +1311,14 @@ export class TiledSurfaceRenderer extends WorldRendering {
     this.stateServiceClient.sendBiomeManifestRequest('onBiomeManifestReceived');
   }
 
+  onGlobalSynchronizerConnected(): void {
+    Logging.Log("Global synchronizer connected.");
+  }
+
+  onGlobalSessionJoined(): void {
+    Logging.Log("Global synchronization session joined.");
+  }
+
   onWorldManifestReceived(response: string): void {
     try {
       Logging.Log('🎯 TiledSurfaceRenderer: onWorldManifestReceived callback invoked');
@@ -1158,6 +1331,8 @@ export class TiledSurfaceRenderer extends WorldRendering {
           Logging.LogError("MetaWorld->GotWorldConfig: Invalid World Config. Aborting.");
         } else {
           this.applyWorldConfig();
+          ((globalThis as any).syncManager as SyncManager).connectToGlobalSynchronizer(
+            this.worldConfig, this.onGlobalSynchronizerConnected, this.onGlobalSessionJoined);
         }
       }
 
@@ -1182,8 +1357,43 @@ export class TiledSurfaceRenderer extends WorldRendering {
       this.getBiomeIDForTerrainTile(terrain);
     this.terrainTiles[terrainIndex.x + "." + terrainIndex.y] = terrain;
 
-    terrain.SetPosition(this.getRenderedPositionForWorldPosition(this.getWorldPosForRegionIndex(
-      new Vector2Int(terrainIndex.x, terrainIndex.y))), false);
+    var terrainPos: Vector3 = this.getRenderedPositionForWorldPosition(this.getWorldPosForRegionIndex(
+      new Vector2Int(terrainIndex.x, terrainIndex.y)));
+    
+    var terrainRot: Quaternion = Quaternion.identity;
+
+    // Handle wrapping over left edge
+    if (this.centerRegion.x < 1) {
+      if (terrainIndex.x > 2) {
+        terrainPos.z -= this.numRegions * this.regionSize * this.regionScale;
+      }
+    }
+
+    // Handle wrapping over right edge
+    if (this.centerRegion.x > this.numRegions - 2) {
+      if (terrainIndex.x < this.numRegions - 3) {
+        terrainPos.z += this.numRegions * this.regionSize * this.regionScale;
+      }
+    }
+
+    // Handle wrapping over top edge
+    if (this.centerRegion.y < 1) {
+      if (terrainIndex.y > 2) {
+        terrainPos.x -= this.numRegions * this.regionSize * this.regionScale;
+        terrainRot = Quaternion.FromEulerAngles(0, 180, 0); // TODO terrain cannot be rotated, do when converted to mesh
+      }
+    }
+
+    // Handle wrapping over bottom edge
+    if (this.centerRegion.y > this.numRegions - 2) {
+      if (terrainIndex.y < this.numRegions - 3) {
+        terrainPos.x += this.numRegions * this.regionSize * this.regionScale;
+        terrainRot = Quaternion.FromEulerAngles(0, 180, 0); // TODO terrain cannot be rotated, do when converted to mesh
+      }
+    }
+
+    terrain.SetPosition(terrainPos, false);
+    terrain.SetRotation(terrainRot, false);
 
     // Check authentication before making requests
     if (!this.isUserAuthenticated()) {
@@ -1251,15 +1461,15 @@ export class TiledSurfaceRenderer extends WorldRendering {
         if (entityType == null || entityType == "") {
           entityType = "mesh";
         }
-        this.entityManager.loadEntity(entityColl[entity].instanceid, undefined, entityColl[entity].entityid,
-          entityColl[entity].variantid, undefined, entityType, entityPos,
+        this.entityManager.loadEntity(null, null, entityColl[entity].instanceid, undefined,
+          entityColl[entity].entityid, entityColl[entity].variantid, undefined, entityType, entityPos,
           new Quaternion(entityColl[entity].xrotation, entityColl[entity].yrotation,
             entityColl[entity].zrotation, entityColl[entity].wrotation), Vector3.one,
           this.entitiesConfig[entityName].variants[variantName].model,
           [this.entitiesConfig[entityName].variants[variantName].model],
           this.entitiesConfig[entityName].variants[variantName].wheels,
           this.entitiesConfig[entityName].variants[variantName].mass,
-          AutomobileType.Car,
+          AutomobileType.Default,
           this.entitiesConfig[entityName].variants[variantName].scripts);
       }
       //this.worldLoaded = true;
@@ -1499,6 +1709,44 @@ export class TiledSurfaceRenderer extends WorldRendering {
     (globalThis as any).tiledsurfacerenderer_updateTimeOfDay = (timeInfo: string) => {
       this.updateTimeOfDay(timeInfo);
     };
+
+    (globalThis as any).tiledsurfacerenderer_getTerrainTileForIndex = (index: Vector2Int) => {
+      return this.getTerrainTileForIndex(index);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getTerrainTileIndexForEntity = (entity: TerrainEntity) => {
+      return this.getTerrainTileIndexForEntity(entity);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getIndexForTerrainTile = (terrainTile: TerrainEntity) => {
+      return this.getIndexForTerrainTile(terrainTile);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getMaterialForDigging = (regionIdx: Vector2Int, height: number) => {
+      return this.getMaterialForDigging(regionIdx, height);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getRegionIndexForWorldPos = (worldPos: Vector3) => {
+      return this.getRegionIndexForWorldPos(worldPos);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getWorldPosForRegionPos = (regionPos: Vector3, regionIdx: Vector2Int) => {
+      return this.getWorldPosForRegionPos(regionPos, regionIdx);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getWorldPositionForRenderedPosition = (renderedPos: Vector3) => {
+      return this.getWorldPositionForRenderedPosition(renderedPos);
+    };
+    
+    (globalThis as any).tiledsurfacerenderer_getRenderedPositionForWorldPosition = (worldPos: Vector3) => {
+      return this.getRenderedPositionForWorldPosition(worldPos);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos = (worldPos: Vector3, regionIdx: Vector2Int) => {
+      return this.getRegionPosForWorldPos(worldPos, regionIdx);
+    };
+
+    (globalThis as any).tiledsurfacerenderer = this;
   }
 
   async initialize(): Promise<void> {
@@ -1531,10 +1779,6 @@ export class TiledSurfaceRenderer extends WorldRendering {
     Logging.Log('TiledSurfaceRenderer initialized');
   }
 
-  render(_deltaTime: number): void {
-    // Render tiled surface
-  }
-
   /**
    * Start the login process using the Identity module
    */
@@ -1559,12 +1803,12 @@ export class TiledSurfaceRenderer extends WorldRendering {
    */
   private registerForPostLoginLoading(): void {
     try {
-      Logging.Log('📝 TiledSurfaceRenderer: Registering for post-login entity template loading...');
+      Logging.Log('📝 TiledSurfaceRenderer: Registering for post-login world manifest loading...');
 
-      // Set the global pending request variable
-      (globalThis as any).pendingEntityTemplateRequest = this;
+      // Set the global pending request variable for world manifest loading
+      (globalThis as any).pendingWorldManifestRequest = this;
 
-      Logging.Log('✓ TiledSurfaceRenderer: Registered for post-login loading');
+      Logging.Log('✓ TiledSurfaceRenderer: Registered for post-login world manifest loading');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ TiledSurfaceRenderer: Failed to register for post-login loading: ' + errorMessage);
@@ -1601,6 +1845,41 @@ export class TiledSurfaceRenderer extends WorldRendering {
     }
   }
 
+  /**
+   * Check if any terrain tiles are currently loading
+   * @returns True if any terrain tile is in "loading" state, false otherwise
+   */
+  isAnyTerrainTileLoading(): boolean {
+    for (const tile in this.terrainTiles) {
+      if (this.terrainTiles[tile] === "loading") {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Calculate elapsed seconds between two Date objects
+   * @param startTime Start time Date object
+   * @param currentTime Current time Date object
+   * @returns Elapsed seconds (approximate calculation)
+   */
+  private calculateElapsedSeconds(startTime: Date, currentTime: Date): number {
+    // Calculate elapsed time using date components
+    // This is an approximation since we don't have direct millisecond comparison
+    const startSeconds = (startTime as any).hour * 3600 + (startTime as any).minute * 60 + (startTime as any).second;
+    const currentSeconds = (currentTime as any).hour * 3600 + (currentTime as any).minute * 60 + (currentTime as any).second;
+    
+    let elapsedSeconds = currentSeconds - startSeconds;
+    
+    // Handle day rollover (simple case - assume max 1 day difference)
+    if (elapsedSeconds < 0) {
+      elapsedSeconds += 24 * 3600; // Add 24 hours worth of seconds
+    }
+    
+    return elapsedSeconds;
+  }
+
   dispose(): void {
     this.stopMaintenance();
     
@@ -1621,10 +1900,6 @@ export class GlobeRenderer extends WorldRendering {
     Logging.Log('GlobeRenderer initialized');
   }
 
-  render(_deltaTime: number): void {
-    // Render globe
-  }
-
   dispose(): void {
     Logging.Log('GlobeRenderer disposed');
   }
@@ -1636,10 +1911,6 @@ export class GlobeRenderer extends WorldRendering {
 export class AtmosphereRenderer extends WorldRendering {
   async initialize(): Promise<void> {
     Logging.Log('AtmosphereRenderer initialized');
-  }
-
-  render(_deltaTime: number): void {
-    // Render atmosphere
   }
 
   dispose(): void {
@@ -1655,10 +1926,6 @@ export class OrbitalRenderer extends WorldRendering {
     Logging.Log('OrbitalRenderer initialized');
   }
 
-  render(_deltaTime: number): void {
-    // Render orbital view
-  }
-
   dispose(): void {
     Logging.Log('OrbitalRenderer disposed');
   }
@@ -1672,10 +1939,6 @@ export class StellarSystemRenderer extends WorldRendering {
     Logging.Log('StellarSystemRenderer initialized');
   }
 
-  render(_deltaTime: number): void {
-    // Render stellar system
-  }
-
   dispose(): void {
     Logging.Log('StellarSystemRenderer disposed');
   }
@@ -1687,10 +1950,6 @@ export class StellarSystemRenderer extends WorldRendering {
 export class GalacticRenderer extends WorldRendering {
   async initialize(): Promise<void> {
     Logging.Log('GalacticRenderer initialized');
-  }
-
-  render(_deltaTime: number): void {
-    // Render galaxy
   }
 
   dispose(): void {
@@ -1826,11 +2085,6 @@ export class SunController extends WorldRendering {
     }
   }
 
-  render(_deltaTime: number): void {
-    // Sun controller doesn't need continuous rendering
-    // Time updates are handled through explicit updateTimeOfDay calls
-  }
-
   /**
    * Set time of day using hours (0-24)
    * @param hours Time of day in hours (0-24)
@@ -1918,10 +2172,6 @@ export class WorldRendererFactory {
     this.renderers.push(sunController);
 
     Logging.Log('All renderers loaded');
-  }
-
-  renderFrame(deltaTime: number): void {
-    this.renderers.forEach(renderer => renderer.render(deltaTime));
   }
 
   /**

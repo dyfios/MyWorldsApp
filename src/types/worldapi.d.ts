@@ -1614,10 +1614,8 @@ declare enum UIElementAlignment {
  * Terrain entity brush type enum.
  */
 declare enum TerrainEntityBrushType {
-    RaiseLower = 0,
-    Flatten = 1,
-    Smooth = 2,
-    Paint = 3
+    sphere = 0,
+    roundedCube = 1
 }
 
 /**
@@ -1712,31 +1710,24 @@ declare interface VoxelBlockSubType {
  * Automobile type enum.
  */
 declare enum AutomobileType {
-    Car = 0,
-    Truck = 1
+    Default = 0
 }
 
 /**
  * Class for automobile entity wheel.
  */
 declare class AutomobileEntityWheel {
-    /** Wheel radius. */
-    radius: number;
-    /** Suspension distance. */
-    suspensionDistance: number;
-    /** Suspension spring. */
-    suspensionSpring: number;
-    /** Suspension damper. */
-    suspensionDamper: number;
-    /** Suspension target position. */
-    suspensionTargetPosition: number;
-    /** Forward friction. */
-    forwardFriction: number;
-    /** Sideways friction. */
-    sidewaysFriction: number;
+    /** Submesh corresponding to the wheel. */
+    wheelSubMesh: string;
+    /** Radius of the wheel. */
+    wheelRadius: number;
 
-    /** Constructor for automobile entity wheel. */
-    constructor();
+    /**
+     * Constructor for automobile entity wheel.
+     * @param wheelSubMesh Submesh corresponding to the wheel.
+     * @param wheelRadius Radius of the wheel.
+     */
+    constructor(wheelSubMesh: string, wheelRadius: number);
 }
 
 /**
@@ -2505,6 +2496,41 @@ declare class CharacterEntity extends BaseEntity {
 declare class ContainerEntity extends BaseEntity {
     /** Constructor for container entity. */
     constructor();
+
+    /**
+     * Create a container entity.
+     * @param parent Parent of the entity to create.
+     * @param position Position of the entity relative to its parent.
+     * @param rotation Rotation of the entity relative to its parent.
+     * @param scale Scale of the entity relative to its parent.
+     * @param isSize Whether or not the scale parameter is a size.
+     * @param tag Tag of the container entity.
+     * @param id ID of the entity. One will be created if not provided.
+     * @param onLoaded Action to perform on load. This takes a single parameter containing the created container entity object.
+     * @returns The container entity object.
+     */
+    static Create(
+        parent: BaseEntity | null,
+        position: Vector3,
+        rotation: Quaternion,
+        scale: Vector3,
+        isSize?: boolean,
+        tag?: string | null,
+        id?: string | null,
+        onLoaded?: string | null
+    ): ContainerEntity;
+
+    /**
+     * Create a container entity from a JSON string.
+     * @param jsonEntity JSON string containing the container entity configuration.
+     * @param parent Parent entity for the container entity. If null, the entity will be created at the world root.
+     * @param onLoaded JavaScript callback function to execute when the entity is created. The callback will receive the created container entity as a parameter.
+     */
+    static Create(
+        jsonEntity: string,
+        parent?: BaseEntity | null,
+        onLoaded?: string | null
+    ): void;
 }
 
 /**

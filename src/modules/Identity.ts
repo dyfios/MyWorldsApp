@@ -379,6 +379,43 @@ export class Identity {
       
       const data: AuthTokenResponse = JSON.parse(responseBody);
       Logging.Log('🎯 Identity: Parsed data: ' + JSON.stringify(data));
+
+      // Execute login callback if provided
+      /*if (this.loginCallbackFunction) {
+          this.loginCallbackFunction();
+      }
+      
+      // Trigger entity templates request after successful login
+      Logging.Log('🔄 Triggering entity templates request after successful login...');
+      if (typeof (globalThis as any).triggerEntityTemplatesAfterLogin === 'function') {
+        (globalThis as any).triggerEntityTemplatesAfterLogin();
+      } else if ((globalThis as any).pendingEntityTemplateRequest && 
+                 typeof (globalThis as any).pendingEntityTemplateRequest.loadEntityTemplates === 'function') {
+        Logging.Log('🔄 Executing pending entity templates request directly...');
+        (globalThis as any).pendingEntityTemplateRequest.loadEntityTemplates();
+        (globalThis as any).pendingEntityTemplateRequest = null;
+      } else {
+        Logging.Log('⚠️ No entity template loading mechanism found - templates may need to be requested manually');
+      }
+
+      // Trigger world manifest loading for planet renderer after successful login
+      Logging.Log('🔄 Triggering world manifest loading after successful login...');
+      if ((globalThis as any).pendingWorldManifestRequest && 
+          typeof (globalThis as any).pendingWorldManifestRequest.loadWorldManifest === 'function') {
+        Logging.Log('🔄 Executing pending world manifest request for planet renderer...');
+        (globalThis as any).pendingWorldManifestRequest.loadWorldManifest();
+        (globalThis as any).pendingWorldManifestRequest = null;
+      } else {
+        Logging.Log('⚠️ No pending world manifest request found - may not be using planet renderer');
+      }
+
+      // Start the main UI and render loop after login and world loading setup is complete
+      Logging.Log('🔄 Starting main UI and render loop after login...');
+      if (typeof (globalThis as any).startRenderLoop === 'function') {
+        (globalThis as any).startRenderLoop();
+      } else {
+        Logging.LogError('❌ startRenderLoop function not available');
+      }*/
       
       if (data.success && data.token) {
         Logging.Log('✅ Identity: Lite auth successful for user: ' + (data.username || 'unknown'));

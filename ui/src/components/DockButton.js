@@ -22,7 +22,7 @@ const DockButton = ({
 }) => {
   // Calculate font size based on text length for non-URL thumbnails
   const getFontSize = (thumbnail) => {
-    if (!thumbnail || thumbnail.startsWith('http')) {
+    if (!thumbnail || isImageUrl(thumbnail)) {
       return '2rem'; // Default for images
     }
     
@@ -32,6 +32,26 @@ const DockButton = ({
     if (length <= 6) return '0.9rem';    // 5-6 chars
     if (length <= 8) return '0.75rem';   // 7-8 chars
     return '0.6rem';                      // 9+ chars
+  };
+
+  // Check if thumbnail is a URL (comprehensive check)
+  const isImageUrl = (thumbnail) => {
+    return thumbnail && (
+      thumbnail.startsWith('http') || 
+      thumbnail.startsWith('https') ||
+      thumbnail.startsWith('data:') ||
+      thumbnail.startsWith('file:') ||
+      thumbnail.startsWith('./') ||
+      thumbnail.startsWith('../') ||
+      (thumbnail.includes('.') && (
+        thumbnail.endsWith('.png') ||
+        thumbnail.endsWith('.jpg') ||
+        thumbnail.endsWith('.jpeg') ||
+        thumbnail.endsWith('.gif') ||
+        thumbnail.endsWith('.svg') ||
+        thumbnail.endsWith('.webp')
+      ))
+    );
   };
 
   const handleMouseDown = (e) => {
@@ -72,8 +92,16 @@ const DockButton = ({
       >
         <div className="button-content">
           {button.thumbnail && (
-            typeof button.thumbnail === 'string' && button.thumbnail.startsWith('http') ? (
-              <img src={button.thumbnail} alt={button.name} className="button-thumbnail" />
+            isImageUrl(button.thumbnail) ? (
+              <img 
+                src={button.thumbnail} 
+                alt={button.name} 
+                className="button-thumbnail"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.parentElement.innerHTML = '<span class="button-emoji" style="font-size: 2rem;">📷</span>';
+                }}
+              />
             ) : (
               <span 
                 className="button-emoji"

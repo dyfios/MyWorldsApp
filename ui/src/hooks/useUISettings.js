@@ -1,288 +1,183 @@
-/**
- * UI Settings Hook - React hook for managing UI Settings functionality
- * Integrates with popup menu system and provides global API access
- */
-
-import { useState, useEffect, useCallback } from 'react';
-
-// Configuration
-const UI_SETTINGS_CONFIG = {
-    tabName: 'UI Settings',
-    tabUrl: './ui-settings.html',
-    position: 0, // Insert at beginning (before other tabs)
-    autoLoad: true,
-    supportedWorldTypes: ['mini-world', 'planet'] // Only add for these world types
-};
+/* global postWorldMessage */
+import { useState, useCallback } from 'react';
 
 export const useUISettings = () => {
-    // Settings state management
-    const [currentSettings, setCurrentSettings] = useState({
-        cameraMode: 'firstPerson',
-        movementSpeed: 1.0,
-        lookSpeed: 1.0,
-        flying: false
-    });
+  const [currentSettings, setCurrentSettings] = useState({
+    cameraMode: 'firstPerson',
+    movementSpeed: 1,
+    lookSpeed: 1,
+    flying: false
+  });
 
-    const [settingsChangeCallbacks, setSettingsChangeCallbacks] = useState([]);
+  const initializeUISettings = useCallback((worldType) => {
+    console.log('initializeUISettings called with worldType:', worldType);
+    
+    // Check if the world type supports UI settings
+    if (!isWorldTypeSupported(worldType)) {
+      console.log('World type not supported for UI settings:', worldType);
+      return false;
+    }
+    
+    let success = true;
+    
+    // Add tabs to the popup menu
+    if (window.popupMenuAPI && typeof window.popupMenuAPI.addTab === 'function') {
+      // Add the UI Settings tab first
+      const uiSettingsTabId = window.popupMenuAPI.addTab('UI Settings', 'ui-settings.html');
+      console.log('UI Settings tab added to popup menu with ID:', uiSettingsTabId);
+      console.log('Added tab URL: ui-settings.html');
+      
+      // Add the Tools tab with a small delay and without specifying position
+      setTimeout(() => {
+        const toolsTabId = window.popupMenuAPI.addTab('Tools', 'tools.html');
+        console.log('Tools tab added to popup menu with ID:', toolsTabId);
+        console.log('Added tab URL: tools.html');
+        
+        // Debug: Check all tabs
+        const allTabs = window.popupMenuAPI.getTabs();
+        console.log('All tabs after adding:', allTabs.map(tab => ({ name: tab.name, url: tab.url })));
+      }, 100);
+    } else {
+      console.warn('PopupMenu API not available, cannot add tabs');
+      success = false;
+    }
+    
+    return success;
+  }, []);
 
-    // Check if current world type supports UI settings
-    const isWorldTypeSupported = useCallback((worldType = null) => {
-        try {
-            // Use provided world type or check for temporary world type first
-            let currentWorldType = worldType || window.tempWorldType;
-            
-            if (!currentWorldType) {
-                // Get world type from URL parameters
-                const urlParams = new URLSearchParams(window.location.search);
-                currentWorldType = urlParams.get('worldType');
-                
-                // Also try to get from WebVerse World API if available
-                if (typeof window.World !== 'undefined' && window.World.GetQueryParam) {
-                    currentWorldType = window.World.GetQueryParam('worldType') || currentWorldType;
-                }
-            }
-            
-            console.log('Checking world type for UI Settings support:', currentWorldType);
-            
-            if (!currentWorldType) {
-                console.log('No world type specified, UI Settings will not be added');
-                return false;
-            }
-            
-            const isSupported = UI_SETTINGS_CONFIG.supportedWorldTypes.includes(currentWorldType);
-            console.log('World type', currentWorldType, 'is', isSupported ? 'supported' : 'not supported', 'for UI Settings');
-            
-            return isSupported;
-        } catch (error) {
-            console.error('Error checking world type:', error);
-            return false;
-        }
-    }, []);
+  const isWorldTypeSupported = useCallback((worldType) => {
+    // Define which world types support UI settings
+    const supportedWorldTypes = ['mini-world', 'planet'];
+    const supported = supportedWorldTypes.includes(worldType);
+    console.log('isWorldTypeSupported called with worldType:', worldType, 'supported:', supported);
+    return supported;
+  }, []);
 
-    // Add the UI Settings tab
-    const addUISettingsTab = useCallback(() => {
-        if (window.popupMenuAPI) {
-            const tabId = window.popupMenuAPI.addTab(
-                UI_SETTINGS_CONFIG.tabName, 
-                UI_SETTINGS_CONFIG.tabUrl,
-                UI_SETTINGS_CONFIG.position
-            );
+  const getSettings = useCallback(() => {
+    return { ...currentSettings };
+  }, [currentSettings]);
 
-            console.log('UI Settings tab added with ID:', tabId);
-            return tabId;
-        } else {
-            console.warn('PopupMenu API not available yet, retrying...');
-            setTimeout(addUISettingsTab, 100);
-        }
-    }, []);
+  const updateSettings = useCallback(() => {
+    // Placeholder
+  }, []);
 
-    // Handle messages from the UI Settings iframe
-    const handleUISettingsMessage = useCallback(({ tabId, tabName, type, data }) => {
-        if (tabName !== UI_SETTINGS_CONFIG.tabName) return;
+  const initialize = useCallback(() => {
+    console.log('UI Settings initialized');
+  }, []);
 
-        switch (type) {
-            case 'iframe-ready':
-                console.log('UI Settings iframe is ready');
-                if (data && data.settings) {
-                    setCurrentSettings({ ...data.settings });
-                    notifySettingsChanged({ ...data.settings });
-                }
-                break;
-
-            case 'settings-changed':
-                console.log('UI Settings changed:', data);
-                setCurrentSettings({ ...data });
-                notifySettingsChanged({ ...data });
-                
-                // Apply settings to the world
-                applySettingsToWorld({ ...data });
-                break;
-
-            case 'settings-response':
-                console.log('Received settings response:', data);
-                setCurrentSettings({ ...data });
-                break;
-
-            default:
-                console.log('Unknown message type from UI Settings:', type, data);
-        }
-    }, []);
-
-    // Apply settings to the WebVerse world
-    const applySettingsToWorld = useCallback((settings) => {
-        try {
-            // Send settings to the main world via postWorldMessage
-            if (typeof window.postWorldMessage === 'function') {
-                window.postWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(settings)})`);
-            }
-
-            // You can also apply settings directly if WebVerse APIs are available
-            // Example implementations:
-            
-            // Camera mode
-            if (settings.cameraMode && window.playerController) {
-                console.log('Applying camera mode:', settings.cameraMode);
-            }
-
-            // Movement speed
-            if (settings.movementSpeed && window.playerController) {
-                console.log('Applying movement speed:', settings.movementSpeed);
-            }
-
-            // Look speed
-            if (settings.lookSpeed && window.playerController) {
-                console.log('Applying look speed:', settings.lookSpeed);
-            }
-
-            // Flying mode
-            if (settings.hasOwnProperty('flying') && window.playerController) {
-                console.log('Applying flying mode:', settings.flying);
-            }
-
-        } catch (error) {
-            console.error('Failed to apply UI settings to world:', error);
-        }
-    }, []);
-
-    // Notify callbacks when settings change
-    const notifySettingsChanged = useCallback((settings) => {
-        settingsChangeCallbacks.forEach(callback => {
-            try {
-                callback(settings);
-            } catch (error) {
-                console.error('Error in settings change callback:', error);
-            }
+  // Tools API functions
+  const addTool = useCallback((name, thumbnail, onClick) => {
+    console.log('addTool called:', { name, thumbnail, onClick });
+    
+    // Send message to the Tools iframe if it exists
+    if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+      const toolsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'Tools');
+      if (toolsTabs.length > 0) {
+        const success = window.popupMenuAPI.sendMessageToTab(toolsTabs[0].id, {
+          type: 'add-tool',
+          data: { name, thumbnail, onClick }
         });
-    }, [settingsChangeCallbacks]);
-
-    // Initialize UI Settings for a specific world type
-    const initializeUISettings = useCallback((worldType) => {
-        console.log('initializeUISettings called with worldType:', worldType);
-        
-        if (!worldType || !UI_SETTINGS_CONFIG.supportedWorldTypes.includes(worldType)) {
-            console.log('UI Settings not initialized - world type not supported:', worldType);
-            return false;
+        if (success) {
+          console.log('Tool add message sent successfully');
+          return true;
         }
-        
-        // Override the URL parameter check with the provided world type
-        window.tempWorldType = worldType;
-        
-        // Initialize if popup menu is available
-        if (window.popupMenuAPI) {
-            window.popupMenuAPI.onTabMessage(handleUISettingsMessage);
-            
-            // Add the tab if auto-load is enabled
-            if (UI_SETTINGS_CONFIG.autoLoad) {
-                addUISettingsTab();
-            }
-            
-            console.log('UI Settings integration initialized for world type:', worldType);
-        } else {
-            // Retry if popup menu API isn't ready yet
-            setTimeout(() => initializeUISettings(worldType), 100);
+      }
+    }
+    console.warn('Could not send tool add message - Tools tab not found or API not available');
+    return false;
+  }, []);
+
+  const removeTool = useCallback((toolId) => {
+    console.log('removeTool called with ID:', toolId);
+    
+    // Send message to the Tools iframe if it exists
+    if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+      const toolsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'Tools');
+      if (toolsTabs.length > 0) {
+        const success = window.popupMenuAPI.sendMessageToTab(toolsTabs[0].id, {
+          type: 'remove-tool',
+          data: { toolId }
+        });
+        if (success) {
+          console.log('Tool remove message sent successfully');
+          return true;
         }
-        
-        // Clean up temp world type
-        setTimeout(() => {
-            delete window.tempWorldType;
-        }, 1000);
-        
-        return true;
-    }, [handleUISettingsMessage, addUISettingsTab]);
+      }
+    }
+    console.warn('Could not send tool remove message - Tools tab not found or API not available');
+    return false;
+  }, []);
 
-    // Initialize when popup menu API is available
-    const initialize = useCallback(() => {
-        // Check if world type supports UI settings
-        if (!isWorldTypeSupported()) {
-            console.log('UI Settings not initialized - world type not supported');
-            return;
+  const clearTools = useCallback(() => {
+    console.log('clearTools called');
+    
+    // Send message to the Tools iframe if it exists
+    if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+      const toolsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'Tools');
+      if (toolsTabs.length > 0) {
+        const success = window.popupMenuAPI.sendMessageToTab(toolsTabs[0].id, {
+          type: 'clear-tools',
+          data: {}
+        });
+        if (success) {
+          console.log('Clear tools message sent successfully');
+          return true;
         }
-        
-        // Register message handler for UI Settings
-        if (window.popupMenuAPI) {
-            window.popupMenuAPI.onTabMessage(handleUISettingsMessage);
-            
-            // Add the tab if auto-load is enabled
-            if (UI_SETTINGS_CONFIG.autoLoad) {
-                addUISettingsTab();
-            }
-            
-            console.log('UI Settings integration initialized');
-        } else {
-            // Retry if popup menu API isn't ready yet
-            setTimeout(initialize, 100);
-        }
-    }, [isWorldTypeSupported, handleUISettingsMessage, addUISettingsTab]);
+      }
+    }
+    console.warn('Could not send clear tools message - Tools tab not found or API not available');
+    return false;
+  }, []);
 
-    // Public API methods
-    const updateSettings = useCallback((newSettings) => {
-        const updatedSettings = { ...currentSettings, ...newSettings };
-        
-        // Send update to iframe if it exists
-        if (window.popupMenuAPI) {
-            const tabs = window.popupMenuAPI.getTabs();
-            const uiSettingsTab = tabs.find(tab => tab.name === UI_SETTINGS_CONFIG.tabName);
-            
-            if (uiSettingsTab) {
-                window.popupMenuAPI.sendMessageToTab(uiSettingsTab.id, {
-                    type: 'update-settings',
-                    data: newSettings
-                });
-            }
-        }
-        
-        setCurrentSettings(updatedSettings);
-        notifySettingsChanged(updatedSettings);
-        applySettingsToWorld(updatedSettings);
-    }, [currentSettings, notifySettingsChanged, applySettingsToWorld]);
+  // Flying toggle function for double-tap space
+  const toggleFlying = useCallback(() => {
+    console.log('toggleFlying called - current flying state:', currentSettings.flying);
+    
+    const newFlyingState = !currentSettings.flying;
+    
+    // Update local state
+    setCurrentSettings(prev => ({
+      ...prev,
+      flying: newFlyingState
+    }));
+    
+    // Send message to UI Settings iframe if it exists
+    if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+      const uiSettingsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'UI Settings');
+      if (uiSettingsTabs.length > 0) {
+        window.popupMenuAPI.sendMessageToTab(uiSettingsTabs[0].id, {
+          type: 'update-settings',
+          data: { flying: newFlyingState }
+        });
+        console.log('Flying state update sent to UI Settings tab');
+      }
+    }
+    
+    // Send flying state change to the world via postWorldMessage
+    if (typeof postWorldMessage === 'function') {
+      const newSettings = { ...currentSettings, flying: newFlyingState };
+      postWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(newSettings)})`);
+      console.log('Flying toggle sent to world:', newFlyingState);
+    } else {
+      console.warn('postWorldMessage not available for flying toggle');
+    }
+    
+    console.log('Flying toggled to:', newFlyingState);
+    return newFlyingState;
+  }, [currentSettings]);
 
-    const requestSettings = useCallback(() => {
-        if (window.popupMenuAPI) {
-            const tabs = window.popupMenuAPI.getTabs();
-            const uiSettingsTab = tabs.find(tab => tab.name === UI_SETTINGS_CONFIG.tabName);
-            
-            if (uiSettingsTab) {
-                window.popupMenuAPI.sendMessageToTab(uiSettingsTab.id, {
-                    type: 'get-settings'
-                });
-            }
-        }
-    }, []);
-
-    const onSettingsChange = useCallback((callback) => {
-        setSettingsChangeCallbacks(prev => [...prev, callback]);
-        return () => {
-            setSettingsChangeCallbacks(prev => prev.filter(cb => cb !== callback));
-        };
-    }, []);
-
-    const resetSettings = useCallback(() => {
-        const defaultSettings = {
-            cameraMode: 'firstPerson',
-            movementSpeed: 1.0,
-            lookSpeed: 1.0,
-            flying: false
-        };
-        
-        updateSettings(defaultSettings);
-    }, [updateSettings]);
-
-    return {
-        currentSettings,
-        initializeUISettings,
-        isWorldTypeSupported,
-        addUISettingsTab: () => {
-            if (!isWorldTypeSupported()) {
-                console.warn('Cannot add UI Settings tab - world type not supported');
-                return false;
-            }
-            return addUISettingsTab();
-        },
-        getSettings: () => ({ ...currentSettings }),
-        updateSettings,
-        requestSettings,
-        onSettingsChange,
-        resetSettings,
-        initialize
-    };
+  return {
+    currentSettings,
+    initializeUISettings,
+    isWorldTypeSupported,
+    getSettings,
+    updateSettings,
+    initialize,
+    // Tools API
+    addTool,
+    removeTool,
+    clearTools,
+    // Flying toggle
+    toggleFlying
+  };
 };

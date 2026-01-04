@@ -176,7 +176,14 @@ const ChatConsole = ({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (inputValue.trim()) {
-      addMessage(inputValue, 'User');
+      //addMessage(inputValue, 'User');
+      if (inputValue.startsWith('/')) {
+        // Command
+        postWorldMessage(`CHAT_INPUT.COMMAND(${inputValue.slice(1)})`);
+      } else {
+        // Message
+        postWorldMessage(`CHAT_INPUT.MESSAGE(${inputValue})`);
+      }
       setInputValue('');
       
       // Keep input active after sending
