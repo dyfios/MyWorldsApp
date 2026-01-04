@@ -584,13 +584,14 @@ export class Identity {
    * Falls back to guest mode if not authenticated
    */
   private startWebGLSessionAuth(): void {
-      const config = getIdentityConfig();
-      const state = getIdentityState();
+      // Hardcode the URL directly - WebVerse may not preserve module-level initializations
+      const AUTH_API_URL = 'https://id-dev.worldhub.me';
+      const state = getIdentityState() || { loginCallbackFunction: undefined };
+      
       Logging.Log("🔐 Identity: Starting Lite session-based authentication...");
+      Logging.Log(`🔐 Identity: AUTH_API_URL = ${AUTH_API_URL}`);
 
-      Logging.Log(`🔐 Identity: AUTH_API_URL = ${config.AUTH_API_URL}`);
-
-      const tokenEndpoint = `${config.AUTH_API_URL}/auth/generate-app-token`;
+      const tokenEndpoint = `${AUTH_API_URL}/auth/generate-app-token`;
       const requestBody = JSON.stringify({ client: 'lite' });
 
       Logging.Log(`🌐 Identity: POST ${tokenEndpoint}`);
