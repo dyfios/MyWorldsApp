@@ -73,7 +73,7 @@ export class REST {
   }
 
   sendGetEntityInstancesRequest(worldId: string, userId: string, userToken: string, onComplete: string): void {
-    this.get('/list-entity-instances', {
+    this.get(`/api/world/${worldId}/list-entity-instances`, {
       'world-id': worldId,
       'user-id': userId,
       'user-token': userToken
@@ -90,7 +90,7 @@ export class REST {
   }
 
   sendGetEntityTemplatesRequest(worldId: string, userId: string, userToken: string, onComplete: string): void {
-    this.get('/list-entity-templates', {
+    this.get(`/api/world/${worldId}/list-entity-templates`, {
       'world-id': worldId,
       'user-id': userId,
       'user-token': userToken
