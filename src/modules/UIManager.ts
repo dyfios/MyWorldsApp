@@ -906,8 +906,8 @@ export class UIManager {
     try {
       Logging.Log('🎛️ UIManager: Scheduling UI Settings initialization for world type: ' + worldType);
       
-      // Use a single delayed call to allow UI to fully load
-      Time.SetTimeout(`
+      // Define the callback function globally so Time.SetTimeout can call it
+      (globalThis as any).executeUISettingsInit = (wt: string) => {
         try {
           const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
           if (!mainToolbarId) {
@@ -915,26 +915,25 @@ export class UIManager {
             return;
           }
 
-          const mainToolbar = Entity.Get(mainToolbarId);
+          const mainToolbar = Entity.Get(mainToolbarId) as any;
           if (!mainToolbar) {
             Logging.LogWarning('UIManager: Main toolbar entity not found after delay');
             return;
           }
 
-          const jsCommand = \`
-            if (typeof window.initializeUISettings === 'function') {
-              console.log('UIManager: UI Settings function found, calling initializeUISettings...');
-              window.initializeUISettings('${worldType}');
-            } else {
-              console.warn('UIManager: initializeUISettings function not available in UI space');
-            }
-          \`;
+          // Build jsCommand using string concatenation to avoid nested template literals
+          const jsCommand = "if (typeof window.initializeUISettings === 'function') { " +
+            "console.log('UIManager: UI Settings function found, calling initializeUISettings...'); " +
+            "window.initializeUISettings('" + wt + "'); " +
+            "} else { " +
+            "console.warn('UIManager: initializeUISettings function not available in UI space'); " +
+            "}";
           
           mainToolbar.ExecuteJavaScript(jsCommand, '');
 
           const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-CANVAS-ID');
           if (vrToolbarHTMLId) {
-            const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId);
+            const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId) as any;
             vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
           }
 
@@ -942,7 +941,10 @@ export class UIManager {
         } catch (error) {
           Logging.LogError('UIManager: Error in delayed UI Settings initialization: ' + (error instanceof Error ? error.message : String(error)));
         }
-      `, 5000);
+      };
+      
+      // Use simple string for Time.SetTimeout to call our global function
+      Time.SetTimeout("executeUISettingsInit('" + worldType + "')", 5000);
       
       Logging.Log('✅ UIManager: UI Settings initialization scheduled for 5 seconds');
 

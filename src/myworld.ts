@@ -158,11 +158,8 @@ export class MyWorld {
       } else {
         Logging.Log('⚠️ UI Settings initialization function not available yet');
         // Retry after a short delay in case the UI hasn't loaded yet
-        Time.SetTimeout(`
-          if (typeof initializeUISettings === 'function') {
-            initializeUISettings('${worldType}');
-          }
-        `, 1000);
+        // Use string concatenation to avoid problematic template literal patterns
+        Time.SetTimeout("if (typeof initializeUISettings === 'function') { initializeUISettings('" + worldType + "'); }", 1000);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -177,31 +174,35 @@ export class MyWorld {
     try {
       Logging.Log('🔧 Initializing default tools for world type: ' + worldType);
       
-      // Add a delay to ensure UI is loaded before adding tools
-      Time.SetTimeout(`
+      // Define the callback function globally so Time.SetTimeout can call it
+      (globalThis as any).executeDefaultToolsInit = (wt: string) => {
         try {
           // Add default tools based on world type
-          if ('${worldType}' === 'mini-world') {
+          if (wt === 'mini-world') {
             // Mini-world tools
-            addTool('Hand', '🔨', 'TOOL.ADD_DOCK_BUTTON(HAND, Hand, 🔨)');
+            (globalThis as any).addTool('Hand', '🔨', 'TOOL.ADD_DOCK_BUTTON(HAND, Hand, 🔨)');
             Logging.Log('Mini-world tools added successfully');
-          } else if ('${worldType}' === 'planet') {
-            // Planet tools
-            addTool('Hand', this.uiManager.handPath, 'TOOL.ADD_DOCK_BUTTON(HAND, Hand, ${(globalThis as any).uiManager.handPath})');
-            addTool('Square Shovel', this.uiManager.squareShovelx1Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_1, Square Shovel, ${(globalThis as any).uiManager.squareShovelx1Path})');
-            addTool('Square Shovel (2x)', this.uiManager.squareShovelx2Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_2, Square Shovel (2x), ${(globalThis as any).uiManager.squareShovelx2Path})');
-            addTool('Square Shovel (4x)', this.uiManager.squareShovelx4Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_4, Square Shovel (4x), ${(globalThis as any).uiManager.squareShovelx4Path})');
-            addTool('Square Shovel (8x)', this.uiManager.squareShovelx8Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_8, Square Shovel (8x), ${(globalThis as any).uiManager.squareShovelx8Path})');
-            addTool('Sledge Hammer', this.uiManager.sledgeHammerPath, 'TOOL.ADD_DOCK_BUTTON(SLEDGE_HAMMER, Sledge Hammer, ${(globalThis as any).uiManager.sledgeHammerPath})');
-            this.addEditToolbarButton('Hand', this.uiManager.handPath, 'TOOL.DOCK_BUTTON_CLICKED(HAND)');
-            this.addEditToolbarButton('Square Shovel', this.uiManager.squareShovelx1Path, 'TOOL.DOCK_BUTTON_CLICKED(SQUARE_SHOVEL_1)');
-            this.addEditToolbarButton('Sledge Hammer', this.uiManager.sledgeHammerPath, 'TOOL.DOCK_BUTTON_CLICKED(SLEDGE_HAMMER)');
+          } else if (wt === 'planet') {
+            // Planet tools - use string concatenation to avoid problematic syntax
+            const ui = (globalThis as any).uiManager;
+            (globalThis as any).addTool('Hand', ui.handPath, 'TOOL.ADD_DOCK_BUTTON(HAND, Hand, ' + ui.handPath + ')');
+            (globalThis as any).addTool('Square Shovel', ui.squareShovelx1Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_1, Square Shovel, ' + ui.squareShovelx1Path + ')');
+            (globalThis as any).addTool('Square Shovel (2x)', ui.squareShovelx2Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_2, Square Shovel (2x), ' + ui.squareShovelx2Path + ')');
+            (globalThis as any).addTool('Square Shovel (4x)', ui.squareShovelx4Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_4, Square Shovel (4x), ' + ui.squareShovelx4Path + ')');
+            (globalThis as any).addTool('Square Shovel (8x)', ui.squareShovelx8Path, 'TOOL.ADD_DOCK_BUTTON(SQUARE_SHOVEL_8, Square Shovel (8x), ' + ui.squareShovelx8Path + ')');
+            (globalThis as any).addTool('Sledge Hammer', ui.sledgeHammerPath, 'TOOL.ADD_DOCK_BUTTON(SLEDGE_HAMMER, Sledge Hammer, ' + ui.sledgeHammerPath + ')');
+            (globalThis as any).addEditToolbarButton('Hand', ui.handPath, 'TOOL.DOCK_BUTTON_CLICKED(HAND)');
+            (globalThis as any).addEditToolbarButton('Square Shovel', ui.squareShovelx1Path, 'TOOL.DOCK_BUTTON_CLICKED(SQUARE_SHOVEL_1)');
+            (globalThis as any).addEditToolbarButton('Sledge Hammer', ui.sledgeHammerPath, 'TOOL.DOCK_BUTTON_CLICKED(SLEDGE_HAMMER)');
             Logging.Log('Planet tools added successfully');
           }
         } catch (error) {
           Logging.LogError('Error adding default tools: ' + error);
         }
-      `, 6000);
+      };
+      
+      // Use simple string for Time.SetTimeout to call our global function
+      Time.SetTimeout("executeDefaultToolsInit('" + worldType + "')", 6000);
       
       Logging.Log('✅ Default tools initialization scheduled for world type: ' + worldType);
     } catch (error) {
