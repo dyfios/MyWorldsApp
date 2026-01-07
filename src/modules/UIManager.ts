@@ -242,7 +242,7 @@ export class UIManager {
             
             if (paramStart > 0 && paramEnd > paramStart) {
               const paramString = msg.substring(paramStart, paramEnd);
-              const params = paramString.split(',').map(param => param.trim().replace(/['"]/g, ''));
+              const params = paramString.split(',').map(param => param.trim().split("'").join("").split('"').join(""));
               
               if (params.length === 3) {
                 const [type, tag, icon] = params;
@@ -262,7 +262,7 @@ export class UIManager {
             const paramEnd = msg.lastIndexOf(')');
             
             if (paramStart > 0 && paramEnd > paramStart) {
-              const buttonType = msg.substring(paramStart, paramEnd).trim().replace(/['"]/g, '');
+              const buttonType = msg.substring(paramStart, paramEnd).trim().split("'").join("").split('"').join("");
               Logging.Log('🔧 UIManager: Dock button clicked - type: ' + buttonType);
               
               // Handle the button click based on type
@@ -273,7 +273,7 @@ export class UIManager {
               const paramEnd = msg.lastIndexOf(')');
               
               if (paramStart > 0 && paramEnd > paramStart) {
-                const message = msg.substring(paramStart, paramEnd).trim().replace(/['"]/g, '');
+                const message = msg.substring(paramStart, paramEnd).trim().split("'").join("").split('"').join("");
                 Logging.Log('💬 UIManager: Chat message received - message: ' + message);
 
                 const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
@@ -306,7 +306,7 @@ export class UIManager {
               const paramEnd = msg.lastIndexOf(')');
 
               if (paramStart > 0 && paramEnd > paramStart) {
-                const command = msg.substring(paramStart, paramEnd).trim().replace(/['"]/g, '');
+                const command = msg.substring(paramStart, paramEnd).trim().split("'").join("").split('"').join("");
                 Logging.Log('💬 UIManager: Chat command received - command: ' + command);
                 ((globalThis as any).syncManager as SyncManager).globalSynchronizer?.SendGlobalMessage(command);
               }
