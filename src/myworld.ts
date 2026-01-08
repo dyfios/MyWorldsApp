@@ -22,9 +22,10 @@ export class MyWorld {
       Logging.Log('🚀 Step 0b2: Parsing query params to get worldAddress...');
       this.queryParams.parse();
       const worldAddress = this.queryParams.getWorldAddress();
+      const clientType = this.queryParams.getClientType();
       Logging.Log('🚀 Step 0b3: worldAddress = ' + (worldAddress || 'undefined'));
       Logging.Log('🚀 Step 0b4: Creating ClientContext with worldAddress...');
-      this.context = new ClientContext(worldAddress);
+      this.context = new ClientContext(clientType, worldAddress);
       Logging.Log('🚀 Step 0b5: MyWorld constructor completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

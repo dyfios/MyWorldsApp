@@ -22,6 +22,8 @@ export class DockButtonInfo {
 }
 
 export class UIManager {
+  public clientType: string;
+
   private static instance: UIManager | null = null;
   
   private editToolbar?: HTMLElement;
@@ -39,8 +41,9 @@ export class UIManager {
   public squareShovelx8Path: string = "assets/images/square-shovel-x8.png";
   public sledgeHammerPath: string = "assets/images/sledgehammer.png";
 
-  constructor() {
+  constructor(clientType?: string) {
     // Set the singleton instance
+    this.clientType = clientType? clientType : 'lite';
     UIManager.instance = this;
     this.setupGlobalCallbacks();
   }
@@ -740,6 +743,8 @@ export class UIManager {
    * Enable edit toolbar.
    */
   enableEditToolbar(): void {
+    Logging.Log('🎯 UIManager: enableEditToolbar invoked');
+
     const toolbarCanvasId = WorldStorage.GetItem('TOOLBAR-CANVAS-ID');
     if (!toolbarCanvasId) {
       Logging.LogError('❌ UIManager: TOOLBAR-CANVAS-ID not found in storage');
@@ -873,7 +878,7 @@ export class UIManager {
   /**
    * Attach event listeners to toolbar buttons
    */
-  /*private attachToolbarEventListeners(): void {
+  private attachToolbarEventListeners(): void {
     const buttons = this.editToolbar?.querySelectorAll('.tool-btn');
     buttons?.forEach(button => {
       button.addEventListener('click', (e) => {
@@ -881,12 +886,12 @@ export class UIManager {
         this.handleToolSelection(target.id);
       });
     });
-  }*/
+  }
 
   /**
    * Handle tool selection
    */
-  /*private handleToolSelection(toolId: string): void {
+  private handleToolSelection(toolId: string): void {
     Logging.Log(`Tool selected: ${toolId}`);
     
     // Remove active class from all buttons
@@ -896,7 +901,7 @@ export class UIManager {
     // Add active class to selected button
     //const selectedBtn = document.getElementById(toolId);
     //selectedBtn?.classList.add('active');
-  }*/
+  }
 
   /**
    * Initialize UI Settings for supported world types
@@ -915,7 +920,7 @@ export class UIManager {
             return;
           }
 
-          const mainToolbar = Entity.Get(mainToolbarId) as any;
+          const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
           if (!mainToolbar) {
             Logging.LogWarning('UIManager: Main toolbar entity not found after delay');
             return;
@@ -933,8 +938,10 @@ export class UIManager {
 
           const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-CANVAS-ID');
           if (vrToolbarHTMLId) {
-            const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId) as any;
-            vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
+            const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId) as HTMLEntity;
+            if (vrToolbarHTMLEntity) {
+              vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
+            }
           }
 
           Logging.Log('UIManager: Sent UI Settings initialization command to UI space');
@@ -1069,6 +1076,11 @@ export class UIManager {
 
   // VR Toolbar methods
   public createVRToolbar(): void {
+    if (this.clientType !== "full") {
+      Logging.Log('VR toolbar creation skipped - not in VR client');
+      return;
+    }
+
     if (this.vrToolbar) {
       Logging.Log('VR toolbar already exists');
       return;

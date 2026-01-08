@@ -4,7 +4,7 @@
  * This module handles user authentication for both WebVerse variants:
  * 
  * 1. **WebVerse Full (Native)**: Uses an HTML entity to display an OAuth login page.
- *    - Opens: https://search-dev.worldhub.me/login.html?client=full
+ *    - Opens: https://dev.worldhub.me/login
  *    - User authenticates via Google OAuth
  *    - Login page calls postWorldMessage with auth token
  *    - Token is extracted and stored for MQTT/API authentication
@@ -69,7 +69,7 @@ const IDENTITY_GLOBALS = {
   LOGIN_CANVAS_ID_KEY: 'LOGIN-CANVAS-ID',
   LOGIN_PANEL_ID_KEY: 'LOGIN-PANEL-ID',
   AUTH_API_URL: 'https://id-dev.worldhub.me',
-  NATIVE_LOGIN_URL: 'https://search-dev.worldhub.me/login.html'
+  NATIVE_LOGIN_URL: 'https://dev.worldhub.me/login'
 };
 
 // Store on globalThis for persistence across WebVerse calls
@@ -380,9 +380,11 @@ export class Identity {
       const data: AuthTokenResponse = JSON.parse(responseBody);
       Logging.Log('🎯 Identity: Parsed data: ' + JSON.stringify(data));
 
+      const state = getIdentityState();
+
       // Execute login callback if provided
-      /*if (this.loginCallbackFunction) {
-          this.loginCallbackFunction();
+      if (state.loginCallbackFunction) {
+          state.loginCallbackFunction();
       }
       
       // Trigger entity templates request after successful login
@@ -415,7 +417,7 @@ export class Identity {
         (globalThis as any).startRenderLoop();
       } else {
         Logging.LogError('❌ startRenderLoop function not available');
-      }*/
+      }
       
       if (data.success && data.token) {
         Logging.Log('✅ Identity: Lite auth successful for user: ' + (data.username || 'unknown'));

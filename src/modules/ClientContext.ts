@@ -30,7 +30,7 @@ export class Modules {
   worldRendering: WorldRendererFactory;
   environmentModifier: EnvironmentModifier;
 
-  constructor(worldAddress?: string) {
+  constructor(clientType?: string, worldAddress?: string) {
     try {
       Logging.Log('⚙️ Step 3a: Creating REST API module with worldAddress: ' + (worldAddress || 'undefined'));
       this.api = new REST(worldAddress);
@@ -49,7 +49,7 @@ export class Modules {
       Logging.Log('⚙️ Step 3h: Creating Sync Manager module...');
       this.sync = new SyncManager();
       Logging.Log('⚙️ Step 3i: Creating UI Manager module...');
-      this.ui = new UIManager();
+      this.ui = new UIManager(clientType);
       Logging.Log('⚙️ Step 3j: Creating World Renderer Factory module...');
       this.worldRendering = new WorldRendererFactory();
       // Store WorldRendererFactory in global context for entity instantiation callbacks
@@ -97,8 +97,8 @@ export class Modules {
 export class ClientContext {
   modules: Modules;
 
-  constructor(worldAddress?: string) {
-    this.modules = new Modules(worldAddress);
+  constructor(clientType?: string, worldAddress?: string) {
+    this.modules = new Modules(clientType, worldAddress);
   }
 
   /**
