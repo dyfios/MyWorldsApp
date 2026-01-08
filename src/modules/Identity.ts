@@ -554,9 +554,14 @@ export class Identity {
     
     Logging.Log('🎉 Identity: User login completed successfully');
     
-    // Show main UI after login
-    Logging.Log('🔄 Identity: Showing main UI after login...');
-    (globalThis as any).enableEditToolbar();
+    // Start the main UI and render loop after login
+    // This will initialize the toolbar before we try to enable it
+    Logging.Log('🔄 Identity: Starting render loop after login...');
+    if (typeof (globalThis as any).startRenderLoop === 'function') {
+      (globalThis as any).startRenderLoop();
+    } else {
+      Logging.LogError('❌ Identity: startRenderLoop function not available');
+    }
     
     // Invoke callback if provided
     if (state.loginCallbackFunction) {

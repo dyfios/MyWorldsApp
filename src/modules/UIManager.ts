@@ -877,21 +877,25 @@ export class UIManager {
 
   /**
    * Attach event listeners to toolbar buttons
+   * @internal Reserved for future DOM-based toolbar (currently unused)
    */
-  private attachToolbarEventListeners(): void {
+  // @ts-ignore: Reserved for future use
+  private _attachToolbarEventListeners(): void {
     const buttons = this.editToolbar?.querySelectorAll('.tool-btn');
     buttons?.forEach(button => {
       button.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-        this.handleToolSelection(target.id);
+        this._handleToolSelection(target.id);
       });
     });
   }
 
   /**
    * Handle tool selection
+   * @internal Reserved for future DOM-based toolbar (currently unused)
    */
-  private handleToolSelection(toolId: string): void {
+  // @ts-ignore: Reserved for future use
+  private _handleToolSelection(toolId: string): void {
     Logging.Log(`Tool selected: ${toolId}`);
     
     // Remove active class from all buttons
