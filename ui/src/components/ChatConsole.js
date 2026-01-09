@@ -53,21 +53,6 @@ const ChatConsole = ({
     return newMessage.id;
   }, [isHistoryVisible, tempPanelTimeout]);
 
-  // Expose API globally
-  useEffect(() => {
-    window.chatConsoleAPI = {
-      addMessage,
-      getMessages: () => messages,
-      clearMessages: () => setMessages([]),
-      openInput: () => handleOpenInput(),
-      closeInput: () => handleCloseInput(),
-      openHistory: () => handleOpenHistory(),
-      closeHistory: () => handleCloseHistory(),
-      isInputActive: () => isInputActive,
-      isHistoryVisible: () => isHistoryVisible
-    };
-  }, [addMessage, messages, isInputActive, isHistoryVisible, handleOpenInput, handleCloseInput, handleOpenHistory, handleCloseHistory]);
-
   // Handle opening input
   const handleOpenInput = useCallback(() => {
     setIsInputActive(true);
@@ -122,6 +107,21 @@ const ChatConsole = ({
     }
     postWorldMessage("CHAT_HISTORY.CLOSED()");
   }, [onChatHistoryClose]);
+
+  // Expose API globally
+  useEffect(() => {
+    window.chatConsoleAPI = {
+      addMessage,
+      getMessages: () => messages,
+      clearMessages: () => setMessages([]),
+      openInput: () => handleOpenInput(),
+      closeInput: () => handleCloseInput(),
+      openHistory: () => handleOpenHistory(),
+      closeHistory: () => handleCloseHistory(),
+      isInputActive: () => isInputActive,
+      isHistoryVisible: () => isHistoryVisible
+    };
+  }, [addMessage, messages, isInputActive, isHistoryVisible, handleOpenInput, handleCloseInput, handleOpenHistory, handleCloseHistory]);
 
   // Keyboard event handler
   useEffect(() => {

@@ -168,8 +168,15 @@ export class StaticSurfaceRenderer extends WorldRendering {
                 + (typeof staticRenderer.instantiateEntities));
 
               if (staticRenderer.instantiateEntities) {
-                Logging.Log('🎯 Calling instantiateEntities with ' + instances['assets'].length + ' instances');
-                staticRenderer.instantiateEntities(instances['assets']);
+                // Safely access assets array with validation
+                const assets = instances['instances'];
+                if (assets && Array.isArray(assets)) {
+                  Logging.Log('🎯 Calling instantiateEntities with ' + assets.length + ' instances');
+                  staticRenderer.instantiateEntities(assets);
+                } else {
+                  Logging.LogError('❌ Entity instances response missing or invalid "instances" array. Response keys: ' 
+                    + Object.keys(instances || {}).join(', '));
+                }
               } else {
                 Logging.LogError('❌ instantiateEntities method not found on StaticSurfaceRenderer');
               }
@@ -463,8 +470,9 @@ export class StaticSurfaceRenderer extends WorldRendering {
               return;
             }
 
-            meshObject = this.queryParams.getWorldAddress() + "/get-asset/" +
-              this.worldMetadata.id + "/" + JSON.parse(template["assets"]).model_path;
+            // TODO: identify if not public
+            meshObject = this.queryParams.getWorldAddress() + "/public-assets/" +
+              "/" + JSON.parse(template["assets"]).model_path;
             meshResources = [meshObject];
             type = template.type;
 

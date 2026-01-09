@@ -22,9 +22,10 @@ export class MyWorld {
       Logging.Log('🚀 Step 0b2: Parsing query params to get worldAddress...');
       this.queryParams.parse();
       const worldAddress = this.queryParams.getWorldAddress();
+      const clientType = this.queryParams.getClientType();
       Logging.Log('🚀 Step 0b3: worldAddress = ' + (worldAddress || 'undefined'));
       Logging.Log('🚀 Step 0b4: Creating ClientContext with worldAddress...');
-      this.context = new ClientContext(worldAddress);
+      this.context = new ClientContext(clientType, worldAddress);
       Logging.Log('🚀 Step 0b5: MyWorld constructor completed successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -148,7 +149,7 @@ export class MyWorld {
       this.initializeDefaultTools(worldType);
       
       // Also call the global UI Settings initialization function if available (fallback)
-      if (typeof (globalThis as any).initializeUISettings === 'function') {
+      /*if (typeof (globalThis as any).initializeUISettings === 'function') {
         const success = (globalThis as any).initializeUISettings(worldType);
         if (success) {
           Logging.Log('✅ UI Settings initialized successfully for world type: ' + worldType);
@@ -163,7 +164,7 @@ export class MyWorld {
             initializeUISettings('${worldType}');
           }
         `, 1000);
-      }
+      }*/
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ Error initializing UI Settings: ' + errorMessage);

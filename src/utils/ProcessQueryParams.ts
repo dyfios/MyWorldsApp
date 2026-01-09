@@ -297,6 +297,13 @@ export class ProcessQueryParams {
   }
 
   /**
+   * Get client type
+   */
+  getClientType(): string | undefined {
+    return this.get('client') as string | undefined;
+  }
+
+  /**
    * Get state service address from world metadata
    * Used for tiled surface renderer state management
    */

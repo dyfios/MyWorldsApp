@@ -4,7 +4,7 @@
  * This module handles user authentication for both WebVerse variants:
  * 
  * 1. **WebVerse Full (Native)**: Uses an HTML entity to display an OAuth login page.
- *    - Opens: https://search-dev.worldhub.me/login.html?client=full
+ *    - Opens: https://dev.worldhub.me/login
  *    - User authenticates via Google OAuth
  *    - Login page calls postWorldMessage with auth token
  *    - Token is extracted and stored for MQTT/API authentication
@@ -69,7 +69,7 @@ const IDENTITY_GLOBALS = {
   LOGIN_CANVAS_ID_KEY: 'LOGIN-CANVAS-ID',
   LOGIN_PANEL_ID_KEY: 'LOGIN-PANEL-ID',
   AUTH_API_URL: 'https://id-dev.worldhub.me',
-  NATIVE_LOGIN_URL: 'https://search-dev.worldhub.me/login.html'
+  NATIVE_LOGIN_URL: 'https://dev.worldhub.me/login'
 };
 
 // Store on globalThis for persistence across WebVerse calls
@@ -77,7 +77,8 @@ const IDENTITY_GLOBALS = {
 (globalThis as any).__identityState = (globalThis as any).__identityState || {
   loginCallbackFunction: undefined as (() => void) | undefined,
   authErrorCallback: undefined as AuthErrorCallback | undefined,
-  clientType: 'lite' as WebVerseClientType
+  clientType: 'lite' as WebVerseClientType,
+  loginCompleted: false as boolean
 };
 
 // Standalone helper functions that don't rely on 'this'
@@ -306,6 +307,12 @@ export class Identity {
         return;
       }
       
+      // Check if already logged in to prevent duplicate processing
+      if (this.isLoggedIn()) {
+        Logging.Log('⚠️ Identity: Already logged in, skipping duplicate legacy auth message');
+        return;
+      }
+      
       // Store authentication data using the common handler
       this.storeAuthenticationData(msgParams[0], msgParams[1], msgParams[2], msgParams[3]);
       this.onLoginSuccess();
@@ -320,6 +327,12 @@ export class Identity {
    */
   private handleNativeAuthComplete(token: string, userId?: string, username?: string): void {
     Logging.Log('🔐 Identity: Processing Native OAuth authentication');
+    
+    // Check if already logged in to prevent duplicate processing
+    if (this.isLoggedIn()) {
+      Logging.Log('⚠️ Identity: Already logged in, skipping duplicate Native OAuth auth');
+      return;
+    }
     
     // For Native OAuth, we may not have all user details immediately
     // The token is the primary authentication credential
@@ -380,10 +393,7 @@ export class Identity {
       const data: AuthTokenResponse = JSON.parse(responseBody);
       Logging.Log('🎯 Identity: Parsed data: ' + JSON.stringify(data));
 
-      // Execute login callback if provided
-      /*if (this.loginCallbackFunction) {
-          this.loginCallbackFunction();
-      }
+      //const state = getIdentityState();
       
       // Trigger entity templates request after successful login
       Logging.Log('🔄 Triggering entity templates request after successful login...');
@@ -411,7 +421,7 @@ export class Identity {
 
       // Start the main UI and render loop after login and world loading setup is complete
       Logging.Log('🔄 Starting main UI and render loop after login...');
-      if (typeof (globalThis as any).startRenderLoop === 'function') {
+      /*if (typeof (globalThis as any).startRenderLoop === 'function') {
         (globalThis as any).startRenderLoop();
       } else {
         Logging.LogError('❌ startRenderLoop function not available');
@@ -541,6 +551,14 @@ export class Identity {
    */
   private onLoginSuccess(): void {
     const state = getIdentityState();
+    
+    // Guard: Prevent duplicate calls to onLoginSuccess
+    if (state.loginCompleted) {
+      Logging.Log('⚠️ Identity: onLoginSuccess already called, skipping duplicate');
+      return;
+    }
+    state.loginCompleted = true;
+    
     // Hide login canvas if visible
     const loginCanvasId = WorldStorage.GetItem('LOGIN-CANVAS-ID');
     if (loginCanvasId) {
@@ -552,9 +570,14 @@ export class Identity {
     
     Logging.Log('🎉 Identity: User login completed successfully');
     
-    // Show main UI after login
-    Logging.Log('🔄 Identity: Showing main UI after login...');
-    (globalThis as any).enableEditToolbar();
+    // Start the main UI and render loop after login
+    // This will initialize the toolbar before we try to enable it
+    Logging.Log('🔄 Identity: Starting render loop after login...');
+    if (typeof (globalThis as any).startRenderLoop === 'function') {
+      (globalThis as any).startRenderLoop();
+    } else {
+      Logging.LogError('❌ Identity: startRenderLoop function not available');
+    }
     
     // Invoke callback if provided
     if (state.loginCallbackFunction) {
@@ -574,6 +597,7 @@ export class Identity {
       Logging.Log(`🔐 Identity: Current client type is: ${state.clientType}`);
 
       state.loginCallbackFunction = onLoggedIn;
+      state.loginCompleted = false;  // Reset flag for new login attempt
 
       if (state.clientType === 'full') {
         Logging.Log('🔐 Identity: Using FULL (Native OAuth) login flow');

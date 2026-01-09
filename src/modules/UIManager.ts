@@ -22,6 +22,8 @@ export class DockButtonInfo {
 }
 
 export class UIManager {
+  public clientType: string;
+
   private static instance: UIManager | null = null;
   
   private editToolbar?: HTMLElement;
@@ -39,7 +41,8 @@ export class UIManager {
   public squareShovelx8Path: string = "assets/images/square-shovel-x8.png";
   public sledgeHammerPath: string = "assets/images/sledgehammer.png";
 
-  constructor() {
+  constructor(clientType?: string) {
+    this.clientType = clientType? clientType : 'lite';
     // Set the singleton instance
     UIManager.instance = this;
     this.setupGlobalCallbacks();
@@ -242,7 +245,7 @@ export class UIManager {
             
             if (paramStart > 0 && paramEnd > paramStart) {
               const paramString = msg.substring(paramStart, paramEnd);
-              const params = paramString.split(',').map(param => param.trim().replace(/['"]/g, ''));
+              const params = paramString.split(',').map(param => param.trim().split("'").join("").split('"').join(""));
               
               if (params.length === 3) {
                 const [type, tag, icon] = params;
@@ -262,7 +265,7 @@ export class UIManager {
             const paramEnd = msg.lastIndexOf(')');
             
             if (paramStart > 0 && paramEnd > paramStart) {
-              const buttonType = msg.substring(paramStart, paramEnd).trim().replace(/['"]/g, '');
+              const buttonType = msg.substring(paramStart, paramEnd).trim().split("'").join("").split('"').join("");
               Logging.Log('🔧 UIManager: Dock button clicked - type: ' + buttonType);
               
               // Handle the button click based on type
@@ -273,7 +276,7 @@ export class UIManager {
               const paramEnd = msg.lastIndexOf(')');
               
               if (paramStart > 0 && paramEnd > paramStart) {
-                const message = msg.substring(paramStart, paramEnd).trim().replace(/['"]/g, '');
+                const message = msg.substring(paramStart, paramEnd).trim().split("'").join("").split('"').join("");
                 Logging.Log('💬 UIManager: Chat message received - message: ' + message);
 
                 const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
@@ -306,7 +309,7 @@ export class UIManager {
               const paramEnd = msg.lastIndexOf(')');
 
               if (paramStart > 0 && paramEnd > paramStart) {
-                const command = msg.substring(paramStart, paramEnd).trim().replace(/['"]/g, '');
+                const command = msg.substring(paramStart, paramEnd).trim().split("'").join("").split('"').join("");
                 Logging.Log('💬 UIManager: Chat command received - command: ' + command);
                 ((globalThis as any).syncManager as SyncManager).globalSynchronizer?.SendGlobalMessage(command);
               }
@@ -873,7 +876,8 @@ export class UIManager {
   /**
    * Attach event listeners to toolbar buttons
    */
-  /*private attachToolbarEventListeners(): void {
+  // @ts-ignore: Reserved for future use
+  private attachToolbarEventListeners(): void {
     const buttons = this.editToolbar?.querySelectorAll('.tool-btn');
     buttons?.forEach(button => {
       button.addEventListener('click', (e) => {
@@ -881,12 +885,12 @@ export class UIManager {
         this.handleToolSelection(target.id);
       });
     });
-  }*/
+  }
 
   /**
    * Handle tool selection
    */
-  /*private handleToolSelection(toolId: string): void {
+  private handleToolSelection(toolId: string): void {
     Logging.Log(`Tool selected: ${toolId}`);
     
     // Remove active class from all buttons
@@ -896,7 +900,7 @@ export class UIManager {
     // Add active class to selected button
     //const selectedBtn = document.getElementById(toolId);
     //selectedBtn?.classList.add('active');
-  }*/
+  }
 
   /**
    * Initialize UI Settings for supported world types
@@ -932,10 +936,12 @@ export class UIManager {
           
           mainToolbar.ExecuteJavaScript(jsCommand, '');
 
-          const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-CANVAS-ID');
+          const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-HTML-ID');
           if (vrToolbarHTMLId) {
             const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId);
-            vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
+            if (vrToolbarHTMLEntity) {
+              vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
+            }
           }
 
           Logging.Log('UIManager: Sent UI Settings initialization command to UI space');
@@ -974,7 +980,9 @@ export class UIManager {
       const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-HTML-ID');
       if (vrToolbarHTMLId) {
         const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId) as HTMLEntity;
-        vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
+        if (vrToolbarHTMLEntity) {
+          vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
+        }
       }
 
       Logging.Log('✅ UIManager: Add remote console message command sent to UI space');
@@ -1067,6 +1075,11 @@ export class UIManager {
 
   // VR Toolbar methods
   public createVRToolbar(): void {
+    if (this.clientType !== "full") {
+      Logging.Log('VR toolbar creation skipped - not in VR client');
+      return;
+    }
+
     if (this.vrToolbar) {
       Logging.Log('VR toolbar already exists');
       return;
