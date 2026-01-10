@@ -10,6 +10,90 @@
       content="MyWorlds Client UI"
     />
     <title>MyWorlds Client UI</title>
+    
+    <!-- Vuplex Polyfill - MUST run before any other scripts -->
+    <!-- Required for 2D WebView for WebGL cross-origin message passing -->
+    <script>
+      (function() {
+        if (window.vuplex) {
+          console.log('[VuplexPolyfill] Native vuplex already exists');
+          return;
+        }
+        
+        console.log('[VuplexPolyfill] Creating polyfill for WebGL');
+        
+        class VuplexPolyfill {
+          constructor() {
+            this._listeners = {};
+            window.addEventListener('message', this._handleWindowMessage.bind(this));
+            console.log('[VuplexPolyfill] Initialized, listening for messages');
+          }
+
+          addEventListener(eventName, listener) {
+            if (!this._listeners[eventName]) {
+              this._listeners[eventName] = [];
+            }
+            if (this._listeners[eventName].indexOf(listener) === -1) {
+              this._listeners[eventName].push(listener);
+            }
+          }
+
+          removeEventListener(eventName, listener) {
+            if (!this._listeners[eventName]) {
+              return;
+            }
+            const index = this._listeners[eventName].indexOf(listener);
+            if (index !== -1) {
+              this._listeners[eventName].splice(index, 1);
+            }
+          }
+
+          postMessage(message) {
+            const messageString = typeof message === 'string' ? message : JSON.stringify(message);
+            const messageType = window.name ? 'vuplex.postMessage-' + window.name : 'vuplex.postMessage';
+            
+            console.log('[VuplexPolyfill] postMessage called with:', messageString);
+            
+            try {
+              parent.postMessage({
+                type: messageType,
+                message: messageString
+              }, '*');
+              console.log('[VuplexPolyfill] parent.postMessage sent successfully');
+            } catch (error) {
+              console.error('[VuplexPolyfill] parent.postMessage failed:', error);
+            }
+          }
+
+          _emit(eventName, ...args) {
+            if (!this._listeners[eventName]) {
+              return;
+            }
+            for (const listener of this._listeners[eventName]) {
+              try {
+                listener(...args);
+              } catch (error) {
+                console.error('Error in ' + eventName + ' handler:', error);
+              }
+            }
+          }
+
+          _handleWindowMessage(event) {
+            if (event.data && typeof event.data.type === 'string' && event.data.type.indexOf('vuplex.postMessage') === 0) {
+              const value = event.data.message;
+              const vuplexMessageEvent = new Event('vuplexmessage');
+              vuplexMessageEvent.value = value;
+              vuplexMessageEvent.data = value;
+              window.dispatchEvent(vuplexMessageEvent);
+              this._emit('message', { value: value, data: value });
+            }
+          }
+        }
+
+        window.vuplex = new VuplexPolyfill();
+        console.log('[VuplexPolyfill] window.vuplex is now available');
+      })();
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

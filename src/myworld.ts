@@ -15,9 +15,7 @@ export class MyWorld {
   constructor() {
     try {
       (globalThis as any).startRenderLoop = this.startRenderLoop.bind(this);
-      Logging.Log('🚀 Step 0b1: Creating ClientContext...');
-      this.context = new ClientContext();
-      Logging.Log('🚀 Step 0b2: Creating ProcessQueryParams...');
+      Logging.Log('🚀 Step 0b1: Creating ProcessQueryParams...');
       this.queryParams = new ProcessQueryParams();
       Logging.Log('🚀 Step 0b2: Parsing query params to get worldAddress...');
       this.queryParams.parse();

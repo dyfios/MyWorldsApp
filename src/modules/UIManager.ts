@@ -546,34 +546,54 @@ export class UIManager {
   addTool(name: string, thumbnail: string, onClick: string): void {
     try {
       Logging.Log('🔧 UIManager: Adding tool to Tools tab: ' + name);
+      Logging.Log('🔧 UIManager: Client type: ' + this.clientType);
 
       const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
       if (!mainToolbarId) {
         Logging.LogError('❌ UIManager: MAIN-TOOLBAR-ID not found, cannot add tool');
         return;
       }
+      
+      Logging.Log('🔧 UIManager: MAIN-TOOLBAR-ID: ' + mainToolbarId);
 
       const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
       if (!mainToolbar) {
         Logging.LogError('❌ UIManager: Main toolbar entity not found, cannot add tool');
         return;
       }
+      
+      Logging.Log('🔧 UIManager: Main toolbar entity found');
+      Logging.Log('🔧 UIManager: ExecuteJavaScript available: ' + (typeof mainToolbar.ExecuteJavaScript === 'function'));
 
       // Call the Tools iframe directly via popupMenuAPI
       const jsCommand = `
+        console.log('UIManager addTool JS: Starting execution');
+        console.log('UIManager addTool JS: popupMenuAPI exists:', !!window.popupMenuAPI);
+        console.log('UIManager addTool JS: sendMessageToTab exists:', window.popupMenuAPI ? !!window.popupMenuAPI.sendMessageToTab : 'N/A');
         if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
           const toolsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'Tools');
+          console.log('UIManager addTool JS: Tools tabs found:', toolsTabs.length);
           if (toolsTabs.length > 0) {
+            console.log('UIManager addTool JS: Sending message to tab:', toolsTabs[0].id);
             window.popupMenuAPI.sendMessageToTab(toolsTabs[0].id, {
               type: 'add-tool',
               data: { name: '${name}', thumbnail: '${thumbnail}', onClick: '${onClick}' }
             });
+            console.log('UIManager addTool JS: Message sent successfully');
+          } else {
+            console.warn('UIManager addTool JS: No Tools tab found');
           }
+        } else {
+          console.warn('UIManager addTool JS: popupMenuAPI or sendMessageToTab not available');
         }
       `;
       
-      mainToolbar.ExecuteJavaScript(jsCommand, '');
-      Logging.Log('✅ UIManager: Tool add command sent to UI space: ' + name);
+      if (typeof mainToolbar.ExecuteJavaScript === 'function') {
+        mainToolbar.ExecuteJavaScript(jsCommand, '');
+        Logging.Log('✅ UIManager: Tool add command sent to UI space: ' + name);
+      } else {
+        Logging.LogError('❌ UIManager: ExecuteJavaScript not available on main toolbar entity');
+      }
 
       // Also send to VR toolbar if it exists
       const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-HTML-ID');

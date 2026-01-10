@@ -360,11 +360,42 @@ function App() {
             switch (message.type) {
               case 'tool-clicked':
                 console.log('Tool clicked:', message.data);
+                console.log('[App.js] Checking postWorldMessage...');
+                console.log('[App.js] - window.vuplex:', window.vuplex);
+                console.log('[App.js] - window.vuplex._targetWindow:', window.vuplex?._targetWindow);
+                console.log('[App.js] - window.vuplex._postMessageType:', window.vuplex?._postMessageType);
+                console.log('[App.js] - window.parent:', window.parent);
+                console.log('[App.js] - window.parent === window:', window.parent === window);
+                
                 // Send tool click event to the world via postWorldMessage
                 if (typeof postWorldMessage === 'function' && message.data.onClick) {
-                  postWorldMessage(message.data.onClick);
+                  console.log('[App.js] Calling postWorldMessage with:', message.data.onClick);
+                  try {
+                    postWorldMessage(message.data.onClick);
+                    console.log('[App.js] postWorldMessage returned successfully');
+                  } catch (error) {
+                    console.error('[App.js] postWorldMessage threw error:', error);
+                  }
+                  
+                  // Also try direct parent.postMessage as fallback for WebGL
+                  if (window.parent && window.parent !== window) {
+                    const messageType = window.vuplex?._postMessageType || 'vuplex.postMessage';
+                    console.log('[App.js] Also sending via parent.postMessage with type:', messageType);
+                    try {
+                      window.parent.postMessage({
+                        type: messageType,
+                        message: message.data.onClick
+                      }, '*');
+                      console.log('[App.js] parent.postMessage sent successfully');
+                    } catch (error) {
+                      console.error('[App.js] parent.postMessage failed:', error);
+                    }
+                  }
+                } else if (typeof window.postWorldMessage === 'function' && message.data.onClick) {
+                  console.log('[App.js] Calling window.postWorldMessage with:', message.data.onClick);
+                  window.postWorldMessage(message.data.onClick);
                 } else {
-                  console.warn('postWorldMessage not available or no onClick defined');
+                  console.warn('[App.js] postWorldMessage not available or no onClick defined');
                 }
                 break;
               
