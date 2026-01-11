@@ -216,6 +216,11 @@ export class PlayerController {
     (globalThis as any).setMotionModeFree = () => {
       this.setMotionModeFree();
     };
+
+    // Define global callback for setting character tag/name
+    (globalThis as any).setCharacterTag = (tag: string) => {
+      this.setCharacterTag(tag);
+    };
   }
 
   /**
@@ -227,6 +232,18 @@ export class PlayerController {
     entity.SetVisibility(true);
     (globalThis as any).playerController.internalCharacterEntity = entity;
     this.enterNonVRMode();
+  }
+
+  /**
+   * Set the character's tag/name (used for display and identification)
+   */
+  setCharacterTag(tag: string): void {
+    if (this.internalCharacterEntity) {
+      this.internalCharacterEntity.tag = tag;
+      Logging.Log(`✓ Player character tag set to: ${tag}`);
+    } else {
+      Logging.LogWarning('Cannot set character tag - character entity not initialized');
+    }
   }
 
   setCharacterPosition(newPosition: Vector3): void {

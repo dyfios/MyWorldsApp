@@ -69,7 +69,7 @@ const IDENTITY_GLOBALS = {
   LOGIN_CANVAS_ID_KEY: 'LOGIN-CANVAS-ID',
   LOGIN_PANEL_ID_KEY: 'LOGIN-PANEL-ID',
   AUTH_API_URL: 'https://id-dev.worldhub.me',
-  NATIVE_LOGIN_URL: 'https://dev.worldhub.me/login'
+  NATIVE_LOGIN_URL: 'https://dev.worldhub.me/login?redirect_url=https://dev.worldhub.me/post-login'
 };
 
 // Store on globalThis for persistence across WebVerse calls
@@ -569,6 +569,13 @@ export class Identity {
     }
     
     Logging.Log('🎉 Identity: User login completed successfully');
+    
+    // Update the player character's tag with the logged-in user's name
+    const mwContext = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+    if (mwContext && mwContext.userTag && typeof (globalThis as any).setCharacterTag === 'function') {
+      (globalThis as any).setCharacterTag(mwContext.userTag);
+      Logging.Log('✅ Identity: Updated player character tag to: ' + mwContext.userTag);
+    }
     
     // Start the main UI and render loop after login
     // This will initialize the toolbar before we try to enable it
