@@ -99,6 +99,35 @@ export class StaticSurfaceRenderer extends WorldRendering {
     (globalThis as any).triggerEntityTemplatesAfterLogin = () => {
       this.triggerEntityTemplatesAfterLogin();
     };
+
+    // For StaticSurfaceRenderer, rendered position equals world position (no tile offset)
+    (globalThis as any).tiledsurfacerenderer_getWorldPositionForRenderedPosition = (renderedPos: Vector3) => {
+      return renderedPos;
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getRenderedPositionForWorldPosition = (worldPos: Vector3) => {
+      return worldPos;
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getRegionIndexForWorldPos = (_worldPos: Vector3) => {
+      return new Vector2Int(0, 0);
+    };
+
+    (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos = (worldPos: Vector3, _regionIdx: Vector2Int) => {
+      return worldPos;
+    };
+
+    // For StaticSurfaceRenderer, return null for terrain tile (entities are not parented to terrain)
+    (globalThis as any).tiledsurfacerenderer_getTerrainTileForIndex = (_index: Vector2Int) => {
+      return null;
+    };
+
+    // Provide a stub tiledsurfacerenderer object for compatibility
+    (globalThis as any).tiledsurfacerenderer = {
+      getTerrainTileForIndex: (_index: Vector2Int) => null,
+      restClient: this.restClient,
+      regionSynchronizers: {}
+    };
   }
 
   onEntityTemplatesComplete(response: string): void {
@@ -265,6 +294,13 @@ export class StaticSurfaceRenderer extends WorldRendering {
    */
   getWorldMetadata(): WorldMetadata | undefined {
     return this.worldMetadata;
+  }
+
+  /**
+   * Get the entity manager for entity operations
+   */
+  getEntityManager(): EntityManager {
+    return this.entityManager;
   }
 
   /**

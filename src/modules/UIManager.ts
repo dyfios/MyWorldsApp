@@ -316,6 +316,101 @@ export class UIManager {
               Logging.Log('💬 UIManager: Chat command received - command: ' + command);
               ((globalThis as any).syncManager as SyncManager).globalSynchronizer?.SendGlobalMessage(command);
             }
+          } else if (msg.startsWith('ENTITY_TEMPLATE.ENTITY_SELECTED(')) {
+            // Handle entity template selection for placement
+            const paramStart = msg.indexOf('(') + 1;
+            const paramEnd = msg.lastIndexOf(')');
+            
+            if (paramStart > 0 && paramEnd > paramStart) {
+              const paramString = msg.substring(paramStart, paramEnd);
+              // Parse entity_id and variant_id - format: 'entity_id','variant_id' or entity_id,variant_id
+              const params = paramString.split(',').map(param => param.trim().split("'").join("").split('"').join(""));
+              
+              if (params.length >= 2) {
+                const entityId = params[0];
+                const variantId = params[1];
+                
+                Logging.Log('🏗️ UIManager: Entity template selected - entityId: ' + entityId + ', variantId: ' + variantId);
+                
+                // Set interaction mode for entity placing
+                (globalThis as any).setInteractionMode('ENTITY-PLACING');
+                
+                // Get entity templates from context
+                const templates = Context.GetContext('MW_ENTITY_TEMPLATES');
+                if (!templates || !templates.templates) {
+                  Logging.LogError('❌ UIManager: No entity templates found in context');
+                  return;
+                }
+                
+                // Find the matching template
+                let foundTemplate = null;
+                for (const template of templates.templates) {
+                  if (template.entity_id === entityId && template.variant_id === variantId) {
+                    foundTemplate = template;
+                    break;
+                  }
+                }
+                
+                if (!foundTemplate) {
+                  Logging.LogError('❌ UIManager: Entity template not found for entityId: ' + entityId + ', variantId: ' + variantId);
+                  return;
+                }
+                
+                // Get world metadata for constructing mesh URL
+                const worldRendererFactory = Context.GetContext('WorldRendererFactory');
+                const staticRenderer = worldRendererFactory?.getStaticSurfaceRenderer?.();
+                const worldMetadata = staticRenderer?.getWorldMetadata?.();
+                const worldAddress = staticRenderer?.queryParams?.getWorldAddress?.();
+                
+                if (!worldMetadata || !worldAddress) {
+                  Logging.LogError('❌ UIManager: World metadata or address not available');
+                  return;
+                }
+                
+                // Parse the assets JSON to get model path
+                let modelPath = '';
+                try {
+                  const assets = JSON.parse(foundTemplate.assets);
+                  modelPath = worldAddress + '/public-assets/' + assets.model_path;
+                } catch (e) {
+                  Logging.LogError('❌ UIManager: Failed to parse template assets: ' + e);
+                  return;
+                }
+                
+                const instanceId = UUID.NewUUID().ToString() || Date.now().toString();
+                const entityType = foundTemplate.type || 'mesh';
+                
+                Logging.Log('🏗️ UIManager: Loading entity for placement - model: ' + modelPath);
+                
+                // Cancel any existing placement
+                (globalThis as any).cancelPlacing?.();
+                
+                // Load the entity for placement using the renderer's entity manager
+                const entityManager = staticRenderer.getEntityManager();
+                entityManager.loadEntity(
+                  foundTemplate.entity_tag,     // entityIndex
+                  foundTemplate.variant_tag,    // variantIndex
+                  instanceId,                   // instanceId
+                  foundTemplate.entity_tag + '_' + foundTemplate.variant_tag + '_' + instanceId, // instanceTag
+                  entityId,                     // entityId
+                  variantId,                    // variantId
+                  undefined,                    // entityParent
+                  entityType,                   // type
+                  Vector3.zero,                 // position
+                  Quaternion.identity,          // rotation
+                  Vector3.one,                  // scale
+                  modelPath,                    // meshObject
+                  [modelPath],                  // meshResources
+                  undefined,                    // wheels
+                  undefined,                    // mass
+                  undefined,                    // autoType
+                  undefined,                    // scripts
+                  true                          // placingEntity = true
+                );
+              } else {
+                Logging.LogError('❌ UIManager: Invalid ENTITY_TEMPLATE.ENTITY_SELECTED parameters: ' + paramString);
+              }
+            }
           }
       }
     } catch (error: any) {
