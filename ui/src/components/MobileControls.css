@@ -1,0 +1,173 @@
+/* Mobile Controls Styles */
+
+.mobile-controls {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  pointer-events: none;
+  display: none; /* Hidden by default, shown via media query */
+}
+
+/* Show only on mobile screens */
+@media (max-width: 768px) {
+  .mobile-controls {
+    display: block;
+  }
+}
+
+/* Analog sticks row - positioned above the dock */
+.analog-sticks-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 1rem;
+  margin-bottom: 0.75rem;
+  pointer-events: none;
+}
+
+/* Individual analog stick container */
+.analog-stick {
+  width: 100px;
+  height: 100px;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.analog-stick.left-stick {
+  margin-left: 0;
+}
+
+.analog-stick.right-stick {
+  margin-right: 0;
+}
+
+/* Stick base (outer circle) */
+.stick-base {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+  transition: opacity 0.2s ease, border-color 0.2s ease;
+}
+
+.analog-stick.active .stick-base {
+  opacity: 0.8;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Stick knob (inner movable circle) */
+.stick-knob {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.3) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: transform 0.05s ease-out;
+  position: absolute;
+}
+
+.analog-stick.active .stick-knob {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.5) 100%);
+}
+
+/* Direction indicators for right stick */
+.stick-indicator {
+  position: absolute;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+
+.stick-indicator.up {
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.stick-indicator.down {
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Bottom controls row */
+.bottom-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.5rem 1rem 0.5rem;
+  pointer-events: none;
+  gap: 0.5rem;
+}
+
+/* Spacer to account for the dock in the middle */
+.dock-spacer {
+  width: 180px; /* Approximate width of 3-button dock */
+  flex-shrink: 0;
+}
+
+/* Mobile action buttons (menu and chat) */
+.mobile-action-button {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.mobile-action-button:active {
+  opacity: 1;
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.mobile-action-button .button-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+/* Menu button positioning */
+.menu-button {
+  /* No extra margin needed with flexbox */
+}
+
+/* Chat button positioning */
+.chat-button {
+  /* No extra margin needed with flexbox */
+}
+
+/* Ensure controls don't interfere with other elements when not visible */
+@media (min-width: 769px) {
+  .mobile-controls {
+    display: none !important;
+  }
+}

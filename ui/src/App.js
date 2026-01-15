@@ -5,7 +5,26 @@ import ButtonDock from './components/ButtonDock';
 import ChatConsole from './components/ChatConsole';
 import PopupMenu from './components/PopupMenu';
 import LoadingPanel from './components/LoadingPanel';
+import MobileControls from './components/MobileControls';
 import { useUISettings } from './hooks/useUISettings';
+
+// Hook for detecting mobile screen size
+const useMobileDetection = (breakpoint = 768) => {
+  const [isMobile, setIsMobile] = React.useState(
+    typeof window !== 'undefined' ? window.innerWidth <= breakpoint : false
+  );
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= breakpoint);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [breakpoint]);
+
+  return isMobile;
+};
 
 function App() {
   const [buttons, setButtons] = useState([]);
@@ -15,6 +34,10 @@ function App() {
 
   const [selectedButtonId, setSelectedButtonId] = useState(null);
   const [isChatActive, setIsChatActive] = useState(false);
+
+  // Mobile detection
+  const isMobile = useMobileDetection(768);
+  const mobileMaxButtons = 3;
 
   const uiSettings = useUISettings();
 
@@ -486,6 +509,33 @@ function App() {
     };
   }, [isChatActive, uiSettings]);
 
+  // Mobile controls handlers
+  const handleMobileMenuClick = useCallback(() => {
+    if (window.popupMenuAPI) {
+      if (window.popupMenuAPI.isOpen()) {
+        window.popupMenuAPI.closeMenu();
+      } else {
+        window.popupMenuAPI.openMenu();
+      }
+    }
+  }, []);
+
+  const handleMobileChatClick = useCallback(() => {
+    if (window.chatConsoleAPI) {
+      if (window.chatConsoleAPI.isInputActive()) {
+        window.chatConsoleAPI.closeInput();
+      } else {
+        window.chatConsoleAPI.openInput();
+      }
+    }
+  }, []);
+
+  const handleMobileChatLongPress = useCallback(() => {
+    if (window.chatConsoleAPI) {
+      window.chatConsoleAPI.openHistory();
+    }
+  }, []);
+
   return (
     <div className="App">
       <ButtonDock
@@ -497,6 +547,8 @@ function App() {
         onSelectPrevious={selectPrevious}
         onSelectNext={selectNext}
         isChatActive={isChatActive}
+        isMobile={isMobile}
+        mobileMaxButtons={mobileMaxButtons}
       />
 
       <ChatConsole
@@ -513,6 +565,13 @@ function App() {
         toggleKey="`"
         onOpen={handlePopupMenuOpen}
         onClose={handlePopupMenuClose}
+      />
+
+      <MobileControls
+        visible={isMobile}
+        onMenuClick={handleMobileMenuClick}
+        onChatClick={handleMobileChatClick}
+        onChatLongPress={handleMobileChatLongPress}
       />
 
       <LoadingPanel />

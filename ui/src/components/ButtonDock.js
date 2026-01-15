@@ -10,7 +10,9 @@ const ButtonDock = ({
   onSelectByNumber,
   onSelectPrevious,
   onSelectNext,
-  isChatActive = false
+  isChatActive = false,
+  isMobile = false,
+  mobileMaxButtons = 3
 }) => {
   const [hoveredButton, setHoveredButton] = useState(null);
   const [draggedIndex, setDraggedIndex] = useState(null);
@@ -172,11 +174,14 @@ const ButtonDock = ({
 
   const draggedButton = draggedIndex !== null ? buttons[draggedIndex] : null;
 
+  // Limit visible buttons on mobile
+  const visibleButtons = isMobile ? buttons.slice(0, mobileMaxButtons) : buttons;
+
   return (
     <>
-      <div className="button-dock-container">
+      <div className={`button-dock-container ${isMobile ? 'mobile' : ''}`}>
         <div className="button-dock">
-          {buttons.map((button, index) => {
+          {visibleButtons.map((button, index) => {
             const isSelected = button.id === selectedButtonId;
             const isHovered = hoveredButton === button.id;
             const isDragged = draggedIndex === index;
