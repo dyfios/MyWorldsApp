@@ -62,6 +62,7 @@ export class UIManager {
     };
 
     (globalThis as any).handleToolbarMessage = (msg: string) => {
+      Logging.Log('🎯🎯🎯 GLOBAL handleToolbarMessage INVOKED with: ' + msg);
       this.handleToolbarMessage(msg);
     };
 
@@ -232,6 +233,18 @@ export class UIManager {
         case 'CHAT_HISTORY.CLOSED()':
         case 'POPUP_MENU.CLOSED()':
           (globalThis as any).unpauseForUI();
+          break;
+        case 'UNFOCUS_PANEL()':
+          // Handle background click - unfocus the HTML panel
+          Logging.Log('🔲 UIManager: Unfocusing panel (background clicked)');
+          const unfocusToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+          if (unfocusToolbarId) {
+            const toolbarEntity = Entity.Get(unfocusToolbarId) as HTMLEntity;
+            if (toolbarEntity && typeof toolbarEntity.UnfocusPanel === 'function') {
+              toolbarEntity.UnfocusPanel();
+              Logging.Log('🔲 UIManager: Panel unfocused successfully');
+            }
+          }
           break;
         default:
           // Handle UI Settings messages
@@ -411,6 +424,57 @@ export class UIManager {
                 Logging.LogError('❌ UIManager: Invalid ENTITY_TEMPLATE.ENTITY_SELECTED parameters: ' + paramString);
               }
             }
+          } else if (msg.startsWith('MOBILE_KEY.DOWN(')) {
+            // Handle mobile control key press - for flying up/down
+            Logging.Log('📱 UIManager: MOBILE_KEY.DOWN detected in message');
+            const paramStart = msg.indexOf('(') + 1;
+            const paramEnd = msg.lastIndexOf(')');
+            
+            if (paramStart > 0 && paramEnd > paramStart) {
+              const key = msg.substring(paramStart, paramEnd).trim().toLowerCase();
+              Logging.Log('📱 UIManager: Mobile control key down: ' + key);
+              
+              // Echo back to browser for debugging
+              const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+              if (mainToolbarId) {
+                const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+                if (mainToolbar && typeof mainToolbar.ExecuteJavaScript === 'function') {
+                  mainToolbar.ExecuteJavaScript(`console.log('[UIManager] Received MOBILE_KEY.DOWN: ${key}');`, '');
+                }
+              }
+              
+              // Store the key state for continuous movement
+              if (key === 'shift') {
+                (globalThis as any).mobileControlShiftDown = true;
+                Logging.Log('📱 UIManager: mobileControlShiftDown set to TRUE');
+              } else if (key === 'space') {
+                (globalThis as any).mobileControlSpaceDown = true;
+                Logging.Log('📱 UIManager: mobileControlSpaceDown set to TRUE');
+              }
+            } else {
+              Logging.Log('📱 UIManager: Failed to parse MOBILE_KEY params');
+            }
+          } else if (msg.startsWith('MOBILE_KEY.UP(')) {
+            // Handle mobile control key release
+            Logging.Log('📱 UIManager: MOBILE_KEY.UP detected in message');
+            const paramStart = msg.indexOf('(') + 1;
+            const paramEnd = msg.lastIndexOf(')');
+            
+            if (paramStart > 0 && paramEnd > paramStart) {
+              const key = msg.substring(paramStart, paramEnd).trim().toLowerCase();
+              Logging.Log('📱 UIManager: Mobile control key up: ' + key);
+              
+              // Clear the key state
+              if (key === 'shift') {
+                (globalThis as any).mobileControlShiftDown = false;
+                Logging.Log('📱 UIManager: mobileControlShiftDown set to FALSE');
+              } else if (key === 'space') {
+                (globalThis as any).mobileControlSpaceDown = false;
+                Logging.Log('📱 UIManager: mobileControlSpaceDown set to FALSE');
+              }
+            } else {
+              Logging.Log('📱 UIManager: Failed to parse MOBILE_KEY.UP params');
+            }
           }
       }
     } catch (error: any) {
@@ -551,6 +615,7 @@ export class UIManager {
   private applyUISettings(settings: any): void {
     try {
       Logging.Log('🎛️ UIManager: Applying UI Settings to world systems: ' + JSON.stringify(settings));
+      Logging.Log('🎛️ UIManager: playerController available: ' + !!(globalThis as any).playerController);
 
       // Apply camera mode
       if (settings.cameraMode && (globalThis as any).playerController) {
@@ -589,10 +654,14 @@ export class UIManager {
       // Apply flying mode
       if (settings.hasOwnProperty('flying') && (globalThis as any).playerController) {
         const playerController = (globalThis as any).playerController;
+        Logging.Log('✈️ UIManager: Flying mode in settings: ' + settings.flying + ', setFlyingMode available: ' + (typeof playerController.setFlyingMode === 'function'));
         if (typeof playerController.setFlyingMode === 'function') {
+          Logging.Log('✈️ UIManager: Calling setFlyingMode with: ' + settings.flying);
           playerController.setFlyingMode(settings.flying);
-          Logging.Log('✈️ UIManager: Applied flying mode: ' + settings.flying);
+          Logging.Log('✈️ UIManager: After setFlyingMode, Input.gravityEnabled = ' + Input.gravityEnabled);
         }
+      } else {
+        Logging.Log('✈️ UIManager: Flying mode NOT applied - hasOwnProperty: ' + settings.hasOwnProperty('flying') + ', playerController: ' + !!(globalThis as any).playerController);
       }
 
       Logging.Log('✅ UIManager: UI Settings applied successfully');

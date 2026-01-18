@@ -36,7 +36,7 @@ export class PlayerController {
 
   startMaintenance(): void {
     Logging.Log('Starting PlayerController maintenance interval function');
-    this.maintenanceFunctionID = Time.SetInterval("playercontroller_maintenance();", 0.03);
+    this.maintenanceFunctionID = Time.SetInterval("globalThis.playercontroller_maintenance();", 0.03);
   }
 
   stopMaintenance(): void {
@@ -60,6 +60,39 @@ export class PlayerController {
     if (this.inVehicle && this.activeVehicle != null) {
       // Update player position to match vehicle position
       this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
+    }
+
+    // Handle mobile control flying (shift=up, space=down) or jump
+    const shiftDown = (globalThis as any).mobileControlShiftDown;
+    const spaceDown = (globalThis as any).mobileControlSpaceDown;
+    
+    // Debug: Log periodically when keys are detected
+    if (shiftDown || spaceDown) {
+      Logging.Log('📱 PlayerController: Mobile controls detected - shift=' + shiftDown + ', space=' + spaceDown + ', gravityEnabled=' + Input.gravityEnabled + ', jumpEnabled=' + Input.jumpEnabled);
+    }
+    
+    if (!Input.gravityEnabled) {
+      // Flying mode - apply vertical movement
+      const flySpeed = 0.15; // Adjust for smooth movement
+      
+      if (shiftDown) {
+        // Move up (shift)
+        Logging.Log('📱 PlayerController: Flying UP');
+        this.internalCharacterEntity.Move(new Vector3(0, flySpeed, 0));
+      }
+      if (spaceDown) {
+        // Move down (space)
+        Logging.Log('📱 PlayerController: Flying DOWN');
+        this.internalCharacterEntity.Move(new Vector3(0, -flySpeed, 0));
+      }
+    } else {
+      // Walking mode - space triggers jump
+      if (spaceDown && Input.jumpEnabled) {
+        // Trigger jump and clear the flag to prevent continuous jumping
+        Logging.Log('📱 PlayerController: JUMPING!');
+        this.internalCharacterEntity.Jump(1);
+        (globalThis as any).mobileControlSpaceDown = false;
+      }
     }
   }
 
@@ -311,7 +344,10 @@ export class PlayerController {
   }
 
   setFlyingMode(enabled: boolean): void {
+    Logging.Log('✈️ PlayerController.setFlyingMode called with: ' + enabled);
+    Logging.Log('✈️ PlayerController: Before - Input.gravityEnabled = ' + Input.gravityEnabled);
     Input.gravityEnabled = !enabled;
+    Logging.Log('✈️ PlayerController: After - Input.gravityEnabled = ' + Input.gravityEnabled);
   }
 
   enterNonVRMode(): void {

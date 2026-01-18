@@ -1,6 +1,33 @@
 /* global postWorldMessage */
 import { useState, useCallback } from 'react';
 
+// Helper function that sends via postWorldMessage AND parent.postMessage fallback for WebGL
+const sendWorldMessage = (msg) => {
+  console.log('[useUISettings] sendWorldMessage:', msg);
+  
+  // First, call the standard postWorldMessage
+  if (typeof postWorldMessage === 'function') {
+    try {
+      postWorldMessage(msg);
+    } catch (error) {
+      console.error('[useUISettings] postWorldMessage threw error:', error);
+    }
+  }
+  
+  // Also try direct parent.postMessage as fallback for WebGL cross-origin
+  if (window.parent && window.parent !== window) {
+    const messageType = window.vuplex?._postMessageType || 'vuplex.postMessage';
+    try {
+      window.parent.postMessage({
+        type: messageType,
+        message: msg
+      }, '*');
+    } catch (error) {
+      console.error('[useUISettings] parent.postMessage failed:', error);
+    }
+  }
+};
+
 export const useUISettings = () => {
   const [currentSettings, setCurrentSettings] = useState({
     cameraMode: 'firstPerson',
@@ -131,40 +158,33 @@ export const useUISettings = () => {
 
   // Flying toggle function for double-tap space
   const toggleFlying = useCallback(() => {
-    console.log('toggleFlying called - current flying state:', currentSettings.flying);
-    
-    const newFlyingState = !currentSettings.flying;
-    
-    // Update local state
-    setCurrentSettings(prev => ({
-      ...prev,
-      flying: newFlyingState
-    }));
-    
-    // Send message to UI Settings iframe if it exists
-    if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
-      const uiSettingsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'UI Settings');
-      if (uiSettingsTabs.length > 0) {
-        window.popupMenuAPI.sendMessageToTab(uiSettingsTabs[0].id, {
-          type: 'update-settings',
-          data: { flying: newFlyingState }
-        });
-        console.log('Flying state update sent to UI Settings tab');
+    // Use functional update to get current state reliably
+    setCurrentSettings(prev => {
+      console.log('toggleFlying called - current flying state:', prev.flying);
+      
+      const newFlyingState = !prev.flying;
+      const newSettings = { ...prev, flying: newFlyingState };
+      
+      // Send message to UI Settings iframe if it exists
+      if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
+        const uiSettingsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'UI Settings');
+        if (uiSettingsTabs.length > 0) {
+          window.popupMenuAPI.sendMessageToTab(uiSettingsTabs[0].id, {
+            type: 'update-settings',
+            data: { flying: newFlyingState }
+          });
+          console.log('Flying state update sent to UI Settings tab');
+        }
       }
-    }
-    
-    // Send flying state change to the world via postWorldMessage
-    if (typeof postWorldMessage === 'function') {
-      const newSettings = { ...currentSettings, flying: newFlyingState };
-      postWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(newSettings)})`);
+      
+      // Send flying state change to the world via sendWorldMessage (with WebGL fallback)
+      sendWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(newSettings)})`);
       console.log('Flying toggle sent to world:', newFlyingState);
-    } else {
-      console.warn('postWorldMessage not available for flying toggle');
-    }
-    
-    console.log('Flying toggled to:', newFlyingState);
-    return newFlyingState;
-  }, [currentSettings]);
+      
+      console.log('Flying toggled to:', newFlyingState);
+      return newSettings;
+    });
+  }, []);
 
   return {
     currentSettings,

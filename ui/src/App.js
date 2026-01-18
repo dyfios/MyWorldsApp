@@ -8,15 +8,48 @@ import LoadingPanel from './components/LoadingPanel';
 import MobileControls from './components/MobileControls';
 import { useUISettings } from './hooks/useUISettings';
 
-// Hook for detecting mobile screen size
+// Helper function that sends via postWorldMessage AND parent.postMessage fallback for WebGL
+const sendWorldMessage = (msg) => {
+  console.log('[App.js] sendWorldMessage:', msg);
+  
+  // First, call the standard postWorldMessage
+  if (typeof postWorldMessage === 'function') {
+    try {
+      postWorldMessage(msg);
+    } catch (error) {
+      console.error('[App.js] postWorldMessage threw error:', error);
+    }
+  }
+  
+  // Also try direct parent.postMessage as fallback for WebGL cross-origin
+  if (window.parent && window.parent !== window) {
+    const messageType = window.vuplex?._postMessageType || 'vuplex.postMessage';
+    try {
+      window.parent.postMessage({
+        type: messageType,
+        message: msg
+      }, '*');
+    } catch (error) {
+      console.error('[App.js] parent.postMessage failed:', error);
+    }
+  }
+};
+
+// Hook for detecting mobile devices (touch + small screen)
 const useMobileDetection = (breakpoint = 768) => {
-  const [isMobile, setIsMobile] = React.useState(
-    typeof window !== 'undefined' ? window.innerWidth <= breakpoint : false
-  );
+  const [isMobile, setIsMobile] = React.useState(() => {
+    if (typeof window === 'undefined') return false;
+    // Check for touch capability AND small screen
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isSmallScreen = window.innerWidth <= breakpoint;
+    return isTouchDevice && isSmallScreen;
+  });
 
   React.useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= breakpoint);
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isSmallScreen = window.innerWidth <= breakpoint;
+      setIsMobile(isTouchDevice && isSmallScreen);
     };
 
     window.addEventListener('resize', handleResize);
@@ -61,9 +94,7 @@ function App() {
         // If the removed button was selected, clear selection
         if (selectedButtonId === removedButton.id) {
           setSelectedButtonId(null);
-          if (typeof postWorldMessage === 'function') {
-            postWorldMessage(`BUTTON.UNSELECTED(NONE)`);
-          }
+          sendWorldMessage(`BUTTON.UNSELECTED(NONE)`);
         }
       }
       
@@ -79,7 +110,7 @@ function App() {
     setButtons(prev => prev.filter(btn => btn.id !== buttonId));
     if (selectedButtonId === buttonId) {
       setSelectedButtonId(null);
-      postWorldMessage(`BUTTON.UNSELECTED(NONE)`);
+      sendWorldMessage(`BUTTON.UNSELECTED(NONE)`);
     }
   }, [selectedButtonId]);
 
@@ -104,14 +135,10 @@ function App() {
     console.log('ButtonDock: Button found:', button ? button.name : 'none', 'onClick:', button ? button.onClick : 'none');
     
     if (button && button.onClick) {
-      // Call postWorldMessage if it exists
-      if (typeof window.postWorldMessage === 'function') {
-        console.log('ButtonDock: Executing onClick via postWorldMessage:', button.onClick);
-        window.postWorldMessage(button.onClick);
-        console.log('ButtonDock: postWorldMessage called successfully');
-      } else {
-        console.warn('postWorldMessage is not defined');
-      }
+      // Call sendWorldMessage with WebGL fallback
+      console.log('ButtonDock: Executing onClick via sendWorldMessage:', button.onClick);
+      sendWorldMessage(button.onClick);
+      console.log('ButtonDock: sendWorldMessage called successfully');
     }
   }, [buttons]);
 
@@ -125,17 +152,13 @@ function App() {
     
     console.log('ButtonDock: selectPrevious called, button:', button.name);
     setSelectedButtonId(button.id);
-    postWorldMessage(`BUTTON.SELECTED(${button.name})`);
+    sendWorldMessage(`BUTTON.SELECTED(${button.name})`);
     
     // Execute the button's onClick action
     if (button.onClick) {
       console.log('ButtonDock: Executing onClick via selectPrevious:', button.onClick);
-      if (typeof postWorldMessage === 'function') {
-        postWorldMessage(button.onClick);
-        console.log('ButtonDock: onClick executed via postWorldMessage');
-      } else {
-        console.warn('postWorldMessage is not defined');
-      }
+      sendWorldMessage(button.onClick);
+      console.log('ButtonDock: onClick executed via sendWorldMessage');
     }
   }, [buttons, selectedButtonId]);
 
@@ -149,17 +172,13 @@ function App() {
     
     console.log('ButtonDock: selectNext called, button:', button.name);
     setSelectedButtonId(button.id);
-    postWorldMessage(`BUTTON.SELECTED(${button.name})`);
+    sendWorldMessage(`BUTTON.SELECTED(${button.name})`);
     
     // Execute the button's onClick action
     if (button.onClick) {
       console.log('ButtonDock: Executing onClick via selectNext:', button.onClick);
-      if (typeof postWorldMessage === 'function') {
-        postWorldMessage(button.onClick);
-        console.log('ButtonDock: onClick executed via postWorldMessage');
-      } else {
-        console.warn('postWorldMessage is not defined');
-      }
+      sendWorldMessage(button.onClick);
+      console.log('ButtonDock: onClick executed via sendWorldMessage');
     }
   }, [buttons, selectedButtonId]);
 
@@ -170,17 +189,13 @@ function App() {
       console.log('ButtonDock: selectByNumber called with number:', number, 'button:', button.name);
       
       setSelectedButtonId(button.id);
-      postWorldMessage(`BUTTON.SELECTED(${button.name})`);
+      sendWorldMessage(`BUTTON.SELECTED(${button.name})`);
       
       // Execute the button's onClick action, just like selectButton does
       if (button.onClick) {
         console.log('ButtonDock: Executing onClick via selectByNumber:', button.onClick);
-        if (typeof postWorldMessage === 'function') {
-          postWorldMessage(button.onClick);
-          console.log('ButtonDock: onClick executed via postWorldMessage');
-        } else {
-          console.warn('postWorldMessage is not defined');
-        }
+        sendWorldMessage(button.onClick);
+        console.log('ButtonDock: onClick executed via sendWorldMessage');
       }
     }
   }, [buttons]);
@@ -216,9 +231,7 @@ function App() {
               // If selected button was removed, clear selection
               if (removed.some(btn => btn.id === selectedButtonId)) {
                 setSelectedButtonId(null);
-                if (typeof postWorldMessage === 'function') {
-                  postWorldMessage(`BUTTON.UNSELECTED(NONE)`);
-                }
+                sendWorldMessage(`BUTTON.UNSELECTED(NONE)`);
               }
               
               return remaining;
@@ -334,14 +347,23 @@ function App() {
     console.log('Chat history closed');
   }, []);
 
-  // Add a welcome message when the app loads
-  React.useEffect(() => {
-    setTimeout(() => {
-      if (window.chatConsoleAPI) {
-        window.chatConsoleAPI.addMessage('Press \\ to toggle chat, | to open history', 'System');
-      }
-    }, 1000);
+  // Track if welcome message was already shown
+  const welcomeMessageShownRef = React.useRef(false);
 
+  // Add a welcome message when the app loads (only once, no dependencies)
+  React.useEffect(() => {
+    if (!welcomeMessageShownRef.current) {
+      welcomeMessageShownRef.current = true;
+      setTimeout(() => {
+        if (window.chatConsoleAPI) {
+          window.chatConsoleAPI.addMessage('Press \\ to toggle chat, | to open history', 'System');
+        }
+      }, 1000);
+    }
+  }, []); // Empty dependency array - runs only once on mount
+
+  // Initialize UI settings
+  React.useEffect(() => {
     setTimeout(() => {
       uiSettings.initialize();
     }, 500);
@@ -361,12 +383,8 @@ function App() {
             switch (message.type) {
               case 'settings-changed':
                 console.log('UI Settings changed:', message.data);
-                // Send settings changes to the world via postWorldMessage
-                if (typeof postWorldMessage === 'function') {
-                  postWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(message.data)})`);
-                } else {
-                  console.warn('postWorldMessage not available');
-                }
+                // Send settings changes to the world via sendWorldMessage (with WebGL fallback)
+                sendWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(message.data)})`);
                 break;
               
               case 'iframe-ready':
@@ -383,42 +401,14 @@ function App() {
             switch (message.type) {
               case 'tool-clicked':
                 console.log('Tool clicked:', message.data);
-                console.log('[App.js] Checking postWorldMessage...');
-                console.log('[App.js] - window.vuplex:', window.vuplex);
-                console.log('[App.js] - window.vuplex._targetWindow:', window.vuplex?._targetWindow);
-                console.log('[App.js] - window.vuplex._postMessageType:', window.vuplex?._postMessageType);
-                console.log('[App.js] - window.parent:', window.parent);
-                console.log('[App.js] - window.parent === window:', window.parent === window);
                 
-                // Send tool click event to the world via postWorldMessage
-                if (typeof postWorldMessage === 'function' && message.data.onClick) {
-                  console.log('[App.js] Calling postWorldMessage with:', message.data.onClick);
-                  try {
-                    postWorldMessage(message.data.onClick);
-                    console.log('[App.js] postWorldMessage returned successfully');
-                  } catch (error) {
-                    console.error('[App.js] postWorldMessage threw error:', error);
-                  }
-                  
-                  // Also try direct parent.postMessage as fallback for WebGL
-                  if (window.parent && window.parent !== window) {
-                    const messageType = window.vuplex?._postMessageType || 'vuplex.postMessage';
-                    console.log('[App.js] Also sending via parent.postMessage with type:', messageType);
-                    try {
-                      window.parent.postMessage({
-                        type: messageType,
-                        message: message.data.onClick
-                      }, '*');
-                      console.log('[App.js] parent.postMessage sent successfully');
-                    } catch (error) {
-                      console.error('[App.js] parent.postMessage failed:', error);
-                    }
-                  }
-                } else if (typeof window.postWorldMessage === 'function' && message.data.onClick) {
-                  console.log('[App.js] Calling window.postWorldMessage with:', message.data.onClick);
-                  window.postWorldMessage(message.data.onClick);
+                // Send tool click event to the world via sendWorldMessage (with WebGL fallback)
+                if (message.data.onClick) {
+                  console.log('[App.js] Calling sendWorldMessage with:', message.data.onClick);
+                  sendWorldMessage(message.data.onClick);
+                  console.log('[App.js] sendWorldMessage called successfully');
                 } else {
-                  console.warn('[App.js] postWorldMessage not available or no onClick defined');
+                  console.warn('[App.js] No onClick defined for tool');
                 }
                 break;
               
@@ -536,8 +526,16 @@ function App() {
     }
   }, []);
 
+  // Handle clicks on the background to unfocus the panel
+  const handleBackgroundClick = useCallback((e) => {
+    // Only trigger if clicking directly on the App background, not on child elements
+    if (e.target === e.currentTarget) {
+      sendWorldMessage('UNFOCUS_PANEL()');
+    }
+  }, []);
+
   return (
-    <div className="App">
+    <div className="App" onClick={handleBackgroundClick}>
       <ButtonDock
         buttons={buttons}
         selectedButtonId={selectedButtonId}
@@ -552,7 +550,8 @@ function App() {
       />
 
       <ChatConsole
-        toggleKey="\"
+        toggleKey="c"
+        historyKey="C"
         onChatInputOpen={handleChatInputOpen}
         onChatInputClose={handleChatInputClose}
         onChatHistoryOpen={handleChatHistoryOpen}
@@ -562,7 +561,7 @@ function App() {
       />
 
       <PopupMenu
-        toggleKey="`"
+        toggleKey="m"
         onOpen={handlePopupMenuOpen}
         onClose={handlePopupMenuClose}
       />

@@ -6,6 +6,26 @@ import { Position, Rotation } from './config';
 
 export type EntityType = 'mesh' | 'automobile' | 'airplane';
 
+/**
+ * Entity template definition from the API
+ */
+export interface EntityTemplate {
+  entity_id: string;
+  variant_id: string;
+  entity_tag: string;
+  variant_tag: string;
+  type: EntityType;
+  assets: string; // JSON string containing model_path etc.
+  style?: string; // Optional style field for visual styling
+}
+
+/**
+ * Container for entity templates from API response
+ */
+export interface EntityTemplatesResponse {
+  templates: EntityTemplate[];
+}
+
 export interface BaseEntity {
   id: string;
   type: EntityType;

@@ -2,9 +2,34 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './ChatConsole.css';
 
+// Helper function that sends via postWorldMessage AND parent.postMessage fallback for WebGL
+const sendWorldMessage = (msg) => {
+  // First, call the standard postWorldMessage
+  if (typeof postWorldMessage === 'function') {
+    try {
+      postWorldMessage(msg);
+    } catch (error) {
+      console.error('[ChatConsole] postWorldMessage threw error:', error);
+    }
+  }
+  
+  // Also try direct parent.postMessage as fallback for WebGL cross-origin
+  if (window.parent && window.parent !== window) {
+    const messageType = window.vuplex?._postMessageType || 'vuplex.postMessage';
+    try {
+      window.parent.postMessage({
+        type: messageType,
+        message: msg
+      }, '*');
+    } catch (error) {
+      console.error('[ChatConsole] parent.postMessage failed:', error);
+    }
+  }
+};
+
 const ChatConsole = ({
-  toggleKey = '\\',
-  historyKey = '|',
+  toggleKey = 'c',
+  historyKey = 'C',
   onChatInputOpen,
   onChatInputClose,
   onChatHistoryOpen,
@@ -22,6 +47,8 @@ const ChatConsole = ({
   const inputRef = useRef(null);
   const chatEndRef = useRef(null);
   const messageIdCounterRef = useRef(0);
+  const chatContainerRef = useRef(null);
+  const historyPanelRef = useRef(null);
 
   // API: Add a message to chat
   const addMessage = useCallback((text, sender = 'System', timestamp = new Date()) => {
@@ -59,7 +86,7 @@ const ChatConsole = ({
     if (onChatInputOpen) {
       onChatInputOpen();
     }
-    postWorldMessage("CHAT_INPUT.OPENED()");
+    sendWorldMessage("CHAT_INPUT.OPENED()");
     // Focus input after state update
     setTimeout(() => {
       if (inputRef.current) {
@@ -75,7 +102,7 @@ const ChatConsole = ({
     if (onChatInputClose) {
       onChatInputClose();
     }
-    postWorldMessage("CHAT_INPUT.CLOSED()");
+    sendWorldMessage("CHAT_INPUT.CLOSED()");
   }, [onChatInputClose]);
 
   // Handle opening history
@@ -86,7 +113,7 @@ const ChatConsole = ({
     if (onChatHistoryOpen) {
       onChatHistoryOpen();
     }
-    postWorldMessage("CHAT_HISTORY.OPENED()");
+    sendWorldMessage("CHAT_HISTORY.OPENED()");
     setTimeout(() => {
       if (inputRef.current) {
         inputRef.current.focus();
@@ -105,7 +132,7 @@ const ChatConsole = ({
     if (onChatHistoryClose) {
       onChatHistoryClose();
     }
-    postWorldMessage("CHAT_HISTORY.CLOSED()");
+    sendWorldMessage("CHAT_HISTORY.CLOSED()");
   }, [onChatHistoryClose]);
 
   // Expose API globally
@@ -126,27 +153,19 @@ const ChatConsole = ({
   // Keyboard event handler
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Toggle input with toggleKey (\)
-      if (e.key === toggleKey) {
+      // Don't handle toggle keys if user is typing in the input
+      const isTypingInInput = inputRef.current && document.activeElement === inputRef.current;
+      
+      // Toggle key (c) only OPENS the chat - use Escape to close
+      if (e.key === toggleKey && !isTypingInInput && !isInputActive && !isHistoryVisible) {
         e.preventDefault();
-        
-        if (isHistoryVisible) {
-          // If history is visible, close everything
-          handleCloseHistory();
-        } else if (isInputActive) {
-          handleCloseInput();
-        } else {
-          handleOpenInput();
-        }
+        handleOpenInput();
       }
       
-      // Open history with historyKey (|)
-      if (e.key === historyKey) {
+      // Open history with historyKey (Shift+C) - only when not typing
+      if (e.key === historyKey && !isTypingInInput && !isHistoryVisible) {
         e.preventDefault();
-        
-        if (!isHistoryVisible) {
-          handleOpenHistory();
-        }
+        handleOpenHistory();
       }
     };
 
@@ -172,6 +191,28 @@ const ChatConsole = ({
     };
   }, [toggleKey, historyKey, isInputActive, isHistoryVisible, handleOpenInput, handleCloseInput, handleOpenHistory, handleCloseHistory]);
 
+  // Handle click outside to close chat input
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      // Only handle if chat input is active (not history)
+      if (!isInputActive || isHistoryVisible) return;
+      
+      // Check if click is outside chat input container
+      if (chatContainerRef.current && !chatContainerRef.current.contains(e.target)) {
+        handleCloseInput();
+      }
+    };
+
+    // Use mousedown for immediate response
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isInputActive, isHistoryVisible, handleCloseInput]);
+
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -179,10 +220,10 @@ const ChatConsole = ({
       //addMessage(inputValue, 'User');
       if (inputValue.startsWith('/')) {
         // Command
-        postWorldMessage(`CHAT_INPUT.COMMAND(${inputValue.slice(1)})`);
+        sendWorldMessage(`CHAT_INPUT.COMMAND(${inputValue.slice(1)})`);
       } else {
         // Message
-        postWorldMessage(`CHAT_INPUT.MESSAGE(${inputValue})`);
+        sendWorldMessage(`CHAT_INPUT.MESSAGE(${inputValue})`);
       }
       setInputValue('');
       
@@ -253,7 +294,7 @@ const ChatConsole = ({
 
       {/* Chat input */}
       {isInputActive && (
-        <div className="chat-input-container">
+        <div className="chat-input-container" ref={chatContainerRef}>
           <form onSubmit={handleSubmit} className="chat-input-form">
             <input
               ref={inputRef}

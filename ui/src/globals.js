@@ -4,15 +4,13 @@
  */
 
 /**
- * Vuplex Polyfill for 2D WebView for WebGL
- * Due to cross-origin domain limitation, 2D WebView for WebGL is unable to automatically 
- * inject the window.vuplex JavaScript API. This polyfill adds support for message passing.
+ * Vuplex Polyfill for cross-origin iframes in WebGL
+ * From: https://developer.vuplex.com/webview/2d-webview-for-webgl
  */
 class VuplexPolyfill {
   constructor() {
     this._listeners = {};
     window.addEventListener('message', this._handleWindowMessage.bind(this));
-    console.log('[VuplexPolyfill] Initialized, listening for messages');
   }
 
   addEventListener(eventName, listener) {
@@ -37,24 +35,11 @@ class VuplexPolyfill {
   postMessage(message) {
     // Don't pass a string to JSON.stringify() because it adds extra quotes.
     const messageString = typeof message === 'string' ? message : JSON.stringify(message);
-    const messageType = window.name ? `vuplex.postMessage-${window.name}` : 'vuplex.postMessage';
-    
-    console.log('[VuplexPolyfill] postMessage called');
-    console.log('[VuplexPolyfill] - message:', messageString);
-    console.log('[VuplexPolyfill] - window.name:', window.name || '(empty)');
-    console.log('[VuplexPolyfill] - messageType:', messageType);
-    console.log('[VuplexPolyfill] - parent === window:', parent === window);
-    console.log('[VuplexPolyfill] - parent:', parent);
-    
-    try {
-      parent.postMessage({
-        type: messageType,
-        message: messageString
-      }, '*');
-      console.log('[VuplexPolyfill] parent.postMessage sent successfully');
-    } catch (error) {
-      console.error('[VuplexPolyfill] parent.postMessage failed:', error);
-    }
+    parent.postMessage({
+      // Use the new 'vuplex.postMessage-{id}' format for newer versions of 2D WebView that populate the iframe's name attribute and fallback to 'vuplex.postMessage' for older versions.
+      type: window.name ? `vuplex.postMessage-${window.name}` : 'vuplex.postMessage',
+      message: messageString
+    }, '*')
   }
 
   _emit(eventName, ...args) {
@@ -71,15 +56,12 @@ class VuplexPolyfill {
   }
 
   _handleWindowMessage(event) {
-    console.log('[VuplexPolyfill] _handleWindowMessage received:', event.data);
-    
     // Check if event.data.type starts with 'vuplex.postMessage' because that approach
     // is compatible both with old versions of 3D WebView where the type is 'vuplex.postMessage' and with new versions where
     // the type is 'vuplex.postMessage-{id}'. Notably this works even for versions v4.8 - v4.12, which have an issue where they
     // use the new 'vuplex.postMessage-{id}' format but don't yet set window.name attribute, so the polyfill is unable to know
     // the exact message type value.
     if (event.data && typeof event.data.type === 'string' && event.data.type.indexOf('vuplex.postMessage') === 0) {
-      console.log('[VuplexPolyfill] Vuplex message detected, dispatching events');
       // Dispatch the new window vuplexmessage event added in v4.11.
       const value = event.data.message;
       const vuplexMessageEvent = new Event('vuplexmessage');
@@ -92,42 +74,31 @@ class VuplexPolyfill {
   };
 }
 
-// Initialize vuplex polyfill if not already present
+// Store our polyfill instance in case we need it
+const vuplexPolyfill = new VuplexPolyfill();
+
+// Only use the polyfill if real vuplex isn't available (WebGL cross-origin mode)
+// In native mode, the real window.vuplex will be provided by Vuplex WebView
 if (!window.vuplex) {
-  console.log('[globals.js] window.vuplex not found, creating VuplexPolyfill');
-  window.vuplex = new VuplexPolyfill();
+  console.log('[globals.js] Real vuplex not found at init, using polyfill for WebGL cross-origin');
+  window.vuplex = vuplexPolyfill;
 } else {
-  console.log('[globals.js] window.vuplex already exists (native):', window.vuplex);
+  console.log('[globals.js] Real vuplex found, using native Vuplex WebView');
 }
 
 // Make sure postWorldMessage is available globally
+// This always checks the CURRENT window.vuplex in case it was set after page load
 if (typeof window !== 'undefined') {
-  console.log('[globals.js] Setting up postWorldMessage');
-  console.log('[globals.js] - existing postWorldMessage:', typeof window.postWorldMessage);
-  
-  // Store reference to any existing native postWorldMessage
-  const nativePostWorldMessage = window.postWorldMessage;
-  
-  // Always override with our implementation that uses vuplex for WebGL
-  console.log('[globals.js] Creating postWorldMessage using vuplex (overriding any native)');
   window.postWorldMessage = function(message) {
-    console.log('[postWorldMessage] called with:', message);
-    console.log('[postWorldMessage] - window.vuplex:', window.vuplex);
-    console.log('[postWorldMessage] - vuplex.postMessage:', typeof window.vuplex?.postMessage);
-    console.log('[postWorldMessage] - nativePostWorldMessage:', typeof nativePostWorldMessage);
+    console.log('[postWorldMessage] Called with:', message);
+    console.log('[postWorldMessage] window.vuplex:', window.vuplex);
+    console.log('[postWorldMessage] window.vuplex === polyfill:', window.vuplex === vuplexPolyfill);
     
-    // Try vuplex first (for WebGL)
     if (window.vuplex && typeof window.vuplex.postMessage === 'function') {
-      console.log('[postWorldMessage] Routing to vuplex.postMessage');
+      console.log('[postWorldMessage] Calling vuplex.postMessage');
       window.vuplex.postMessage(message);
-    } 
-    // Fallback to native if vuplex didn't work
-    else if (typeof nativePostWorldMessage === 'function') {
-      console.log('[postWorldMessage] Routing to native postWorldMessage');
-      nativePostWorldMessage(message);
-    }
-    else {
-      console.warn('[postWorldMessage] No message handler available - cannot send message');
+    } else {
+      console.warn('[postWorldMessage] vuplex.postMessage not available');
     }
   };
 }

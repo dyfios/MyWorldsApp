@@ -109,16 +109,14 @@
 .bottom-controls-row {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   padding: 0 0.5rem 1rem 0.5rem;
   pointer-events: none;
-  gap: 0.5rem;
 }
 
 /* Spacer to account for the dock in the middle */
 .dock-spacer {
-  width: 180px; /* Approximate width of 3-button dock */
-  flex-shrink: 0;
+  flex: 1;
 }
 
 /* Mobile action buttons (menu and chat) */

@@ -2691,6 +2691,12 @@ declare class HTMLEntity extends BaseEntity {
      * @returns Whether or not the operation was successful.
      */
     ExecuteJavaScript(logic: string, onComplete: string): boolean;
+
+    /**
+     * Unfocus the HTML panel.
+     * @returns Whether or not the operation was successful.
+     */
+    UnfocusPanel(): boolean;
 }
 
 /**

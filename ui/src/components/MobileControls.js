@@ -2,6 +2,36 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import './MobileControls.css';
 
+// Helper function that mirrors App.js behavior - sends via postWorldMessage AND parent.postMessage fallback
+const sendWorldMessage = (msg) => {
+  console.log('[MobileControls] sendWorldMessage:', msg);
+  
+  // First, call the standard postWorldMessage
+  if (typeof postWorldMessage === 'function') {
+    try {
+      postWorldMessage(msg);
+      console.log('[MobileControls] postWorldMessage returned successfully');
+    } catch (error) {
+      console.error('[MobileControls] postWorldMessage threw error:', error);
+    }
+  }
+  
+  // Also try direct parent.postMessage as fallback for WebGL cross-origin
+  if (window.parent && window.parent !== window) {
+    const messageType = window.vuplex?._postMessageType || 'vuplex.postMessage';
+    console.log('[MobileControls] Also sending via parent.postMessage with type:', messageType);
+    try {
+      window.parent.postMessage({
+        type: messageType,
+        message: msg
+      }, '*');
+      console.log('[MobileControls] parent.postMessage sent successfully');
+    } catch (error) {
+      console.error('[MobileControls] parent.postMessage failed:', error);
+    }
+  }
+};
+
 const MobileControls = ({
   onMenuClick,
   onChatClick,
@@ -23,6 +53,10 @@ const MobileControls = ({
   
   // Track which key is currently being "pressed" by the right stick
   const currentRightStickKey = useRef(null);
+  
+  // Track active state in refs for event handlers (refs don't cause re-renders in handlers)
+  const leftStickActiveRef = useRef(false);
+  const rightStickActiveRef = useRef(false);
 
   const stickRadius = 40; // Maximum movement radius in pixels
 
@@ -50,7 +84,6 @@ const MobileControls = ({
   // Send key events for right stick (flying controls)
   const handleRightStickInput = useCallback((position) => {
     const threshold = 15; // Minimum movement to trigger action
-    const normalizedY = position.y / stickRadius; // -1 to 1
     
     // Determine which key should be pressed based on Y position
     let newKey = null;
@@ -58,92 +91,122 @@ const MobileControls = ({
       // Stick pushed up - Shift (fly up)
       newKey = 'shift';
     } else if (position.y > threshold) {
-      // Stick pushed down - Space (descend)
+      // Stick pushed down - Space (descend/jump)
       newKey = 'space';
     }
     
     // Only send events if the key changed
     if (newKey !== currentRightStickKey.current) {
+      console.log('Right stick key change:', currentRightStickKey.current, '->', newKey);
       // Release previous key if any
       if (currentRightStickKey.current) {
-        if (typeof postWorldMessage === 'function') {
-          postWorldMessage(`MOBILE_CONTROL.KEY_UP(${currentRightStickKey.current})`);
-        }
+        console.log('Right stick releasing key:', currentRightStickKey.current);
+        const msg = `MOBILE_KEY.UP(${currentRightStickKey.current})`;
+        sendWorldMessage(msg);
       }
       
       // Press new key if any
       if (newKey) {
-        if (typeof postWorldMessage === 'function') {
-          postWorldMessage(`MOBILE_CONTROL.KEY_DOWN(${newKey})`);
-        }
+        const msg = `MOBILE_KEY.DOWN(${newKey})`;
+        sendWorldMessage(msg);
       }
       
       currentRightStickKey.current = newKey;
     }
   }, []);
 
-  // Left stick touch handlers
-  const handleLeftStickTouchStart = useCallback((e) => {
-    e.preventDefault();
-    setLeftStickActive(true);
-    const touch = e.touches[0];
-    const position = calculateStickPosition(touch, leftStickRef.current);
-    setLeftStickPosition(position);
-    // Left stick is non-functional for now (WASD movement)
-  }, [calculateStickPosition]);
-
-  const handleLeftStickTouchMove = useCallback((e) => {
-    e.preventDefault();
-    if (!leftStickActive) return;
-    const touch = e.touches[0];
-    const position = calculateStickPosition(touch, leftStickRef.current);
-    setLeftStickPosition(position);
-    // Left stick is non-functional for now
-  }, [leftStickActive, calculateStickPosition]);
-
-  const handleLeftStickTouchEnd = useCallback((e) => {
-    e.preventDefault();
-    setLeftStickActive(false);
-    setLeftStickPosition({ x: 0, y: 0 });
-  }, []);
-
-  // Right stick touch handlers
-  const handleRightStickTouchStart = useCallback((e) => {
-    e.preventDefault();
-    setRightStickActive(true);
-    const touch = e.touches[0];
-    const position = calculateStickPosition(touch, rightStickRef.current);
-    setRightStickPosition(position);
-    handleRightStickInput(position);
-  }, [calculateStickPosition, handleRightStickInput]);
-
-  const handleRightStickTouchMove = useCallback((e) => {
-    e.preventDefault();
-    if (!rightStickActive) return;
-    const touch = e.touches[0];
-    const position = calculateStickPosition(touch, rightStickRef.current);
-    setRightStickPosition(position);
-    handleRightStickInput(position);
-  }, [rightStickActive, calculateStickPosition, handleRightStickInput]);
-
-  const handleRightStickTouchEnd = useCallback((e) => {
-    e.preventDefault();
-    setRightStickActive(false);
-    setRightStickPosition({ x: 0, y: 0 });
+  // Attach touch event listeners with { passive: false } to allow preventDefault
+  useEffect(() => {
+    const leftStick = leftStickRef.current;
+    const rightStick = rightStickRef.current;
     
-    // Release any held key
-    if (currentRightStickKey.current) {
-      if (typeof postWorldMessage === 'function') {
-        postWorldMessage(`MOBILE_CONTROL.KEY_UP(${currentRightStickKey.current})`);
+    if (!leftStick || !rightStick) return;
+
+    // Left stick handlers
+    const handleLeftTouchStart = (e) => {
+      e.preventDefault();
+      leftStickActiveRef.current = true;
+      setLeftStickActive(true);
+      const touch = e.touches[0];
+      const position = calculateStickPosition(touch, leftStick);
+      setLeftStickPosition(position);
+    };
+
+    const handleLeftTouchMove = (e) => {
+      e.preventDefault();
+      if (!leftStickActiveRef.current) return;
+      const touch = e.touches[0];
+      const position = calculateStickPosition(touch, leftStick);
+      setLeftStickPosition(position);
+    };
+
+    const handleLeftTouchEnd = (e) => {
+      e.preventDefault();
+      leftStickActiveRef.current = false;
+      setLeftStickActive(false);
+      setLeftStickPosition({ x: 0, y: 0 });
+    };
+
+    // Right stick handlers
+    const handleRightTouchStart = (e) => {
+      e.preventDefault();
+      rightStickActiveRef.current = true;
+      setRightStickActive(true);
+      const touch = e.touches[0];
+      const position = calculateStickPosition(touch, rightStick);
+      setRightStickPosition(position);
+      handleRightStickInput(position);
+    };
+
+    const handleRightTouchMove = (e) => {
+      e.preventDefault();
+      if (!rightStickActiveRef.current) return;
+      const touch = e.touches[0];
+      const position = calculateStickPosition(touch, rightStick);
+      setRightStickPosition(position);
+      handleRightStickInput(position);
+    };
+
+    const handleRightTouchEnd = (e) => {
+      e.preventDefault();
+      rightStickActiveRef.current = false;
+      setRightStickActive(false);
+      setRightStickPosition({ x: 0, y: 0 });
+      
+      // Release any held key
+      if (currentRightStickKey.current) {
+        const msg = `MOBILE_KEY.UP(${currentRightStickKey.current})`;
+        sendWorldMessage(msg);
+        currentRightStickKey.current = null;
       }
-      currentRightStickKey.current = null;
-    }
-  }, []);
+    };
+
+    // Add event listeners with passive: false
+    leftStick.addEventListener('touchstart', handleLeftTouchStart, { passive: false });
+    leftStick.addEventListener('touchmove', handleLeftTouchMove, { passive: false });
+    leftStick.addEventListener('touchend', handleLeftTouchEnd, { passive: false });
+    leftStick.addEventListener('touchcancel', handleLeftTouchEnd, { passive: false });
+
+    rightStick.addEventListener('touchstart', handleRightTouchStart, { passive: false });
+    rightStick.addEventListener('touchmove', handleRightTouchMove, { passive: false });
+    rightStick.addEventListener('touchend', handleRightTouchEnd, { passive: false });
+    rightStick.addEventListener('touchcancel', handleRightTouchEnd, { passive: false });
+
+    return () => {
+      leftStick.removeEventListener('touchstart', handleLeftTouchStart);
+      leftStick.removeEventListener('touchmove', handleLeftTouchMove);
+      leftStick.removeEventListener('touchend', handleLeftTouchEnd);
+      leftStick.removeEventListener('touchcancel', handleLeftTouchEnd);
+
+      rightStick.removeEventListener('touchstart', handleRightTouchStart);
+      rightStick.removeEventListener('touchmove', handleRightTouchMove);
+      rightStick.removeEventListener('touchend', handleRightTouchEnd);
+      rightStick.removeEventListener('touchcancel', handleRightTouchEnd);
+    };
+  }, [calculateStickPosition, handleRightStickInput]);
 
   // Chat button handlers (tap to toggle, hold for history)
   const handleChatTouchStart = useCallback((e) => {
-    e.preventDefault();
-    
     // Start long press timer for history
     chatLongPressTimer.current = setTimeout(() => {
       if (onChatLongPress) {
@@ -154,8 +217,6 @@ const MobileControls = ({
   }, [onChatLongPress]);
 
   const handleChatTouchEnd = useCallback((e) => {
-    e.preventDefault();
-    
     // If timer still exists, it was a short press (tap)
     if (chatLongPressTimer.current) {
       clearTimeout(chatLongPressTimer.current);
@@ -182,9 +243,7 @@ const MobileControls = ({
       }
       // Release any held keys
       if (currentRightStickKey.current) {
-        if (typeof postWorldMessage === 'function') {
-          postWorldMessage(`MOBILE_CONTROL.KEY_UP(${currentRightStickKey.current})`);
-        }
+        sendWorldMessage(`MOBILE_KEY.UP(${currentRightStickKey.current})`);
       }
     };
   }, []);
@@ -199,10 +258,6 @@ const MobileControls = ({
         <div 
           className={`analog-stick left-stick ${leftStickActive ? 'active' : ''}`}
           ref={leftStickRef}
-          onTouchStart={handleLeftStickTouchStart}
-          onTouchMove={handleLeftStickTouchMove}
-          onTouchEnd={handleLeftStickTouchEnd}
-          onTouchCancel={handleLeftStickTouchEnd}
         >
           <div className="stick-base">
             <div 
@@ -218,10 +273,6 @@ const MobileControls = ({
         <div 
           className={`analog-stick right-stick ${rightStickActive ? 'active' : ''}`}
           ref={rightStickRef}
-          onTouchStart={handleRightStickTouchStart}
-          onTouchMove={handleRightStickTouchMove}
-          onTouchEnd={handleRightStickTouchEnd}
-          onTouchCancel={handleRightStickTouchEnd}
         >
           <div className="stick-base">
             <div 

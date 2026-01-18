@@ -2,8 +2,33 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './PopupMenu.css';
 
+// Helper function that sends via postWorldMessage AND parent.postMessage fallback for WebGL
+const sendWorldMessage = (msg) => {
+  // First, call the standard postWorldMessage
+  if (typeof postWorldMessage === 'function') {
+    try {
+      postWorldMessage(msg);
+    } catch (error) {
+      console.error('[PopupMenu] postWorldMessage threw error:', error);
+    }
+  }
+  
+  // Also try direct parent.postMessage as fallback for WebGL cross-origin
+  if (window.parent && window.parent !== window) {
+    const messageType = window.vuplex?._postMessageType || 'vuplex.postMessage';
+    try {
+      window.parent.postMessage({
+        type: messageType,
+        message: msg
+      }, '*');
+    } catch (error) {
+      console.error('[PopupMenu] parent.postMessage failed:', error);
+    }
+  }
+};
+
 const PopupMenu = ({
-  toggleKey = '`',
+  toggleKey = 'm',
   onOpen,
   onClose,
   onMessage
@@ -235,7 +260,7 @@ const PopupMenu = ({
     if (onOpen) {
       onOpen();
     }
-    postWorldMessage("POPUP_MENU.OPENED()");
+    sendWorldMessage("POPUP_MENU.OPENED()");
   }, [onOpen]);
 
   // Close menu
@@ -244,7 +269,7 @@ const PopupMenu = ({
     if (onClose) {
       onClose();
     }
-    postWorldMessage("POPUP_MENU.CLOSED()");
+    sendWorldMessage("POPUP_MENU.CLOSED()");
   }, [onClose]);
 
   // Toggle menu
