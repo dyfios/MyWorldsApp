@@ -63,28 +63,35 @@ export class PlayerController {
     }
 
     // Handle mobile control flying (shift=up, space=down) or jump
-    const shiftDown = (globalThis as any).mobileControlShiftDown;
-    const spaceDown = (globalThis as any).mobileControlSpaceDown;
-    
-    // Debug: Log periodically when keys are detected
-    if (shiftDown || spaceDown) {
-      Logging.Log('📱 PlayerController: Mobile controls detected - shift=' + shiftDown + ', space=' + spaceDown + ', gravityEnabled=' + Input.gravityEnabled + ', jumpEnabled=' + Input.jumpEnabled);
-    }
+    const shiftDown = (globalThis as any).mobileControlShiftDown === true;
+    const spaceDown = (globalThis as any).mobileControlSpaceDown === true;
     
     if (!Input.gravityEnabled) {
-      // Flying mode - apply vertical movement
-      const flySpeed = 0.15; // Adjust for smooth movement
+      // Flying mode - move at constant speed using position offset
+      const flySpeed = 0.1; // Units per frame
       
       if (shiftDown) {
-        // Move up (shift)
-        Logging.Log('📱 PlayerController: Flying UP');
-        this.internalCharacterEntity.Move(new Vector3(0, flySpeed, 0));
+        // Move up
+        const currentPos = this.internalCharacterEntity.GetPosition(false);
+        if (currentPos) {
+          this.internalCharacterEntity.SetPosition(
+            new Vector3(currentPos.x, currentPos.y + flySpeed, currentPos.z), 
+            false, 
+            false
+          );
+        }
+      } else if (spaceDown) {
+        // Move down
+        const currentPos = this.internalCharacterEntity.GetPosition(false);
+        if (currentPos) {
+          this.internalCharacterEntity.SetPosition(
+            new Vector3(currentPos.x, currentPos.y - flySpeed, currentPos.z), 
+            false, 
+            false
+          );
+        }
       }
-      if (spaceDown) {
-        // Move down (space)
-        Logging.Log('📱 PlayerController: Flying DOWN');
-        this.internalCharacterEntity.Move(new Vector3(0, -flySpeed, 0));
-      }
+      // When neither pressed, do nothing - stay at current position
     } else {
       // Walking mode - space triggers jump
       if (spaceDown && Input.jumpEnabled) {

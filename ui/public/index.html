@@ -10,68 +10,76 @@
       content="MyWorlds Client UI"
     />
     <title>MyWorlds Client UI</title>
-    <!-- Vuplex Polyfill for cross-origin iframes in WebGL - MUST run before other scripts -->
+    <!-- Vuplex Polyfill - MUST run before React bundle loads -->
     <script>
-      class VuplexPolyfill {
-        constructor() {
-          this._listeners = {};
-          window.addEventListener('message', this._handleWindowMessage.bind(this));
+      (function() {
+        // Only set up polyfill if native vuplex isn't already present
+        if (window.vuplex) {
+          console.log('[index.html] Native vuplex already present');
+          return;
         }
-        addEventListener(eventName, listener) {
-          if (!this._listeners[eventName]) {
-            this._listeners[eventName] = [];
-          }
-          if (this._listeners[eventName].indexOf(listener) === -1) {
-            this._listeners[eventName].push(listener);
-          }
-        }
-        removeEventListener(eventName, listener) {
-          if (!this._listeners[eventName]) {
-            return;
-          }
-          const index = this._listeners[eventName].indexOf(listener);
-          if (index !== -1) {
-            this._listeners[eventName].splice(index, 1);
-          }
-        }
-        postMessage(message) {
-          const messageString = typeof message === 'string' ? message : JSON.stringify(message);
-          parent.postMessage({
-            type: window.name ? 'vuplex.postMessage-' + window.name : 'vuplex.postMessage',
-            message: messageString
-          }, '*');
-        }
-        _emit(eventName, ...args) {
-          if (!this._listeners[eventName]) {
-            return;
-          }
-          for (const listener of this._listeners[eventName]) {
-            try {
-              listener(...args);
-            } catch (error) {
-              console.error('Error in ' + eventName + ' handler:', error);
+        
+        console.log('[index.html] Setting up Vuplex polyfill for WebGL');
+        
+        var polyfill = {
+          _listeners: {},
+          addEventListener: function(eventName, listener) {
+            if (!this._listeners[eventName]) this._listeners[eventName] = [];
+            if (this._listeners[eventName].indexOf(listener) === -1) {
+              this._listeners[eventName].push(listener);
             }
+          },
+          removeEventListener: function(eventName, listener) {
+            if (!this._listeners[eventName]) return;
+            var index = this._listeners[eventName].indexOf(listener);
+            if (index !== -1) this._listeners[eventName].splice(index, 1);
+          },
+          postMessage: function(message) {
+            var messageString = typeof message === 'string' ? message : JSON.stringify(message);
+            var messageType = window.name ? 'vuplex.postMessage-' + window.name : 'vuplex.postMessage';
+            console.log('[Polyfill] Sending to parent:', messageType, messageString);
+            window.parent.postMessage({ type: messageType, message: messageString }, '*');
+          },
+          _emit: function(eventName) {
+            var args = Array.prototype.slice.call(arguments, 1);
+            if (!this._listeners[eventName]) return;
+            this._listeners[eventName].forEach(function(listener) {
+              try { listener.apply(null, args); } catch (e) { console.error(e); }
+            });
           }
-        }
-        _handleWindowMessage(event) {
-          if (event.data && typeof event.data.type === 'string' && event.data.type.indexOf('vuplex.postMessage') === 0) {
-            const value = event.data.message;
-            const vuplexMessageEvent = new Event('vuplexmessage');
-            vuplexMessageEvent.value = value;
-            vuplexMessageEvent.data = value;
-            window.dispatchEvent(vuplexMessageEvent);
-            this._emit('message', { value, data: value });
+        };
+        
+        window.addEventListener('message', function(event) {
+          if (event.data && typeof event.data.type === 'string' && 
+              event.data.type.indexOf('vuplex.postMessage') === 0) {
+            var value = event.data.message;
+            var evt = new Event('vuplexmessage');
+            evt.value = value;
+            evt.data = value;
+            window.dispatchEvent(evt);
+            polyfill._emit('message', { value: value, data: value });
           }
-        }
-      }
-      // Only use the polyfill if real vuplex isn't available (WebGL cross-origin mode)
-      // In native mode, the real window.vuplex will be provided by Vuplex WebView
-      if (!window.vuplex) {
-        console.log('[index.html] Real vuplex not found, using polyfill for WebGL cross-origin');
-        window.vuplex = new VuplexPolyfill();
-      } else {
-        console.log('[index.html] Real vuplex found, using native Vuplex WebView');
-      }
+        });
+        
+        window.vuplex = polyfill;
+        
+        // Also set up postWorldMessage immediately
+        window.postWorldMessage = function(message) {
+          console.log('[postWorldMessage] Called with:', message);
+          if (window.vuplex && typeof window.vuplex.postMessage === 'function') {
+            window.vuplex.postMessage(message);
+          } else {
+            console.warn('[postWorldMessage] vuplex not available');
+          }
+        };
+        
+        // Listen for native vuplex to arrive (Desktop mode)
+        window.addEventListener('vuplexready', function() {
+          console.log('[index.html] Native vuplex arrived, upgrading');
+          // window.vuplex is now the native one
+          // postWorldMessage will use it automatically
+        });
+      })();
     </script>
   </head>
   <body>

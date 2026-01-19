@@ -2,30 +2,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './ChatConsole.css';
 
-// Helper function that sends via postWorldMessage AND parent.postMessage fallback for WebGL
-const sendWorldMessage = (msg) => {
-  // First, call the standard postWorldMessage
+/**
+ * Send a message to the world/WebVerse runtime
+ * Uses both postWorldMessage and direct parent.postMessage for WebGL compatibility
+ */
+function sendWorldMessage(msg) {
   if (typeof postWorldMessage === 'function') {
-    try {
-      postWorldMessage(msg);
-    } catch (error) {
-      console.error('[ChatConsole] postWorldMessage threw error:', error);
-    }
+    try { postWorldMessage(msg); } catch (e) { console.error('[ChatConsole] postWorldMessage error:', e); }
   }
-  
-  // Also try direct parent.postMessage as fallback for WebGL cross-origin
   if (window.parent && window.parent !== window) {
-    const messageType = window.vuplex?._postMessageType || 'vuplex.postMessage';
-    try {
-      window.parent.postMessage({
-        type: messageType,
-        message: msg
-      }, '*');
-    } catch (error) {
-      console.error('[ChatConsole] parent.postMessage failed:', error);
-    }
+    const messageType = window.name ? 'vuplex.postMessage-' + window.name : 'vuplex.postMessage';
+    try { window.parent.postMessage({ type: messageType, message: msg }, '*'); } catch (e) { console.error('[ChatConsole] parent.postMessage error:', e); }
   }
-};
+}
 
 const ChatConsole = ({
   toggleKey = 'c',

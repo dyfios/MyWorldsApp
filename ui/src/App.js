@@ -8,10 +8,11 @@ import LoadingPanel from './components/LoadingPanel';
 import MobileControls from './components/MobileControls';
 import { useUISettings } from './hooks/useUISettings';
 
-// Helper function that sends via postWorldMessage AND parent.postMessage fallback for WebGL
-const sendWorldMessage = (msg) => {
-  console.log('[App.js] sendWorldMessage:', msg);
-  
+/**
+ * Send a message to the world/WebVerse runtime
+ * Uses both postWorldMessage and direct parent.postMessage for WebGL compatibility
+ */
+function sendWorldMessage(msg) {
   // First, call the standard postWorldMessage
   if (typeof postWorldMessage === 'function') {
     try {
@@ -23,7 +24,7 @@ const sendWorldMessage = (msg) => {
   
   // Also try direct parent.postMessage as fallback for WebGL cross-origin
   if (window.parent && window.parent !== window) {
-    const messageType = window.vuplex?._postMessageType || 'vuplex.postMessage';
+    const messageType = window.name ? 'vuplex.postMessage-' + window.name : 'vuplex.postMessage';
     try {
       window.parent.postMessage({
         type: messageType,
@@ -33,7 +34,7 @@ const sendWorldMessage = (msg) => {
       console.error('[App.js] parent.postMessage failed:', error);
     }
   }
-};
+}
 
 // Hook for detecting mobile devices (touch + small screen)
 const useMobileDetection = (breakpoint = 768) => {
@@ -383,6 +384,14 @@ function App() {
             switch (message.type) {
               case 'settings-changed':
                 console.log('UI Settings changed:', message.data);
+                // Update React state so UI reflects the change
+                if (uiSettings && uiSettings.setCurrentSettings) {
+                  uiSettings.setCurrentSettings(prev => ({
+                    ...prev,
+                    ...message.data
+                  }));
+                  console.log('React state updated with:', message.data);
+                }
                 // Send settings changes to the world via sendWorldMessage (with WebGL fallback)
                 sendWorldMessage(`UI_SETTINGS.APPLY(${JSON.stringify(message.data)})`);
                 break;
@@ -566,8 +575,12 @@ function App() {
         onClose={handlePopupMenuClose}
       />
 
+      {/* Debug: Log flying state */}
+      {console.log('[App.js] Rendering MobileControls with isFlying:', uiSettings?.currentSettings?.flying)}
+      
       <MobileControls
         visible={isMobile}
+        isFlying={uiSettings?.currentSettings?.flying || false}
         onMenuClick={handleMobileMenuClick}
         onChatClick={handleMobileChatClick}
         onChatLongPress={handleMobileChatLongPress}

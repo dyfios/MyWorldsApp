@@ -163,6 +163,26 @@
   /* No extra margin needed with flexbox */
 }
 
+/* Jump button - positioned in the analog sticks row */
+.jump-button {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: rgba(100, 200, 255, 0.2);
+  border: 2px solid rgba(100, 200, 255, 0.4);
+  opacity: 0.6;
+}
+
+.jump-button:active {
+  opacity: 1;
+  background: rgba(100, 200, 255, 0.4);
+  border-color: rgba(100, 200, 255, 0.6);
+}
+
+.jump-button .button-icon {
+  font-size: 2rem;
+}
+
 /* Ensure controls don't interfere with other elements when not visible */
 @media (min-width: 769px) {
   .mobile-controls {

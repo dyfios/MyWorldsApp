@@ -1,32 +1,19 @@
 /* global postWorldMessage */
 import { useState, useCallback } from 'react';
 
-// Helper function that sends via postWorldMessage AND parent.postMessage fallback for WebGL
-const sendWorldMessage = (msg) => {
-  console.log('[useUISettings] sendWorldMessage:', msg);
-  
-  // First, call the standard postWorldMessage
+/**
+ * Send a message to the world/WebVerse runtime
+ * Uses both postWorldMessage and direct parent.postMessage for WebGL compatibility
+ */
+function sendWorldMessage(msg) {
   if (typeof postWorldMessage === 'function') {
-    try {
-      postWorldMessage(msg);
-    } catch (error) {
-      console.error('[useUISettings] postWorldMessage threw error:', error);
-    }
+    try { postWorldMessage(msg); } catch (e) { console.error('[useUISettings] postWorldMessage error:', e); }
   }
-  
-  // Also try direct parent.postMessage as fallback for WebGL cross-origin
   if (window.parent && window.parent !== window) {
-    const messageType = window.vuplex?._postMessageType || 'vuplex.postMessage';
-    try {
-      window.parent.postMessage({
-        type: messageType,
-        message: msg
-      }, '*');
-    } catch (error) {
-      console.error('[useUISettings] parent.postMessage failed:', error);
-    }
+    const messageType = window.name ? 'vuplex.postMessage-' + window.name : 'vuplex.postMessage';
+    try { window.parent.postMessage({ type: messageType, message: msg }, '*'); } catch (e) { console.error('[useUISettings] parent.postMessage error:', e); }
   }
-};
+}
 
 export const useUISettings = () => {
   const [currentSettings, setCurrentSettings] = useState({
@@ -188,6 +175,7 @@ export const useUISettings = () => {
 
   return {
     currentSettings,
+    setCurrentSettings, // Expose so App.js can update from iframe messages
     initializeUISettings,
     isWorldTypeSupported,
     getSettings,

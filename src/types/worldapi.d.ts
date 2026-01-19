@@ -3931,6 +3931,22 @@ declare class Input {
     static lookSpeed: number;
 
     /**
+     * Set the current movement value programmatically.
+     * @param amount A Vector2 representing the desired movement direction and magnitude.
+     */
+    static SetMovement(amount: Vector2): void;
+
+    /**
+     * Trigger a jump action.
+     */
+    static Jump(): void;
+
+    /**
+     * Trigger a lower action.
+     */
+    static Lower(): void;
+
+    /**
      * Add a rig follower (an entity that follows the rig).
      * @param entityToFollowRig Entity to follow the rig.
      * @returns Whether or not the operation was successful.

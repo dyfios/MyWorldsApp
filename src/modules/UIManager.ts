@@ -475,6 +475,50 @@ export class UIManager {
             } else {
               Logging.Log('📱 UIManager: Failed to parse MOBILE_KEY.UP params');
             }
+          } else if (msg.startsWith('MOBILE_FLY.VERTICAL(')) {
+            // Handle mobile flight vertical speed control
+            Logging.Log('📱 UIManager: MOBILE_FLY.VERTICAL detected in message');
+            const paramStart = msg.indexOf('(') + 1;
+            const paramEnd = msg.lastIndexOf(')');
+            
+            Logging.Log('📱 UIManager: paramStart=' + paramStart + ', paramEnd=' + paramEnd);
+            
+            if (paramStart > 0 && paramEnd > paramStart) {
+              const speedStr = msg.substring(paramStart, paramEnd).trim();
+              Logging.Log('📱 UIManager: speedStr=' + speedStr);
+              const speed = parseFloat(speedStr);
+              
+              if (!isNaN(speed)) {
+                // Store the vertical speed for continuous movement (-1 to 1)
+                (globalThis as any).mobileFlightVerticalSpeed = speed;
+                Logging.Log('📱 UIManager: mobileFlightVerticalSpeed set to ' + speed);
+              } else {
+                Logging.Log('📱 UIManager: Invalid MOBILE_FLY.VERTICAL speed: ' + speedStr);
+              }
+            } else {
+              Logging.Log('📱 UIManager: Failed to parse MOBILE_FLY.VERTICAL params');
+            }
+          } else if (msg.startsWith('MOBILE_MOVE(')) {
+            // Handle mobile movement input - x,y values from -1 to 1
+            const paramStart = msg.indexOf('(') + 1;
+            const paramEnd = msg.lastIndexOf(')');
+            
+            if (paramStart > 0 && paramEnd > paramStart) {
+              const paramString = msg.substring(paramStart, paramEnd);
+              const params = paramString.split(',').map(p => parseFloat(p.trim()));
+              
+              if (params.length >= 2 && !isNaN(params[0]) && !isNaN(params[1])) {
+                const moveX = params[0]; // Left/right (-1 to 1)
+                const moveY = params[1]; // Forward/backward (-1 to 1)
+                
+                // Call Input.SetMovement with the movement vector
+                Input.SetMovement(new Vector2(moveX, moveY));
+              } else {
+                Logging.Log('📱 UIManager: Invalid MOBILE_MOVE params: ' + paramString);
+              }
+            } else {
+              Logging.Log('📱 UIManager: Failed to parse MOBILE_MOVE params');
+            }
           }
       }
     } catch (error: any) {
