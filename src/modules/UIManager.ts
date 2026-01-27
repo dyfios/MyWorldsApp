@@ -519,6 +519,27 @@ export class UIManager {
             } else {
               Logging.Log('📱 UIManager: Failed to parse MOBILE_MOVE params');
             }
+          } else if (msg.startsWith('MOBILE_LOOK(')) {
+            // Handle mobile look input - x,y delta values
+            const paramStart = msg.indexOf('(') + 1;
+            const paramEnd = msg.lastIndexOf(')');
+            
+            if (paramStart > 0 && paramEnd > paramStart) {
+              const paramString = msg.substring(paramStart, paramEnd);
+              const params = paramString.split(',').map(p => parseFloat(p.trim()));
+              
+              if (params.length >= 2 && !isNaN(params[0]) && !isNaN(params[1])) {
+                const lookX = params[0]; // Horizontal look delta
+                const lookY = params[1]; // Vertical look delta
+                
+                // Call Input.SetLook with the look vector
+                Input.SetLook(new Vector2(lookX, lookY));
+              } else {
+                Logging.Log('📱 UIManager: Invalid MOBILE_LOOK params: ' + paramString);
+              }
+            } else {
+              Logging.Log('📱 UIManager: Failed to parse MOBILE_LOOK params');
+            }
           }
       }
     } catch (error: any) {

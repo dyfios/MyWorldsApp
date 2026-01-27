@@ -508,6 +508,63 @@ function App() {
     };
   }, [isChatActive, uiSettings]);
 
+  // Mouse/touch movement tracking for look control
+  React.useEffect(() => {
+    let lastX = null;
+    let lastY = null;
+
+    const sendLookDelta = (deltaX, deltaY) => {
+      if (deltaX !== 0 || deltaY !== 0) {
+        console.log(`[Movement] Look delta - X: ${deltaX}, Y: ${deltaY}`);
+        sendWorldMessage(`MOBILE_LOOK(${deltaX},${deltaY})`);
+      }
+    };
+
+    const handleMouseMove = (e) => {
+      if (lastX !== null && lastY !== null) {
+        const deltaX = e.clientX - lastX;
+        const deltaY = e.clientY - lastY;
+        sendLookDelta(deltaX, deltaY);
+      }
+      
+      lastX = e.clientX;
+      lastY = e.clientY;
+    };
+
+    const handleTouchMove = (e) => {
+      if (e.touches.length === 0) return;
+      
+      const touch = e.touches[0];
+      if (lastX !== null && lastY !== null) {
+        const deltaX = touch.clientX - lastX;
+        const deltaY = touch.clientY - lastY;
+        sendLookDelta(deltaX, deltaY);
+      }
+      
+      lastX = touch.clientX;
+      lastY = touch.clientY;
+    };
+
+    const handleTouchEnd = () => {
+      lastX = null;
+      lastY = null;
+    };
+
+    console.log('[Movement] Adding mouse/touch listeners');
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('touchmove', handleTouchMove, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd);
+    document.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, []);
+
   // Mobile controls handlers
   const handleMobileMenuClick = useCallback(() => {
     if (window.popupMenuAPI) {

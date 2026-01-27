@@ -3947,6 +3947,12 @@ declare class Input {
     static Lower(): void;
 
     /**
+     * Set the current look value programmatically.
+     * @param amount A Vector2 representing the desired look direction.
+     */
+    static SetLook(amount: Vector2): void;
+
+    /**
      * Add a rig follower (an entity that follows the rig).
      * @param entityToFollowRig Entity to follow the rig.
      * @returns Whether or not the operation was successful.
