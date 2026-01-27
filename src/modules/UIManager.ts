@@ -586,6 +586,26 @@ export class UIManager {
           (globalThis as any).cancelPlacing();
           (globalThis as any).setInteractionMode('SLEDGE-HAMMER');
           break;
+        case 'ROUND_SHOVEL_1':
+          Logging.Log('🎨 UIManager: Round Shovel 1 button clicked');
+          (globalThis as any).cancelPlacing();
+          (globalThis as any).setInteractionMode('ROUND-SHOVEL-1');
+          break;
+        case 'ROUND_SHOVEL_2':
+          Logging.Log('📦 UIManager: Round Shovel 2 button clicked');
+          (globalThis as any).cancelPlacing();
+          (globalThis as any).setInteractionMode('ROUND-SHOVEL-2');
+          break;
+        case 'ROUND_SHOVEL_4':
+          Logging.Log('🗑️ UIManager: Round Shovel 4 button clicked');
+          (globalThis as any).cancelPlacing();
+          (globalThis as any).setInteractionMode('ROUND-SHOVEL-4');
+          break;
+        case 'ROUND_SHOVEL_8':
+          Logging.Log('🗑️ UIManager: Round Shovel 8 button clicked');
+          (globalThis as any).cancelPlacing();
+          (globalThis as any).setInteractionMode('ROUND-SHOVEL-8');
+          break;
         default:
           if (buttonType.startsWith('ENTITY.')) {
             (globalThis as any).setInteractionMode('ENTITY-PLACING');

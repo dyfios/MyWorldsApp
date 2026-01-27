@@ -17,6 +17,7 @@ export interface EntityTemplate {
   type: EntityType;
   assets: string; // JSON string containing model_path etc.
   style?: string; // Optional style field for visual styling
+  thumbnail?: string; // Thumbnail image URL for the variant
 }
 
 /**

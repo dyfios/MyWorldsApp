@@ -137,18 +137,51 @@ export class StaticSurfaceRenderer extends WorldRendering {
       Logging.Log('📋 StaticSurfaceRenderer: Entity templates received: ' + templates);
       Logging.Log('✓ StaticSurfaceRenderer: Entity templates request completed successfully');
       Context.DefineContext('MW_ENTITY_TEMPLATES', templates);
+      WorldStorage.SetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS", "0");
+
+      // Add default dock buttons for mini-world type
+      Time.SetTimeout(`
+        try {
+          addEditToolbarButton('Hand', 'assets/img/hand.png', 'TOOL.DOCK_BUTTON_CLICKED(HAND)');
+          addEditToolbarButton('Sledgehammer', 'assets/img/sledgehammer.png', 'TOOL.DOCK_BUTTON_CLICKED(SLEDGE_HAMMER)');
+          Logging.Log('Added default dock buttons for mini-world: Hand, Sledgehammer');
+        }
+        catch (error) {
+          Logging.LogError('Error adding default dock buttons: ' + error);
+        }
+      `, 3000);
 
       let dockButtons: DockButtonInfo[] = [];
       for (const template of templates['templates']) {
+        // Strip file extensions from tags for display using split
+        var entityTagParts = template.entity_tag.split('.');
+        var entityTagClean = entityTagParts.length > 1 ? entityTagParts.slice(0, -1).join('.') : template.entity_tag;
+        var variantTagParts = template.variant_tag.split('.');
+        var variantTagClean = variantTagParts.length > 1 ? variantTagParts.slice(0, -1).join('.') : template.variant_tag;
+        var displayName = entityTagClean + "_" + variantTagClean;
+        
         dockButtons.push({
-          name: template.entity_tag + "_" + template.variant_tag,
-          thumbnail: template.entity_tag,
+          name: displayName,
+          thumbnail: template.thumbnail || 'assets/img/entity-default.png',
           onClick: `ENTITY_TEMPLATE.ENTITY_SELECTED('${template.entity_id}','${template.variant_id}');`
         });
-        Time.SetTimeout("addEditToolbarButton('" + template.entity_tag + "_" +
-          template.variant_tag + "', '" + template.entity_tag +
-          "', 'ENTITY_TEMPLATE.ENTITY_SELECTED(" + template.entity_id + "," +
-          template.variant_id + ");')", 3000);
+        
+        // Add entity template to the Tools menu (after Tools tab is created at 5000ms)
+        Time.SetTimeout("addTool('" + displayName + 
+          "', '" + (template.thumbnail || 'assets/img/entity-default.png') + 
+          "', 'TOOL.ADD_DOCK_BUTTON(ENTITY." + template.entity_id + "." + template.variant_id + 
+          ", " + displayName + 
+          ", " + (template.thumbnail || 'assets/img/entity-default.png') + ");')", 6000);
+        
+        // Also add first few entities to the dock
+        var numEntityButtons = parseInt(WorldStorage.GetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS") as string);
+        if (numEntityButtons < 7) {
+          Time.SetTimeout("addEditToolbarButton('" + displayName +
+            "', '" + (template.thumbnail || 'assets/img/entity-default.png') +
+            "', 'ENTITY_TEMPLATE.ENTITY_SELECTED(" + template.entity_id + "," +
+            template.variant_id + ");')", 3100);
+          WorldStorage.SetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS", (numEntityButtons + 1).toString());
+        }
       }
 
       // Now that templates are complete, trigger entity instances loading
@@ -1085,6 +1118,19 @@ export class TiledSurfaceRenderer extends WorldRendering {
     Logging.Log("Applying Entities Config...");
     WorldStorage.SetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS", "0");
 
+    // Add default dock buttons for planet world type
+    Time.SetTimeout(`
+      try {
+        addEditToolbarButton('Hand', 'assets/img/hand.png', 'TOOL.DOCK_BUTTON_CLICKED(HAND)');
+        addEditToolbarButton('Square Shovel', 'assets/img/square-shovel.png', 'TOOL.DOCK_BUTTON_CLICKED(SQUARE_SHOVEL_1)');
+        addEditToolbarButton('Sledgehammer', 'assets/img/sledgehammer.png', 'TOOL.DOCK_BUTTON_CLICKED(SLEDGE_HAMMER)');
+        Logging.Log('Added default dock buttons: Hand, Square Shovel, Sledgehammer');
+      }
+      catch (error) {
+        Logging.LogError('Error adding default dock buttons: ' + error);
+      }
+    `, 6000);
+
     for (var entity in this.entitiesConfig) {
       if (this.entitiesConfig[entity].id == null) {
         Logging.LogError("applyEntitiesConfig: Invalid entity config: " + entity + " missing id");
@@ -1126,19 +1172,22 @@ export class TiledSurfaceRenderer extends WorldRendering {
           this.entitiesConfig[entity].variants[variant].thumbnail =
             this.worldAddress + "/" + this.worldConfig["entities-directory"] + "/"
             + this.entitiesConfig[entity].variants[variant].thumbnail;
+          // Strip file extensions from display name for cleaner labels using split
+          var displayNameParts = this.entitiesConfig[entity].variants[variant].display_name.split('.');
+          var displayNameClean = displayNameParts.length > 1 ? displayNameParts.slice(0, -1).join('.') : this.entitiesConfig[entity].variants[variant].display_name;
           Time.SetTimeout(`
             try {
-              addTool('${this.entitiesConfig[entity].variants[variant].display_name}', '${this.entitiesConfig[entity].variants[variant].thumbnail}', 'TOOL.ADD_DOCK_BUTTON(ENTITY.${entity}.${variant}, ${this.entitiesConfig[entity].variants[variant].display_name}, ${this.entitiesConfig[entity].variants[variant].thumbnail})');
+              addTool('${displayNameClean}', '${this.entitiesConfig[entity].variants[variant].thumbnail}', 'TOOL.ADD_DOCK_BUTTON(ENTITY.${entity}.${variant}, ${displayNameClean}, ${this.entitiesConfig[entity].variants[variant].thumbnail})');
               var numEntityButtons = parseInt(WorldStorage.GetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS"));
-              if (numEntityButtons < 3) {
-                this.addEditToolbarButton('${this.entitiesConfig[entity].variants[variant].display_name}', '${this.entitiesConfig[entity].variants[variant].thumbnail}', 'TOOL.DOCK_BUTTON_CLICKED(ENTITY.${entity}.${variant}, ${this.entitiesConfig[entity].variants[variant].display_name}, ${this.entitiesConfig[entity].variants[variant].thumbnail})');
+              if (numEntityButtons < 6) {
+                this.addEditToolbarButton('${displayNameClean}', '${this.entitiesConfig[entity].variants[variant].thumbnail}', 'TOOL.DOCK_BUTTON_CLICKED(ENTITY.${entity}.${variant}, ${displayNameClean}, ${this.entitiesConfig[entity].variants[variant].thumbnail})');
                 WorldStorage.SetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS", (numEntityButtons + 1).toString());
               }
             }
             catch (error) {
               Logging.LogError('Error adding entity: ' + error);
             }
-          `, 6000);
+          `, 6100);
         }
 
         for (var valid_orientation in this.entitiesConfig[entity].variants[variant].valid_orientations) {
