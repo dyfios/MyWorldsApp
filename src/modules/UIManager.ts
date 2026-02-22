@@ -31,6 +31,9 @@ export class UIManager {
   private isInitialized: boolean = false;
   private vrToolbarInitialized: boolean = false;
 
+  // WASD key state for translating keyboard input into Input.SetMovement
+  private wasdState: { w: boolean; a: boolean; s: boolean; d: boolean } = { w: false, a: false, s: false, d: false };
+
   public defaultToolPath: string = "assets/images/tool-default.png";
   public defaultEntityPath: string = "assets/images/entity-default.png";
   public defaultTerrainPath: string = "assets/images/terrain-default.png";
@@ -62,7 +65,7 @@ export class UIManager {
     };
 
     (globalThis as any).handleToolbarMessage = (msg: string) => {
-      Logging.Log('🎯🎯🎯 GLOBAL handleToolbarMessage INVOKED with: ' + msg);
+      //Logging.Log('🎯🎯🎯 GLOBAL handleToolbarMessage INVOKED with: ' + msg);
       this.handleToolbarMessage(msg);
     };
 
@@ -219,9 +222,9 @@ export class UIManager {
   }
 
   handleToolbarMessage(msg: string): void {
-    Logging.Log('🎯 UIManager: UI_HandleToolbarMessage invoked with: ' + msg);
+    //Logging.Log('🎯 UIManager: UI_HandleToolbarMessage invoked with: ' + msg);
     try {
-      Logging.Log('📨 UIManager: Processing toolbar message: ' + msg);
+      //Logging.Log('📨 UIManager: Processing toolbar message: ' + msg);
 
       switch (msg) {
         case 'CHAT_INPUT.OPENED()':
@@ -234,6 +237,12 @@ export class UIManager {
         case 'POPUP_MENU.CLOSED()':
           (globalThis as any).unpauseForUI();
           break;
+        case 'RIGHT_PRESS()':
+          // Handle right click from web browser mode
+          if (typeof (globalThis as any).processRightPress === 'function') {
+            (globalThis as any).processRightPress();
+          }
+          break;
         case 'UNFOCUS_PANEL()':
           // Handle background click - unfocus the HTML panel
           Logging.Log('🔲 UIManager: Unfocusing panel (background clicked)');
@@ -244,6 +253,10 @@ export class UIManager {
               toolbarEntity.UnfocusPanel();
               Logging.Log('🔲 UIManager: Panel unfocused successfully');
             }
+          }
+          // Also trigger a left press so clicks pass through to placement/interaction
+          if (typeof (globalThis as any).processLeftPress === 'function') {
+            (globalThis as any).processLeftPress();
           }
           break;
         default:
@@ -540,6 +553,32 @@ export class UIManager {
             } else {
               Logging.Log('📱 UIManager: Failed to parse MOBILE_LOOK params');
             }
+          } else if (msg.startsWith('KEY_PRESS(')) {
+            // Key pressed while UI panel has focus — forward to engine
+            const paramStart = msg.indexOf('(') + 1;
+            const paramEnd = msg.lastIndexOf(')');
+            if (paramStart > 0 && paramEnd > paramStart) {
+              const key = msg.substring(paramStart, paramEnd);
+              // Flag to prevent InputRouter from bouncing this back to the UI
+              (globalThis as any)._keyFromUI = true;
+              if (typeof (globalThis as any).processKeyPress === 'function') {
+                (globalThis as any).processKeyPress(key);
+              }
+              (globalThis as any)._keyFromUI = false;
+              this.updateMovementFromKey(key, true);
+            }
+          } else if (msg.startsWith('KEY_RELEASE(')) {
+            const paramStart = msg.indexOf('(') + 1;
+            const paramEnd = msg.lastIndexOf(')');
+            if (paramStart > 0 && paramEnd > paramStart) {
+              const key = msg.substring(paramStart, paramEnd);
+              (globalThis as any)._keyFromUI = true;
+              if (typeof (globalThis as any).processKeyRelease === 'function') {
+                (globalThis as any).processKeyRelease(key);
+              }
+              (globalThis as any)._keyFromUI = false;
+              this.updateMovementFromKey(key, false);
+            }
           }
       }
     } catch (error: any) {
@@ -549,11 +588,29 @@ export class UIManager {
   }
 
   /**
+   * Translate WASD / Space / Shift key state into engine movement APIs.
+   * Called when a KEY_PRESS or KEY_RELEASE message arrives from the UI panel.
+   */
+  private updateMovementFromKey(key: string, pressed: boolean): void {
+    const k = key.toLowerCase();
+    if (k === 'w' || k === 'a' || k === 's' || k === 'd') {
+      (this.wasdState as any)[k] = pressed;
+      const moveX = (this.wasdState.d ? 1 : 0) - (this.wasdState.a ? 1 : 0);
+      const moveY = (this.wasdState.w ? 1 : 0) - (this.wasdState.s ? 1 : 0);
+      Input.SetMovement(new Vector2(moveX, moveY));
+    } else if (key === ' ') {
+      (globalThis as any).mobileControlSpaceDown = pressed;
+    } else if (k === 'shift') {
+      (globalThis as any).mobileControlShiftDown = pressed;
+    }
+  }
+
+  /**
    * Handle dock button click events
    */
   private handleDockButtonClick(buttonType: string): void {
     try {
-      Logging.Log('🔧 UIManager: Processing dock button click for type: ' + buttonType);
+      //Logging.Log('🔧 UIManager: Processing dock button click for type: ' + buttonType);
       
       switch (buttonType) {
         case 'HAND':
@@ -618,27 +675,40 @@ export class UIManager {
               Logging.Log('🏗️ UIManager: Entity button clicked - entityID: ' + entityName + ', variantID: ' + variantName);
               
               (globalThis as any).cancelPlacing();
-              for (var entity in (globalThis as any).tiledsurfacerenderer.entitiesConfig) {
-                if (entity == entityName) {
-                  for (var variant in (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants) {
-                    if (variant == variantName) {
-                      (globalThis as any).loadEntity(entity, variant, instanceID,
-                        entity + "." + variant + "." + instanceID,
-                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].id,
-                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].variant_id, null,
-                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].type,
-                        Vector3.zero, Quaternion.identity, Vector3.one,
-                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].model,
-                        [ (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].model ],
-                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].wheels,
-                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].mass,
-                        AutomobileType.Default,
-                        (globalThis as any).tiledsurfacerenderer.entitiesConfig[entity].variants[variant].scripts,
-                        true);
-                      return;
+
+              // Try TiledSurfaceRenderer path first (entitiesConfig lookup)
+              const entitiesConfig = (globalThis as any).tiledsurfacerenderer?.entitiesConfig;
+              let found = false;
+              if (entitiesConfig) {
+                for (var entity in entitiesConfig) {
+                  if (entity == entityName) {
+                    for (var variant in entitiesConfig[entity].variants) {
+                      if (variant == variantName) {
+                        (globalThis as any).loadEntity(entity, variant, instanceID,
+                          entity + "." + variant + "." + instanceID,
+                          entitiesConfig[entity].id,
+                          entitiesConfig[entity].variants[variant].variant_id, null,
+                          entitiesConfig[entity].variants[variant].type,
+                          Vector3.zero, Quaternion.identity, Vector3.one,
+                          entitiesConfig[entity].variants[variant].model,
+                          [ entitiesConfig[entity].variants[variant].model ],
+                          entitiesConfig[entity].variants[variant].wheels,
+                          entitiesConfig[entity].variants[variant].mass,
+                          AutomobileType.Default,
+                          entitiesConfig[entity].variants[variant].scripts,
+                          true);
+                        found = true;
+                        return;
+                      }
                     }
                   }
                 }
+              }
+
+              // Fallback: StaticSurfaceRenderer path (templates lookup)
+              if (!found) {
+                Logging.Log('🔄 UIManager: entitiesConfig lookup failed, trying templates fallback for ' + entityName + '/' + variantName);
+                this.handleToolbarMessage('ENTITY_TEMPLATE.ENTITY_SELECTED(' + entityName + ',' + variantName + ')');
               }
             } else {
               Logging.LogError('❌ UIManager: Invalid ENTITY button format: ' + buttonType + ' (expected ENTITY.<entityID>.<variantID>)');
@@ -671,7 +741,7 @@ export class UIManager {
    */
   private handleUISettingsMessage(msg: string): void {
     try {
-      Logging.Log('🎛️ UIManager: Processing UI Settings message: ' + msg);
+      //Logging.Log('🎛️ UIManager: Processing UI Settings message: ' + msg);
 
       if (msg.startsWith('UI_SETTINGS.APPLY(') && msg.endsWith(')')) {
         // Extract JSON data from message
@@ -699,8 +769,8 @@ export class UIManager {
    */
   private applyUISettings(settings: any): void {
     try {
-      Logging.Log('🎛️ UIManager: Applying UI Settings to world systems: ' + JSON.stringify(settings));
-      Logging.Log('🎛️ UIManager: playerController available: ' + !!(globalThis as any).playerController);
+      //Logging.Log('🎛️ UIManager: Applying UI Settings to world systems: ' + JSON.stringify(settings));
+      //Logging.Log('🎛️ UIManager: playerController available: ' + !!(globalThis as any).playerController);
 
       // Apply camera mode
       if (settings.cameraMode && (globalThis as any).playerController) {
@@ -739,9 +809,9 @@ export class UIManager {
       // Apply flying mode
       if (settings.hasOwnProperty('flying') && (globalThis as any).playerController) {
         const playerController = (globalThis as any).playerController;
-        Logging.Log('✈️ UIManager: Flying mode in settings: ' + settings.flying + ', setFlyingMode available: ' + (typeof playerController.setFlyingMode === 'function'));
+        //Logging.Log('✈️ UIManager: Flying mode in settings: ' + settings.flying + ', setFlyingMode available: ' + (typeof playerController.setFlyingMode === 'function'));
         if (typeof playerController.setFlyingMode === 'function') {
-          Logging.Log('✈️ UIManager: Calling setFlyingMode with: ' + settings.flying);
+          //Logging.Log('✈️ UIManager: Calling setFlyingMode with: ' + settings.flying);
           playerController.setFlyingMode(settings.flying);
           Logging.Log('✈️ UIManager: After setFlyingMode, Input.gravityEnabled = ' + Input.gravityEnabled);
         }
@@ -782,7 +852,7 @@ export class UIManager {
       `;
       
       mainToolbar.ExecuteJavaScript(jsCommand, '');
-      Logging.Log('✅ UIManager: Loading panel toggle command sent to UI space: ' + show);
+      //Logging.Log('✅ UIManager: Loading panel toggle command sent to UI space: ' + show);
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       Logging.LogError('❌ UIManager: Error in toggleLoadingPanel: ' + errorMessage);
@@ -803,7 +873,7 @@ export class UIManager {
         return;
       }
       
-      Logging.Log('🔧 UIManager: MAIN-TOOLBAR-ID: ' + mainToolbarId);
+      //Logging.Log('🔧 UIManager: MAIN-TOOLBAR-ID: ' + mainToolbarId);
 
       const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
       if (!mainToolbar) {
@@ -811,19 +881,19 @@ export class UIManager {
         return;
       }
       
-      Logging.Log('🔧 UIManager: Main toolbar entity found');
-      Logging.Log('🔧 UIManager: ExecuteJavaScript available: ' + (typeof mainToolbar.ExecuteJavaScript === 'function'));
+      //Logging.Log('🔧 UIManager: Main toolbar entity found');
+      //Logging.Log('🔧 UIManager: ExecuteJavaScript available: ' + (typeof mainToolbar.ExecuteJavaScript === 'function'));
 
       // Call the Tools iframe directly via popupMenuAPI
       const jsCommand = `
-        console.log('UIManager addTool JS: Starting execution');
-        console.log('UIManager addTool JS: popupMenuAPI exists:', !!window.popupMenuAPI);
-        console.log('UIManager addTool JS: sendMessageToTab exists:', window.popupMenuAPI ? !!window.popupMenuAPI.sendMessageToTab : 'N/A');
+        //console.log('UIManager addTool JS: Starting execution');
+        //console.log('UIManager addTool JS: popupMenuAPI exists:', !!window.popupMenuAPI);
+        //console.log('UIManager addTool JS: sendMessageToTab exists:', window.popupMenuAPI ? !!window.popupMenuAPI.sendMessageToTab : 'N/A');
         if (window.popupMenuAPI && window.popupMenuAPI.sendMessageToTab) {
           const toolsTabs = window.popupMenuAPI.getTabs().filter(tab => tab.name === 'Tools');
-          console.log('UIManager addTool JS: Tools tabs found:', toolsTabs.length);
+          //console.log('UIManager addTool JS: Tools tabs found:', toolsTabs.length);
           if (toolsTabs.length > 0) {
-            console.log('UIManager addTool JS: Sending message to tab:', toolsTabs[0].id);
+            //console.log('UIManager addTool JS: Sending message to tab:', toolsTabs[0].id);
             window.popupMenuAPI.sendMessageToTab(toolsTabs[0].id, {
               type: 'add-tool',
               data: { name: '${name}', thumbnail: '${thumbnail}', onClick: '${onClick}' }
@@ -839,7 +909,7 @@ export class UIManager {
       
       if (typeof mainToolbar.ExecuteJavaScript === 'function') {
         mainToolbar.ExecuteJavaScript(jsCommand, '');
-        Logging.Log('✅ UIManager: Tool add command sent to UI space: ' + name);
+        //Logging.Log('✅ UIManager: Tool add command sent to UI space: ' + name);
       } else {
         Logging.LogError('❌ UIManager: ExecuteJavaScript not available on main toolbar entity');
       }
@@ -850,7 +920,7 @@ export class UIManager {
         const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId) as HTMLEntity;
         if (vrToolbarHTMLEntity) {
           vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
-          Logging.Log('✅ UIManager: Tool add command sent to VR toolbar: ' + name);
+          //Logging.Log('✅ UIManager: Tool add command sent to VR toolbar: ' + name);
         }
       }
 
@@ -944,7 +1014,7 @@ export class UIManager {
       `;
       
       mainToolbar.ExecuteJavaScript(jsCommand, '');
-      Logging.Log('✅ UIManager: Clear tools command sent to UI space');
+      //Logging.Log('✅ UIManager: Clear tools command sent to UI space');
 
       // Also send to VR toolbar if it exists
       const vrToolbarHTMLId = WorldStorage.GetItem('VR-TOOLBAR-HTML-ID');
@@ -1055,8 +1125,8 @@ export class UIManager {
    * Set up edit toolbar buttons
    */
   private addEditToolbarButton(name: string, thumbnail: string, onClick: string): void {
-    Logging.Log('🎨 UIManager: Setting up edit toolbar buttons...');
-    Logging.Log('🎨 UIManager: Button details - name: ' + name + ', thumbnail: ' + thumbnail + ', onClick: ' + onClick);
+    //Logging.Log('🎨 UIManager: Setting up edit toolbar buttons...');
+    //Logging.Log('🎨 UIManager: Button details - name: ' + name + ', thumbnail: ' + thumbnail + ', onClick: ' + onClick);
     
     const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
       if (!mainToolbarId) {
@@ -1071,7 +1141,7 @@ export class UIManager {
       }
 
       const jsCommand = `
-        console.log('UIManager: Adding button to ButtonDock - name: ${name}, onClick: ${onClick}');
+        //console.log('UIManager: Adding button to ButtonDock - name: ${name}, onClick: ${onClick}');
         if (window.buttonDockAPI && typeof window.buttonDockAPI.addButton === 'function') {
           window.buttonDockAPI.addButton('${name}', '${thumbnail}', '${onClick}');
           console.log('UIManager: Button added successfully');
@@ -1085,7 +1155,7 @@ export class UIManager {
       if (vrToolbarHTMLId) {
         const vrToolbarHTMLEntity = Entity.Get(vrToolbarHTMLId) as HTMLEntity;
         vrToolbarHTMLEntity.ExecuteJavaScript(jsCommand, '');
-        Logging.Log('✅ UIManager: Button add command sent to VR toolbar');
+        //Logging.Log('✅ UIManager: Button add command sent to VR toolbar');
       }
 
       Logging.Log('✅ UIManager: Button add command sent to UI space');
@@ -1177,7 +1247,7 @@ export class UIManager {
    */
   initializeUISettingsForWorldType(worldType: string): void {
     try {
-      Logging.Log('🎛️ UIManager: Scheduling UI Settings initialization for world type: ' + worldType);
+      //Logging.Log('🎛️ UIManager: Scheduling UI Settings initialization for world type: ' + worldType);
       
       // Use a single delayed call to allow UI to fully load
       Time.SetTimeout(`

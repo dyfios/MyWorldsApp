@@ -497,25 +497,78 @@ function App() {
       }
     };
 
-    // Add event listeners to document
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('keyup', handleKeyUp);
+    // Add event listeners to window (must match where synthetic key events are dispatched)
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 
     // Cleanup function
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
   }, [isChatActive, uiSettings]);
 
+  // Forward keyboard input to the 3D engine when the UI panel has focus (web mode only).
+  // When the environment (WebGL canvas) has focus the engine handles keys natively,
+  // but when the user clicks on the UI overlay, keys stay in the iframe. This bridges them.
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const clientType = urlParams.get('client');
+    if (clientType === 'full') return;
+
+    const keysDown = new Set();
+
+    const handleKeyDown = (e) => {
+      // Don't forward when the user is typing in an input field
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      // Prevent key-repeat from spamming messages
+      if (keysDown.has(e.key)) return;
+      keysDown.add(e.key);
+      sendWorldMessage('KEY_PRESS(' + e.key + ')');
+    };
+
+    const handleKeyUp = (e) => {
+      if (!keysDown.has(e.key)) return;
+      keysDown.delete(e.key);
+      sendWorldMessage('KEY_RELEASE(' + e.key + ')');
+    };
+
+    // Clear all tracked keys on blur so nothing gets "stuck"
+    const handleBlur = () => {
+      keysDown.forEach(key => {
+        sendWorldMessage('KEY_RELEASE(' + key + ')');
+      });
+      keysDown.clear();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
   // Mouse/touch movement tracking for look control
   React.useEffect(() => {
+    // Check if client type is "full" - if so, skip look delta (VR handles its own look)
+    const urlParams = new URLSearchParams(window.location.search);
+    const clientType = urlParams.get('client');
+    if (clientType === 'full') {
+      console.log('[Movement] Client type is "full" - skipping look delta handling');
+      return;
+    }
+
     let lastX = null;
     let lastY = null;
 
     const sendLookDelta = (deltaX, deltaY) => {
       if (deltaX !== 0 || deltaY !== 0) {
-        console.log(`[Movement] Look delta - X: ${deltaX}, Y: ${deltaY}`);
+        //console.log(`[Movement] Look delta - X: ${deltaX}, Y: ${deltaY}`);
         sendWorldMessage(`MOBILE_LOOK(${deltaX},${deltaY})`);
       }
     };
@@ -524,7 +577,8 @@ function App() {
       if (lastX !== null && lastY !== null) {
         const deltaX = e.clientX - lastX;
         const deltaY = e.clientY - lastY;
-        sendLookDelta(deltaX, deltaY);
+        // Invert Y for mouse mode
+        sendLookDelta(deltaX, -deltaY);
       }
       
       lastX = e.clientX;
@@ -534,11 +588,19 @@ function App() {
     const handleTouchMove = (e) => {
       if (e.touches.length === 0) return;
       
+      // Don't rotate camera while a thumbstick is being used
+      if (window.thumbstickActive) {
+        lastX = null;
+        lastY = null;
+        return;
+      }
+      
       const touch = e.touches[0];
       if (lastX !== null && lastY !== null) {
         const deltaX = touch.clientX - lastX;
         const deltaY = touch.clientY - lastY;
-        sendLookDelta(deltaX, deltaY);
+        // Invert X for touch mode
+        sendLookDelta(-deltaX, deltaY);
       }
       
       lastX = touch.clientX;
@@ -550,15 +612,23 @@ function App() {
       lastY = null;
     };
 
+    // Reset mouse tracking when cursor leaves the window
+    const handleMouseLeave = () => {
+      lastX = null;
+      lastY = null;
+    };
+
     console.log('[Movement] Adding mouse/touch listeners');
     
     document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseleave', handleMouseLeave);
     document.addEventListener('touchmove', handleTouchMove, { passive: true });
     document.addEventListener('touchend', handleTouchEnd);
     document.addEventListener('touchcancel', handleTouchEnd);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseleave', handleMouseLeave);
       document.removeEventListener('touchmove', handleTouchMove);
       document.removeEventListener('touchend', handleTouchEnd);
       document.removeEventListener('touchcancel', handleTouchEnd);
@@ -600,8 +670,16 @@ function App() {
     }
   }, []);
 
+  // Handle right-clicks on the background
+  const handleBackgroundRightClick = useCallback((e) => {
+    if (e.target === e.currentTarget) {
+      e.preventDefault();
+      sendWorldMessage('RIGHT_PRESS()');
+    }
+  }, []);
+
   return (
-    <div className="App" onClick={handleBackgroundClick}>
+    <div className="App" onClick={handleBackgroundClick} onContextMenu={handleBackgroundRightClick}>
       <ButtonDock
         buttons={buttons}
         selectedButtonId={selectedButtonId}

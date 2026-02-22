@@ -4620,6 +4620,12 @@ declare class Camera {
      * @returns The rotation of the camera.
      */
     static GetRotation(local: boolean): Quaternion;
+
+    /**
+     * Get a raycast forward from the camera.
+     * @returns A raycast forward from the camera, or null.
+     */
+    static GetRaycast(): RaycastHitInfo | null;
 }
 
 /**

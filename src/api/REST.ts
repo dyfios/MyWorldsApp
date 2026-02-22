@@ -56,25 +56,29 @@ export class REST {
     }, onComplete);
   }
 
-  sendPositionEntityRequest(terrainIndex: Vector2Int, entityId: string, variantId: string,
+  sendPositionEntityRequest(worldId: string, entityId: string, variantId: string,
     instanceId: string, position: Vector3, rotation: Quaternion, userId: string,
     userToken: string, onComplete: string): void {
-    this.get('/positionentity', {
-      'regionX': terrainIndex.x,
-      'regionY': terrainIndex.y,
-      'entityID': entityId,
-      'variantID': variantId,
-      'instanceID': instanceId,
-      'xPosition': position.x,
-      'yPosition': position.y,
-      'zPosition': position.z,
-      'xRotation': rotation.x,
-      'yRotation': rotation.y,
-      'zRotation': rotation.z,
-      'wRotation': rotation.w,
-      'userID': userId,
-      'userToken': userToken
-     }, onComplete);
+    this.post(`/world/${worldId}/create-entity-instance`, {
+      'world-id': worldId,
+      'entity-data': {
+        'entity_id': entityId,
+        'variant_id': variantId,
+        'instanceid': String(instanceId),
+        'pos_x': Number(position.x) || 0,
+        'pos_y': Number(position.y) || 0,
+        'pos_z': Number(position.z) || 0,
+        'rot_x': Number(rotation.x) || 0,
+        'rot_y': Number(rotation.y) || 0,
+        'rot_z': Number(rotation.z) || 0,
+        'rot_w': Number(rotation.w) || 0,
+        'scl_x': 1,
+        'scl_y': 1,
+        'scl_z': 1
+      },
+      'user-id': userId,
+      'user-token': userToken
+    }, "application/json", onComplete);
   }
 
   async sendDeleteEntityRequest(entityId: string): Promise<void> {

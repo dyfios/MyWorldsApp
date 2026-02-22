@@ -126,7 +126,8 @@ export class StaticSurfaceRenderer extends WorldRendering {
     (globalThis as any).tiledsurfacerenderer = {
       getTerrainTileForIndex: (_index: Vector2Int) => null,
       restClient: this.restClient,
-      regionSynchronizers: {}
+      regionSynchronizers: {},
+      worldId: null as string | null  // Will be set after initialize() parses metadata
     };
   }
 
@@ -285,6 +286,12 @@ export class StaticSurfaceRenderer extends WorldRendering {
     }
 
     Logging.Log('StaticSurfaceRenderer initialized');
+
+    // Update the tiledsurfacerenderer stub with worldId from metadata
+    if (this.worldMetadata && this.worldMetadata.id && (globalThis as any).tiledsurfacerenderer) {
+      (globalThis as any).tiledsurfacerenderer.worldId = this.worldMetadata.id;
+      Logging.Log('🌐 StaticSurfaceRenderer: Set tiledsurfacerenderer.worldId=' + this.worldMetadata.id);
+    }
   }
 
   /**

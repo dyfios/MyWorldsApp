@@ -68,7 +68,15 @@ export class EnvironmentModifier {
    * Handle left mouse button press
    */
   private handleLeftPress(): void {
+    const isFullClient = (globalThis as any).uiManager?.clientType === 'full';
     var hitInfo = Input.GetPointerRaycast(Vector3.forward);
+    // In browser/lite mode, pointer position isn't reliable (defaults to 0,0);
+    // use Camera.GetRaycast() for entity placing instead
+    if (!isFullClient && this.interactionMode == "ENTITY-PLACING") {
+      hitInfo = Camera.GetRaycast();
+    } else if (hitInfo == null && this.interactionMode == "ENTITY-PLACING") {
+      hitInfo = Camera.GetRaycast();
+    }
 
     if (this.interactionMode == "HAND") {
         if (hitInfo != null) {
@@ -201,13 +209,30 @@ export class EnvironmentModifier {
         }
     }
     else if (this.interactionMode == "ENTITY-PLACING") {
+        Logging.Log('[handleLeftPress] ENTITY-PLACING: hitInfo=' + (hitInfo != null ? 'non-null' : 'null'));
         if (hitInfo != null) {
+            Logging.Log('[handleLeftPress] hitInfo.entity=' + (hitInfo.entity != null ? hitInfo.entity.id + ' type=' + hitInfo.entity.constructor?.name : 'null'));
             if (hitInfo.entity != null) {
-                if (hitInfo.entity instanceof TerrainEntity || hitInfo.entity instanceof MeshEntity
-                    || hitInfo.entity instanceof AutomobileEntity || hitInfo.entity instanceof AirplaneEntity) {
+                const isTE = hitInfo.entity instanceof TerrainEntity;
+                const isME = hitInfo.entity instanceof MeshEntity;
+                const isAE = hitInfo.entity instanceof AutomobileEntity;
+                const isAP = hitInfo.entity instanceof AirplaneEntity;
+                Logging.Log('[handleLeftPress] instanceof: TE=' + isTE + ' ME=' + isME + ' AE=' + isAE + ' AP=' + isAP);
+                if (isTE || isME || isAE || isAP) {
+                    Logging.Log('[handleLeftPress] Calling stopPlacing()');
                     (globalThis as any).stopPlacing();
+                } else {
+                    Logging.LogWarning('[handleLeftPress] Entity hit but not a valid placement surface type');
                 }
+            } else {
+                Logging.LogWarning('[handleLeftPress] hitInfo.entity is null (hit non-entity geometry)');
             }
+        } else if ((globalThis as any).entityPlacementComponent?.placingEntity != null) {
+            // Fallback for browser mode: entity is already positioned by placementUpdate
+            Logging.Log('[handleLeftPress] hitInfo null but placingEntity exists - calling stopPlacing()');
+            (globalThis as any).stopPlacing();
+        } else {
+            Logging.LogWarning('[handleLeftPress] hitInfo null AND no placingEntity - cannot place');
         }
     }
   }
@@ -685,7 +710,15 @@ export class EnvironmentModifier {
    * Handle right mouse button press
    */
   private handleRightPress(): void {
+    const isFullClient = (globalThis as any).uiManager?.clientType === 'full';
     var hitInfo = Input.GetPointerRaycast(Vector3.forward);
+    // In browser/lite mode, pointer position isn't reliable (defaults to 0,0);
+    // use Camera.GetRaycast() for entity placing instead
+    if (!isFullClient && this.interactionMode == "ENTITY-PLACING") {
+      hitInfo = Camera.GetRaycast();
+    } else if (hitInfo == null && this.interactionMode == "ENTITY-PLACING") {
+      hitInfo = Camera.GetRaycast();
+    }
 
     if (this.interactionMode == "HAND") {
         if (hitInfo != null) {

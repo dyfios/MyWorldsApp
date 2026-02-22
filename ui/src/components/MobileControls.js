@@ -165,8 +165,10 @@ const MobileControls = ({
     // Left stick handlers (WASD movement)
     const handleLeftTouchStart = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       leftStickActiveRef.current = true;
       setLeftStickActive(true);
+      window.thumbstickActive = true;
       const touch = e.touches[0];
       const position = calculateStickPosition(touch, leftStick);
       setLeftStickPosition(position);
@@ -175,6 +177,7 @@ const MobileControls = ({
 
     const handleLeftTouchMove = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       if (!leftStickActiveRef.current) return;
       const touch = e.touches[0];
       const position = calculateStickPosition(touch, leftStick);
@@ -184,10 +187,15 @@ const MobileControls = ({
 
     const handleLeftTouchEnd = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       leftStickActiveRef.current = false;
       setLeftStickActive(false);
       setLeftStickPosition({ x: 0, y: 0 });
       releaseLeftStickMovement();
+      // Only clear flag if the other stick isn't also active
+      if (!rightStickActiveRef.current) {
+        window.thumbstickActive = false;
+      }
     };
 
     // Add event listeners with passive: false
@@ -217,8 +225,10 @@ const MobileControls = ({
     // Right stick handlers (vertical flight control)
     const handleRightTouchStart = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       rightStickActiveRef.current = true;
       setRightStickActive(true);
+      window.thumbstickActive = true;
       const touch = e.touches[0];
       const position = calculateStickPosition(touch, rightStick);
       setRightStickPosition(position);
@@ -227,6 +237,7 @@ const MobileControls = ({
 
     const handleRightTouchMove = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       if (!rightStickActiveRef.current) return;
       const touch = e.touches[0];
       const position = calculateStickPosition(touch, rightStick);
@@ -236,12 +247,17 @@ const MobileControls = ({
 
     const handleRightTouchEnd = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       rightStickActiveRef.current = false;
       setRightStickActive(false);
       setRightStickPosition({ x: 0, y: 0 });
       
       // Release flight key when stick released
       releaseFlightKey();
+      // Only clear flag if the other stick isn't also active
+      if (!leftStickActiveRef.current) {
+        window.thumbstickActive = false;
+      }
     };
 
     rightStick.addEventListener('touchstart', handleRightTouchStart, { passive: false });

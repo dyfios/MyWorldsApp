@@ -4,7 +4,7 @@
  * This module handles user authentication for both WebVerse variants:
  * 
  * 1. **WebVerse Full (Native)**: Uses an HTML entity to display an OAuth login page.
- *    - Opens: https://dev.worldhub.me/login
+ *    - Opens: https://worldhub.me/login
  *    - User authenticates via Google OAuth
  *    - Login page calls postWorldMessage with auth token
  *    - Token is extracted and stored for MQTT/API authentication
@@ -68,8 +68,8 @@ const IDENTITY_GLOBALS = {
   MW_TOP_LEVEL_CONTEXT_KEY: 'MW_TOP_LEVEL_CONTEXT',
   LOGIN_CANVAS_ID_KEY: 'LOGIN-CANVAS-ID',
   LOGIN_PANEL_ID_KEY: 'LOGIN-PANEL-ID',
-  AUTH_API_URL: 'https://id-dev.worldhub.me',
-  NATIVE_LOGIN_URL: 'https://dev.worldhub.me/login?redirect_url=https://dev.worldhub.me/post-login'
+  AUTH_API_URL: 'https://id.worldhub.me',
+  NATIVE_LOGIN_URL: 'https://worldhub.me/login?redirect_url=https://worldhub.me/post-login'
 };
 
 // Store on globalThis for persistence across WebVerse calls
@@ -653,7 +653,7 @@ export class Identity {
    */
   private startWebGLSessionAuth(): void {
       // Hardcode the URL directly - WebVerse may not preserve module-level initializations
-      const AUTH_API_URL = 'https://id-dev.worldhub.me';
+      const AUTH_API_URL = 'https://id.worldhub.me';
       const state = getIdentityState() || { loginCallbackFunction: undefined };
       
       Logging.Log("🔐 Identity: Starting Lite session-based authentication...");

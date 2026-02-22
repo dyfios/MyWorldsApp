@@ -102,7 +102,11 @@ export class EntityPlacement {
       return;
     }
 
-    const hitInfo = Input.GetPointerRaycast(Vector3.forward);
+    const isThirdPerson = (globalThis as any).playerController?.cameraMode === 'thirdPerson';
+    const isFullClient = (globalThis as any).uiManager?.clientType === 'full';
+    const hitInfo = (isThirdPerson && isFullClient)
+      ? Input.GetPointerRaycast(Vector3.forward)
+      : Camera.GetRaycast();
     if (hitInfo != null && hitInfo.entity != null) {
       if (hitInfo.entity !== this.placingEntity) {
         let gridSnappedPosition: Vector3;
@@ -171,6 +175,7 @@ export class EntityPlacement {
       return;
     }
     
+    Logging.Log('[startPlacing] entityID=' + entityID + ' variantID=' + variantID + ' entityIndex=' + entityIndex + ' variantIndex=' + variantIndex + ' instanceID=' + instanceID);
     this.entityType = entityType;
     this.modelOffset = offset || Vector3.zero;
     this.modelRotation = rotation || Quaternion.identity;
@@ -193,14 +198,20 @@ export class EntityPlacement {
   }
 
   stopPlacing(): void {
+    Logging.Log('[stopPlacing] Called. placingEntity=' + (this.placingEntity != null ? this.placingEntity.id : 'null'));
+    Logging.Log('[stopPlacing] State: entityID=' + this.entityID + ' variantID=' + this.variantID + ' instanceID=' + this.instanceID + ' keepSpawning=' + this.keepSpawning);
     if (this.placingEntity == null) {
+      Logging.Log('[stopPlacing] placingEntity is null - early return path');
       if (this.keepSpawning === true && this.entityType && this.entityIndex !== null && 
         this.variantIndex !== null && this.entityID && this.variantID) {
         const instanceID = UUID.NewUUID().ToString();
+        Logging.Log('[stopPlacing] keepSpawning: loading next entity with instanceID=' + instanceID);
         (globalThis as any).loadEntity(this.entityIndex, this.variantIndex, instanceID,
           this.entityIndex + "." + this.variantIndex + "." + instanceID, this.entityID, this.variantID,
           null, this.entityType, Vector3.zero, Quaternion.identity, Vector3.one, this.modelPath,
           [ this.modelPath ], this.wheels, this.mass, AutomobileType.Default, this.scripts, true);
+      } else {
+        Logging.LogWarning('[stopPlacing] Cannot respawn: keepSpawning=' + this.keepSpawning + ' entityType=' + this.entityType + ' entityIndex=' + this.entityIndex + ' variantIndex=' + this.variantIndex + ' entityID=' + this.entityID + ' variantID=' + this.variantID);
       }
       return;
     }
@@ -209,22 +220,45 @@ export class EntityPlacement {
     //  return;
     //}
     
-    const pos: Vector3 = (globalThis as any).tiledsurfacerenderer_getWorldPositionForRenderedPosition(this.placingEntity.GetPosition(false));
+    const rawPos: Vector3 = this.placingEntity.GetPosition(false);
     const rot: Quaternion = this.placingEntity.GetRotation(false);
-    const terrainIndex = (globalThis as any).tiledsurfacerenderer_getRegionIndexForWorldPos(pos);
-    const regionPos = (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos(pos, terrainIndex);
+    Logging.Log('[stopPlacing] rawPos=' + rawPos + ' rawPos.x=' + rawPos.x + ' rawPos.y=' + rawPos.y + ' rawPos.z=' + rawPos.z);
+    Logging.Log('[stopPlacing] rot=' + rot + ' rot.x=' + rot.x + ' rot.y=' + rot.y + ' rot.z=' + rot.z + ' rot.w=' + rot.w);
 
-    // Send REST request to add entity instance
+    // Determine position and region info based on renderer type
+    const hasTiledHelpers = typeof (globalThis as any).tiledsurfacerenderer_getWorldPositionForRenderedPosition === 'function';
+    const pos: Vector3 = hasTiledHelpers
+      ? (globalThis as any).tiledsurfacerenderer_getWorldPositionForRenderedPosition(rawPos)
+      : rawPos;
+    const terrainIndex: Vector2Int | null = hasTiledHelpers
+      ? (globalThis as any).tiledsurfacerenderer_getRegionIndexForWorldPos(pos)
+      : null;
+    const regionPos: Vector3 = hasTiledHelpers && terrainIndex
+      ? (globalThis as any).tiledsurfacerenderer_getRegionPosForWorldPos(pos, terrainIndex)
+      : pos;
+
+    // Send REST request to persist entity placement
+    Logging.Log('[stopPlacing] regionPos=' + regionPos + ' regionPos.x=' + regionPos.x + ' regionPos.y=' + regionPos.y + ' regionPos.z=' + regionPos.z);
+    Logging.Log('[stopPlacing] typeof regionPos.x=' + typeof regionPos.x + ' Number(regionPos.x)=' + Number(regionPos.x));
+    Logging.Log('[stopPlacing] REST check: instanceID=' + this.instanceID + ' entityID=' + this.entityID + ' variantID=' + this.variantID);
     if (this.instanceID && this.entityID && this.variantID) {
       var tsr = (globalThis as any).tiledsurfacerenderer as TiledSurfaceRenderer;
       const userId = this.getUserId();
       const userToken = this.getUserToken();
-      if (tsr) {
-        tsr.restClient.sendPositionEntityRequest(terrainIndex, this.entityID, this.variantID,
+      const worldId = (globalThis as any).tiledsurfacerenderer?.worldId || '';
+      Logging.Log('[stopPlacing] tsr=' + (tsr ? 'exists' : 'null') + ' tsr.restClient=' + (tsr?.restClient ? 'exists' : 'null') + ' worldId=' + worldId + ' userId=' + userId + ' userToken=' + (userToken ? 'present' : 'empty'));
+      if (tsr && tsr.restClient && worldId) {
+        Logging.Log('[stopPlacing] Sending REST create-entity-instance request: pos=' + regionPos.x + ',' + regionPos.y + ',' + regionPos.z);
+        tsr.restClient.sendPositionEntityRequest(
+          worldId, this.entityID, this.variantID,
           this.instanceID, regionPos, rot, userId, userToken, "onCompleteCallback");
+        // VOS sync only available in planet/tiled mode
         var wsync = (globalThis as any).wsync_instance as VOSSynchronizer;
-        wsync.SendEntityAddUpdate(tsr.regionSynchronizers[terrainIndex.x + '.' + terrainIndex.y],
-          this.instanceID, regionPos, rot);
+        if (wsync && terrainIndex && tsr.regionSynchronizers
+            && tsr.regionSynchronizers[terrainIndex.x + '.' + terrainIndex.y]) {
+          wsync.SendEntityAddUpdate(tsr.regionSynchronizers[terrainIndex.x + '.' + terrainIndex.y],
+            this.instanceID, regionPos, rot);
+        }
       }
       Logging.Log(`[EntityPlacer] Placing entity at position: ${pos.x}, ${pos.y}, ${pos.z}`);
     }
@@ -254,19 +288,28 @@ export class EntityPlacement {
     }
 
     // Finalize placement
-    this.placingEntity.SetParent((globalThis as any).tiledsurfacerenderer.getTerrainTileForIndex(terrainIndex));
+    if (terrainIndex && (globalThis as any).tiledsurfacerenderer?.getTerrainTileForIndex) {
+      const terrainTile = (globalThis as any).tiledsurfacerenderer.getTerrainTileForIndex(terrainIndex);
+      if (terrainTile) {
+        this.placingEntity.SetParent(terrainTile);
+      }
+    }
     this.placingEntity.SetHighlight(false);
     if (this.placingEntity instanceof AutomobileEntity || this.placingEntity instanceof AirplaneEntity) {
       this.placingEntity.SetInteractionState(InteractionState.Physical);
     }
     this.placingEntity = null;
     
+    Logging.Log('[stopPlacing] Finalized. keepSpawning=' + this.keepSpawning + ' entityID=' + this.entityID + ' variantID=' + this.variantID);
     if (this.keepSpawning === true && this.entityID && this.variantID) {
       const instanceID = UUID.NewUUID().ToString();
+      Logging.Log('[stopPlacing] keepSpawning: loading next entity with instanceID=' + instanceID);
       (globalThis as any).loadEntity(this.entityIndex, this.variantIndex, instanceID,
         this.entityIndex + "." + this.variantIndex + "." + instanceID, this.entityID, this.variantID,
         null, this.entityType, Vector3.zero, Quaternion.identity, Vector3.one, this.modelPath,
         [ this.modelPath ], this.wheels, this.mass, AutomobileType.Default, this.scripts, true);
+    } else {
+      Logging.Log('[stopPlacing] NOT respawning: keepSpawning=' + this.keepSpawning + ' entityID=' + this.entityID + ' variantID=' + this.variantID);
     }
 
     this.entityBeingPlaced = false;
@@ -514,10 +557,12 @@ export class EntityManager {
     if (entityId == null || variantId == null || scale == null) {
 
     }
+    Logging.Log('[loadEntity] entityId=' + entityId + ' variantId=' + variantId + ' placingEntity=' + placingEntity);
     this.currentEntityIndex = entityIndex || "";
     this.currentVariantIndex = variantIndex || "";
     this.currentEntityId = entityId;
     this.currentVariantId = variantId || "";
+    Logging.Log('[loadEntity] stored currentEntityId=' + this.currentEntityId + ' currentVariantId=' + this.currentVariantId);
     this.currentModelPath = meshObject;
     this.currentWheels = wheels;
     var automobileWheels: AutomobileEntityWheel[] = [];
@@ -529,6 +574,26 @@ export class EntityManager {
     //this.currentWheels = automobileWheels;
     this.currentMass = mass;
     this.currentScripts = scripts;
+
+    // Store placement metadata globally keyed by instanceId so async callbacks
+    // can retrieve it regardless of which EntityManager instance they fire on
+    if (placingEntity) {
+      if (!(globalThis as any).pendingPlacements) {
+        (globalThis as any).pendingPlacements = {};
+      }
+      (globalThis as any).pendingPlacements[instanceId] = {
+        entityIndex: entityIndex || "",
+        variantIndex: variantIndex || "",
+        entityId: entityId,
+        variantId: variantId || "",
+        modelPath: meshObject,
+        wheels: wheels,
+        mass: mass,
+        scripts: scripts,
+        type: type
+      };
+      Logging.Log('[loadEntity] Stored pending placement for instanceId=' + instanceId);
+    }
     if (type == null || type === "") {
       type = "mesh";
     }
@@ -622,9 +687,21 @@ export class EntityManager {
     Logging.Log(`✓ Mesh entity loaded for placement successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
-    var scripts = this.currentScripts;
-    (globalThis as any).startPlacing(entity, "mesh", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
-      this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, scripts, entity.id);
+
+    // Retrieve placement metadata from global map (avoids cross-instance issues)
+    const entityIdStr: string = String(entity.id || '');
+    const pending = entityIdStr ? (globalThis as any).pendingPlacements?.[entityIdStr] : null;
+    const instanceIdStr: string = (entity.id?.ToString ? entity.id.ToString() : String(entity.id || '')) || '';
+    if (pending) {
+      Logging.Log('[onMeshEntityLoadedGenericPlacing] Using pending placement data: entityId=' + pending.entityId + ' variantId=' + pending.variantId + ' instanceId=' + instanceIdStr);
+      (globalThis as any).startPlacing(entity, "mesh", pending.entityIndex, pending.variantIndex, pending.entityId,
+        pending.variantId, pending.modelPath, pending.wheels, pending.mass, pending.scripts, instanceIdStr);
+      delete (globalThis as any).pendingPlacements[entityIdStr];
+    } else {
+      Logging.LogWarning('[onMeshEntityLoadedGenericPlacing] No pending placement found for ' + entity.id + ', falling back to current* fields');
+      (globalThis as any).startPlacing(entity, "mesh", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
+        this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, this.currentScripts, instanceIdStr);
+    }
   }
 
   onAutomobileEntityLoadedGeneric(entity: AutomobileEntity): void {
@@ -655,9 +732,21 @@ export class EntityManager {
     Logging.Log(`✓ Automobile entity loaded for placement successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
-    var scripts = this.currentScripts;
-    (globalThis as any).startPlacing(entity, "automobile", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
-      this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, scripts, entity.id);
+
+    // Retrieve placement metadata from global map (avoids cross-instance issues)
+    const entityIdStr: string = String(entity.id || '');
+    const pending = entityIdStr ? (globalThis as any).pendingPlacements?.[entityIdStr] : null;
+    const instanceIdStr: string = (entity.id?.ToString ? entity.id.ToString() : String(entity.id || '')) || '';
+    if (pending) {
+      Logging.Log('[onAutomobileEntityLoadedGenericPlacing] Using pending placement data: entityId=' + pending.entityId + ' variantId=' + pending.variantId + ' instanceId=' + instanceIdStr);
+      (globalThis as any).startPlacing(entity, "automobile", pending.entityIndex, pending.variantIndex, pending.entityId,
+        pending.variantId, pending.modelPath, pending.wheels, pending.mass, pending.scripts, instanceIdStr);
+      delete (globalThis as any).pendingPlacements[entityIdStr];
+    } else {
+      Logging.LogWarning('[onAutomobileEntityLoadedGenericPlacing] No pending placement found for ' + entity.id + ', falling back to current* fields');
+      (globalThis as any).startPlacing(entity, "automobile", this.currentEntityIndex, this.currentVariantIndex, this.currentEntityId,
+        this.currentVariantId, this.currentModelPath, this.currentWheels, this.currentMass, this.currentScripts, instanceIdStr);
+    }
   }
 
   triggerEntityInstancesAfterTemplates(): void {

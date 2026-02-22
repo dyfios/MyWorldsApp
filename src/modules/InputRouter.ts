@@ -5,8 +5,44 @@
 export class InputRouter {
   private isControlHeld: boolean = false;
 
+  // Keys that the UI panel listens for (menu, chat, toolbar, etc.)
+  private static readonly UI_KEYS: Set<string> = new Set([
+    'm', 'c', 'C', 'Escape',
+    '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    'ArrowLeft', 'ArrowRight',
+    ' '  // Space (double-tap flying toggle)
+  ]);
+
   constructor() {
     this.setupGlobalCallbacks();
+  }
+
+  /**
+   * Forward a key event to the UI HTML panel so React listeners receive it.
+   * Only fires when running in web/lite mode (not full/VR client).
+   */
+  private forwardKeyToUI(key: string, eventType: 'keydown' | 'keyup'): void {
+    // Don't bounce back if this key event was forwarded FROM the UI
+    if ((globalThis as any)._keyFromUI) return;
+
+    // Only forward in web browser mode
+    const uiMgr = (globalThis as any).uiManager;
+    if (!uiMgr || uiMgr.clientType === 'full') {
+      return;
+    }
+
+    const toolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+    if (!toolbarId) return;
+
+    const toolbar = Entity.Get(toolbarId) as HTMLEntity;
+    if (!toolbar || typeof toolbar.ExecuteJavaScript !== 'function') return;
+
+    // Build a synthetic KeyboardEvent dispatch.
+    // UI_KEYS only contains safe alphanumeric/arrow/Escape/space values, no escaping needed.
+    const code = key === ' ' ? 'Space' : key;
+    const js = "window.dispatchEvent(new KeyboardEvent('" + eventType + "', " +
+      "{ key: '" + key + "', code: '" + code + "', bubbles: true }));";
+    toolbar.ExecuteJavaScript(js, '');
   }
 
   /**
@@ -179,6 +215,11 @@ export class InputRouter {
     else if (key == "x") {
         (globalThis as any).exitVehicle();
     }
+
+    // Forward UI-relevant keys to the HTML panel (web browser mode only)
+    if (InputRouter.UI_KEYS.has(key)) {
+      this.forwardKeyToUI(key, 'keydown');
+    }
   }
 
   /**
@@ -199,6 +240,11 @@ export class InputRouter {
     }
     else if (key == "d") {
         (globalThis as any).stopSteeringVehicle();
+    }
+
+    // Forward UI-relevant key releases to the HTML panel (web browser mode only)
+    if (InputRouter.UI_KEYS.has(key)) {
+      this.forwardKeyToUI(key, 'keyup');
     }
   }
 

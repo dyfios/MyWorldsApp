@@ -23,7 +23,7 @@ export class PlayerController {
   public inVR: boolean = false;
   public activeVehicle: AutomobileEntity | AirplaneEntity | null = null;
   private maintenanceFunctionID: UUID | null = null;
-  // private cameraMode: 'firstPerson' | 'thirdPerson' = 'thirdPerson'; // Reserved for future camera mode switching
+  public cameraMode: 'firstPerson' | 'thirdPerson' = 'thirdPerson';
 
   constructor(initialPosition: Vector3, characterName: string, characterId: string | undefined) {
     this.setupGlobalCallbacks();
@@ -328,11 +328,13 @@ export class PlayerController {
   setCameraModeFirstPerson(): void {
     Camera.SetPosition(new Vector3(0, 0.79, 0), true);
     this.internalCharacterEntity.SetVisibility(false, false);
+    this.cameraMode = 'firstPerson';
   }
 
   setCameraModeThirdPerson(): void {
     Camera.SetPosition(new Vector3(0, 1.5, -2.75), true);
     this.internalCharacterEntity.SetVisibility(true, false);
+    this.cameraMode = 'thirdPerson';
   }
 
   enterVRMode(): void {
@@ -413,6 +415,7 @@ export class PlayerController {
         // Place the camera on the character.
         this.internalCharacterEntity.PlaceCameraOn();
         Camera.SetPosition(new Vector3(0, 1.5, -2.75), true);
+        this.cameraMode = 'thirdPerson';
         Input.wasdMotionEnabled = true;
     }
     else {
