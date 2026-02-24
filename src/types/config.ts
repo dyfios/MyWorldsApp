@@ -60,3 +60,27 @@ export interface EntityPlacementData {
   rotation?: Rotation;
   scale?: number;
 }
+
+export interface SpawnConfig {
+  /** Default spawn position for the world */
+  position: Position;
+  /** Optional facing direction at spawn */
+  rotation?: Rotation;
+}
+
+export interface SkyConfig {
+  /** Sky rendering mode. Default: 'day-night' */
+  type?: 'day-night' | 'constant-color' | 'solid-color' | 'texture';
+  /** Named preset for day-night or constant-color modes */
+  preset?: string;
+  /** Texture URI for 'texture' mode */
+  texture?: string;
+  /** Color for 'solid-color' mode */
+  color?: { r: number; g: number; b: number; a?: number };
+  /** Optional fog settings (applies to all sky modes) */
+  fog?: {
+    enabled: boolean;
+    color?: { r: number; g: number; b: number; a?: number };
+    density?: number;
+  };
+}

@@ -2,6 +2,8 @@
  * Process Query Parameters utility
  */
 
+import { SkyConfig, SpawnConfig } from '../types/config';
+
 export interface AvatarSettings {
   model?: string;
   offset?: { x: number; y: number; z: number };
@@ -22,6 +24,8 @@ export interface WorldMetadata {
   owner: string;
   permissions: string;
   stateService?: string; // Used for tiled surface renderer
+  sky?: SkyConfig;
+  spawn?: SpawnConfig;
 }
 
 export interface QueryParams {
@@ -268,11 +272,47 @@ export class ProcessQueryParams {
   }
 
   /**
+   * Check if a userPosition query parameter was explicitly provided in the URL
+   */
+  hasExplicitUserPosition(): boolean {
+    const value = World.GetQueryParam('userPosition');
+    return value !== null && value !== undefined && value !== '';
+  }
+
+  /**
    * Get user position as a 3D vector
    */
   getUserPosition(): Vector3 {
     const position = this.get('userPosition') as Vector3;
     return position || new Vector3(0, 0, 0);
+  }
+
+  /**
+   * Get the effective spawn position, considering priority:
+   * 1. Explicit userPosition from URL query parameter (highest priority)
+   * 2. World-defined spawn position from config/metadata
+   * 3. Origin (0, 0, 0) as final fallback
+   */
+  getSpawnPosition(worldSpawn?: SpawnConfig): Vector3 {
+    // URL userPosition takes highest priority
+    if (this.hasExplicitUserPosition()) {
+      const urlPos = this.getUserPosition();
+      Logging.Log('📍 Spawn: Using explicit URL userPosition: ('
+        + urlPos.x + ', ' + urlPos.y + ', ' + urlPos.z + ')');
+      return urlPos;
+    }
+
+    // World-defined spawn position is second priority
+    if (worldSpawn?.position) {
+      const sp = worldSpawn.position;
+      Logging.Log('📍 Spawn: Using world-defined spawn position: ('
+        + sp.x + ', ' + sp.y + ', ' + sp.z + ')');
+      return new Vector3(sp.x, sp.y, sp.z);
+    }
+
+    // Default fallback
+    Logging.Log('📍 Spawn: No explicit position, using origin (0, 0, 0)');
+    return new Vector3(0, 0, 0);
   }
 
   /**

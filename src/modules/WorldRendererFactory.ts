@@ -9,6 +9,7 @@ import { EntityManager } from './EntityManager';
 import { DockButtonInfo } from './UIManager';
 import { Identity } from './Identity';
 import { SyncManager } from './SyncManager';
+import { applySkyConfig } from './SkyPresets';
 
 /**
  * Entity instance format received from the server
@@ -128,6 +129,11 @@ export class StaticSurfaceRenderer extends WorldRendering {
       restClient: this.restClient,
       regionSynchronizers: {},
       worldId: null as string | null  // Will be set after initialize() parses metadata
+    };
+
+    // Sky setup callback for when sun entity is created
+    (globalThis as any).MW_StaticRenderer_OnSunCreated = (entity: LightEntity) => {
+      this.onStaticRendererSunCreated(entity);
     };
   }
 
@@ -291,6 +297,75 @@ export class StaticSurfaceRenderer extends WorldRendering {
     if (this.worldMetadata && this.worldMetadata.id && (globalThis as any).tiledsurfacerenderer) {
       (globalThis as any).tiledsurfacerenderer.worldId = this.worldMetadata.id;
       Logging.Log('🌐 StaticSurfaceRenderer: Set tiledsurfacerenderer.worldId=' + this.worldMetadata.id);
+    }
+
+    // Set up sky (uses worldMetadata.sky config if available, otherwise engine defaults)
+    this.setupSky();
+
+    // Apply spawn position: URL userPosition > worldMetadata spawn > origin
+    this.applySpawnPosition();
+  }
+
+  /**
+   * Apply spawn position to the player character.
+   * Priority: URL userPosition > worldMetadata.spawn > origin (0,0,0)
+   */
+  private applySpawnPosition(): void {
+    const spawnPos = this.queryParams.getSpawnPosition(this.worldMetadata?.spawn);
+    const isOrigin = spawnPos.x === 0 && spawnPos.y === 0 && spawnPos.z === 0;
+
+    if (!isOrigin) {
+      Logging.Log('📍 StaticSurfaceRenderer: Teleporting player to spawn ('
+        + spawnPos.x + ', ' + spawnPos.y + ', ' + spawnPos.z + ')');
+      (globalThis as any).playerController.setMotionModeFree();
+      (globalThis as any).playerController.setCharacterPosition(spawnPos);
+      (globalThis as any).playerController.setMotionModePhysical();
+    } else {
+      Logging.Log('📍 StaticSurfaceRenderer: Spawn at origin, no teleport needed');
+    }
+
+    // Apply spawn rotation if configured and no explicit URL position overrode it
+    if (!this.queryParams.hasExplicitUserPosition() && this.worldMetadata?.spawn?.rotation) {
+      const r = this.worldMetadata.spawn.rotation;
+      Logging.Log('📍 StaticSurfaceRenderer: Applying spawn rotation: (' + r.x + ', ' + r.y + ', ' + r.z + ', ' + r.w + ')');
+      (globalThis as any).playerController.internalCharacterEntity.SetRotation(
+        new Quaternion(r.x, r.y, r.z, r.w), false);
+    }
+  }
+
+  /**
+   * Set up sky rendering based on world metadata configuration
+   */
+  private setupSky(): void {
+    const skyConfig = this.worldMetadata?.sky;
+    const skyType = skyConfig?.type || 'day-night';
+
+    // Texture and solid-color modes don't need a sun entity
+    if (skyType === 'texture' || skyType === 'solid-color') {
+      applySkyConfig(skyConfig, null);
+      return;
+    }
+
+    // Day-night and constant-color modes need a sun entity - create one
+    LightEntity.Create(null, Vector3.zero, Quaternion.identity, undefined, "StaticRendererSun",
+      "MW_StaticRenderer_OnSunCreated");
+  }
+
+  /**
+   * Callback when sun entity is created for sky setup
+   */
+  private onStaticRendererSunCreated(entity: LightEntity): void {
+    try {
+      Logging.Log('☀️ StaticSurfaceRenderer: Sun entity created for sky');
+      entity.SetVisibility(true);
+      entity.SetInteractionState(InteractionState.Static);
+      entity.SetLightType(LightType.Directional);
+      entity.SetLightProperties(Color.white, 1000, 1.0);
+      applySkyConfig(this.worldMetadata?.sky, entity);
+      Logging.Log('✅ StaticSurfaceRenderer: Sky configured successfully');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Logging.LogError('❌ StaticSurfaceRenderer: Failed to configure sky: ' + errorMessage);
     }
   }
 
@@ -1372,10 +1447,24 @@ export class TiledSurfaceRenderer extends WorldRendering {
     water.SetInteractionState(InteractionState.Hidden);
     water.SetVisibility(true);
     this.water = water;
+
+    // Resolve spawn position: URL userPosition > world config spawn > origin
+    const spawnConfig = this.worldConfig?.["spawn"];
+    const effectiveSpawn = this.queryParams.getSpawnPosition(spawnConfig);
+    this.startPos = effectiveSpawn;
+
     (globalThis as any).playerController.setMotionModeFree();
     var adjustedPos = this.getRenderedPositionForWorldPosition(this.startPos);
     (globalThis as any).playerController.setCharacterPosition(adjustedPos);
     (globalThis as any).playerController.setMotionModePhysical();
+
+    // Apply spawn rotation if configured and no explicit URL position overrode it
+    if (!this.queryParams.hasExplicitUserPosition() && spawnConfig?.rotation) {
+      const r = spawnConfig.rotation;
+      Logging.Log('📍 Spawn: Applying spawn rotation: (' + r.x + ', ' + r.y + ', ' + r.z + ', ' + r.w + ')');
+      (globalThis as any).playerController.internalCharacterEntity.SetRotation(
+        new Quaternion(r.x, r.y, r.z, r.w), false);
+    }
   }
 
   applyWorldConfig(): void {
@@ -1389,13 +1478,9 @@ export class TiledSurfaceRenderer extends WorldRendering {
     this.sun.initialize(this.worldConfig).then(() => {
       Logging.Log("✅ Sun controller initialized successfully");
       
-    // Set up sky (placeholder for future sky configuration)
-    var sunEntity = this.sun?.getSunEntity();
-    if (sunEntity == null) {
-      Logging.LogError("❌ applyWorldConfig: Sun entity is null, cannot set sky");
-      return;
-    }
-    Environment.SetLiteDayNightSky(sunEntity);
+    // Apply sky configuration from world config
+    var sunEntity = this.sun?.getSunEntity() || null;
+    applySkyConfig(this.worldConfig["sky"], sunEntity);
       
     }).catch(error => {
       Logging.LogError("❌ Failed to initialize sun controller: " + error);
@@ -1853,7 +1938,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
     // Parse query parameters to ensure they're available
     this.queryParams.parse();
 
-    // Get start position from query parameters
+    // Get start position - URL userPosition takes priority, world config spawn applied later in applyWorldConfig
     this.startPos = this.queryParams.getUserPosition();
 
     // Get world address from query parameters

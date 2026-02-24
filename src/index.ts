@@ -42,6 +42,8 @@ export {
   GalacticRenderer,
   SunController
 } from './modules/WorldRendererFactory';
+export { applySkyConfig, DAY_NIGHT_SKY_PRESETS, CONSTANT_COLOR_SKY_PRESETS } from './modules/SkyPresets';
+export type { DayNightSkyPresetParams, ConstantColorSkyPresetParams } from './modules/SkyPresets';
 export { EnvironmentModifier } from './modules/EnvironmentModifier';
 
 // Utils
