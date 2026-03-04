@@ -37,20 +37,43 @@ function sendWorldMessage(msg) {
 }
 
 // Hook for detecting mobile devices (touch + small screen)
+// Excludes desktop client (client=full) which should never show mobile UI
 const useMobileDetection = (breakpoint = 768) => {
   const [isMobile, setIsMobile] = React.useState(() => {
     if (typeof window === 'undefined') return false;
-    // Check for touch capability AND small screen
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // Desktop client (client=full) should never show mobile UI
+    const urlParams = new URLSearchParams(window.location.search);
+    const clientType = urlParams.get('client');
+    
+    if (clientType === 'full') {
+      return false;
+    }
+    
+    // Check for mobile user agent (more reliable than touch detection)
+    const mobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const isSmallScreen = window.innerWidth <= breakpoint;
-    return isTouchDevice && isSmallScreen;
+    
+    // Require mobile user agent AND small screen
+    return mobileUserAgent && isSmallScreen;
   });
 
   React.useEffect(() => {
     const handleResize = () => {
-      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      // Desktop client (client=full) should never show mobile UI
+      const urlParams = new URLSearchParams(window.location.search);
+      const clientType = urlParams.get('client');
+      if (clientType === 'full') {
+        setIsMobile(false);
+        return;
+      }
+      
+      // Check for mobile user agent (more reliable than touch detection)
+      const mobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       const isSmallScreen = window.innerWidth <= breakpoint;
-      setIsMobile(isTouchDevice && isSmallScreen);
+      const result = mobileUserAgent && isSmallScreen;
+
+      setIsMobile(result);
     };
 
     window.addEventListener('resize', handleResize);
@@ -559,8 +582,9 @@ function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const clientType = urlParams.get('client');
     
-    // Also check if native vuplex is present (indicates desktop mode)
-    const isDesktopMode = clientType === 'full' || (window.vuplex && !window.vuplex._listeners);
+    // Only skip in desktop mode (client=full)
+    // Web browser should always handle look delta
+    const isDesktopMode = clientType === 'full';
     
     if (isDesktopMode) {
       console.log('[Movement] Desktop/full mode detected - skipping look delta handling');
