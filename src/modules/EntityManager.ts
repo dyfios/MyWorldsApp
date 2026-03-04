@@ -86,39 +86,45 @@ export class EntityPlacement {
   }
 
   placementUpdate(): void {
-    const normalPlacementThreshold = 0.5;
-    
-    if (this.placingEntity == null) {
-      return;
-    }
-    
-    if (this.modelOffset == null) {
-      Logging.LogError("[EntityPlacer] Model Offset is null.");
-      return;
-    }
-    
-    if (this.modelOffset.x == null || this.modelOffset.y == null || this.modelOffset.z == null) {
-      Logging.LogError("[EntityPlacer] Model Offset invalid.");
-      return;
-    }
+    // Logging.Log('🔵 placementUpdate() START');
+    try {
+      const normalPlacementThreshold = 0.5;
+      
+      if (this.placingEntity == null) {
+        return;
+      }
+      
+      if (this.modelOffset == null) {
+        return;
+      }
+      
+      if (this.modelOffset.x == null || this.modelOffset.y == null || this.modelOffset.z == null) {
+        return;
+      }
 
+    // Logging.Log('🔵 placementUpdate() A - before raycast');
     const isThirdPerson = (globalThis as any).playerController?.cameraMode === 'thirdPerson';
     const isFullClient = (globalThis as any).uiManager?.clientType === 'full';
     const hitInfo = (isThirdPerson && isFullClient)
       ? Input.GetPointerRaycast(Vector3.forward)
       : Camera.GetRaycast();
+    // Logging.Log('🔵 placementUpdate() B - after raycast');
     if (hitInfo != null && hitInfo.entity != null) {
+      // Logging.Log('🔵 placementUpdate() C - hitInfo valid');
       if (hitInfo.entity !== this.placingEntity) {
         let gridSnappedPosition: Vector3;
         
         if (this.gridEnabled) {
+          // Logging.Log('🔵 placementUpdate() D - grid enabled, accessing hitPoint');
           gridSnappedPosition = new Vector3(
             Math.round(hitInfo.hitPoint.x / this.gridSize) * this.gridSize + this.modelOffset.x,
             Math.round(hitInfo.hitPoint.y / this.gridSize) * this.gridSize + this.modelOffset.y,
             Math.round(hitInfo.hitPoint.z / this.gridSize) * this.gridSize + this.modelOffset.z
           );
+          // Logging.Log('🔵 placementUpdate() E - after hitPoint access');
 
           // Adjust position based on surface normal
+          // Logging.Log('🔵 placementUpdate() F - accessing hitPointNormal');
           if (hitInfo.hitPointNormal.x >= normalPlacementThreshold) {
             gridSnappedPosition.x += this.gridSize;
           } else if (hitInfo.hitPointNormal.x <= -normalPlacementThreshold) {
@@ -132,6 +138,7 @@ export class EntityPlacement {
           if (hitInfo.hitPointNormal.z <= -normalPlacementThreshold) {
             gridSnappedPosition.z -= this.gridSize;
           }
+          // Logging.Log('🔵 placementUpdate() G - after hitPointNormal access');
         } else {
           gridSnappedPosition = new Vector3(
             hitInfo.hitPoint.x + this.modelOffset.x,
@@ -140,8 +147,13 @@ export class EntityPlacement {
           );
         }
         
+        // Logging.Log('🔵 placementUpdate() H - before SetPosition');
         this.placingEntity.SetPosition(gridSnappedPosition, false, false);
+        // Logging.Log('🔵 placementUpdate() I - after SetPosition');
       }
+    }
+    } catch (e) {
+      // Silently ignore to prevent log spam
     }
   }
 
@@ -659,6 +671,10 @@ export class EntityManager {
   }
 
   onMeshEntityLoadedGeneric(entity: MeshEntity): void {
+    if (entity == null) {
+      Logging.LogError('❌ EntityManager: onMeshEntityLoadedGeneric received null entity');
+      return;
+    }
     Logging.Log(`✓ Mesh entity loaded successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
@@ -684,6 +700,10 @@ export class EntityManager {
   }
 
   onMeshEntityLoadedGenericPlacing(entity: MeshEntity): void {
+    if (entity == null) {
+      Logging.LogError('❌ EntityManager: onMeshEntityLoadedGenericPlacing received null entity');
+      return;
+    }
     Logging.Log(`✓ Mesh entity loaded for placement successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
@@ -705,6 +725,10 @@ export class EntityManager {
   }
 
   onAutomobileEntityLoadedGeneric(entity: AutomobileEntity): void {
+    if (entity == null) {
+      Logging.LogError('❌ EntityManager: onAutomobileEntityLoadedGeneric received null entity');
+      return;
+    }
     Logging.Log(`✓ Automobile entity loaded successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
@@ -729,6 +753,10 @@ export class EntityManager {
   }
 
   onAutomobileEntityLoadedGenericPlacing(entity: AutomobileEntity): void {
+    if (entity == null) {
+      Logging.LogError('❌ EntityManager: onAutomobileEntityLoadedGenericPlacing received null entity');
+      return;
+    }
     Logging.Log(`✓ Automobile entity loaded for placement successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);

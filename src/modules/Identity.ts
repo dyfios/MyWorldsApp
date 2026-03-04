@@ -4,7 +4,7 @@
  * This module handles user authentication for both WebVerse variants:
  * 
  * 1. **WebVerse Full (Native)**: Uses an HTML entity to display an OAuth login page.
- *    - Opens: https://worldhub.me/login
+ *    - Opens: https://www.worldhub.me/login
  *    - User authenticates via Google OAuth
  *    - Login page calls postWorldMessage with auth token
  *    - Token is extracted and stored for MQTT/API authentication
@@ -24,14 +24,15 @@ export type WebVerseClientType = 'full' | 'lite';
 
 /**
  * Interface for login context data
+ * Note: Kept for reference but no longer used after canvas creation refactor
  */
-interface LoginContext {
-    loginCanvas?: any; // BaseEntity type from WebVerse
-    userID?: string;
-    userTag?: string;
-    token?: string;
-    tokenExpiration?: string;
-}
+// interface LoginContext {
+//     loginCanvas?: any; // BaseEntity type from WebVerse
+//     userID?: string;
+//     userTag?: string;
+//     token?: string;
+//     tokenExpiration?: string;
+// }
 
 /**
  * Interface for top-level MyWorlds context
@@ -69,7 +70,7 @@ const IDENTITY_GLOBALS = {
   LOGIN_CANVAS_ID_KEY: 'LOGIN-CANVAS-ID',
   LOGIN_PANEL_ID_KEY: 'LOGIN-PANEL-ID',
   AUTH_API_URL: 'https://id.worldhub.me',
-  NATIVE_LOGIN_URL: 'https://worldhub.me/login?redirect_url=https://worldhub.me/post-login'
+  NATIVE_LOGIN_URL: 'https://www.worldhub.me/login?redirect_url=https://www.worldhub.me/post-login'
 };
 
 // Store on globalThis for persistence across WebVerse calls
@@ -462,9 +463,24 @@ export class Identity {
     const state = getIdentityState();
     Logging.Log('👤 Identity: Continuing as guest - ' + reason);
     
+    // Guard: Prevent duplicate calls
+    if (state.loginCompleted) {
+      Logging.Log('⚠️ Identity: handleGuestMode called but login already completed, skipping');
+      return;
+    }
+    state.loginCompleted = true;
+    
     // Notify about guest mode (not an error, just informational)
     if (state.authErrorCallback) {
       state.authErrorCallback('Guest mode: ' + reason, true);
+    }
+    
+    // Start the render loop (same as onLoginSuccess)
+    Logging.Log('🔄 Identity: Starting render loop for guest mode...');
+    if (typeof (globalThis as any).startRenderLoop === 'function') {
+      (globalThis as any).startRenderLoop();
+    } else {
+      Logging.LogError('❌ Identity: startRenderLoop function not available');
     }
     
     // Continue - invoke callback
@@ -618,32 +634,43 @@ export class Identity {
   /**
    * Start Native OAuth login flow
    * Creates an HTML panel that loads the OAuth login page
+   * If canvas creation fails, falls back to guest mode
    */
   private startNativeOAuthLogin(): void {
       const config = getIdentityConfig();
       Logging.Log("🔐 Identity: Starting Native OAuth login flow...");
 
-      const loginContext: LoginContext = {};
       const loginCanvasId = UUID.NewUUID().ToString();
       
       if (!loginCanvasId) {
-          Logging.LogError("Failed to generate login canvas ID");
+          Logging.LogError("Failed to generate login canvas ID - falling back to guest mode");
+          this.handleGuestMode('Canvas ID generation failed');
           return;
       }
 
       WorldStorage.SetItem(config.LOGIN_CANVAS_ID_KEY, loginCanvasId);
 
-      // Create login canvas
-      loginContext.loginCanvas = CanvasEntity.Create(
-          undefined, // parent
-          Vector3.zero, // position
-          Quaternion.identity, // rotation
-          Vector3.one, // scale
-          false, // isVisible
-          loginCanvasId,
-          "LoginCanvas",
-          "finishLoginCanvasSetup" // callback when creation is complete
-      );
+      try {
+        // Create login canvas
+        const loginCanvas = CanvasEntity.Create(
+            undefined, // parent
+            Vector3.zero, // position
+            Quaternion.identity, // rotation
+            Vector3.one, // scale
+            false, // isVisible
+            loginCanvasId,
+            "LoginCanvas",
+            "finishLoginCanvasSetup" // callback when creation is complete
+        );
+        
+        if (!loginCanvas) {
+          Logging.LogWarning("⚠️ Identity: Canvas creation returned null - falling back to guest mode");
+          this.handleGuestMode('Canvas creation failed');
+        }
+      } catch (error: any) {
+        Logging.LogError("❌ Identity: Error creating login canvas: " + (error.message || error));
+        this.handleGuestMode('Canvas creation error: ' + (error.message || error));
+      }
   }
 
   /**

@@ -158,14 +158,20 @@ export class ScriptEngine {
    * Handle 0.25 second interval scripts
    */
   handle0_25IntervalScripts(): void {
-    this._0_25IntervalScripts.forEach((value, key) => {
-      const [ entity, script ] = value;
-      try {
-        Scripting.RunScript(script);
-      } catch (error) {
-        Logging.LogError(`Error running 0.25s interval script for ${key} ${entity.id.ToString()}:` + error);
-      }
-    });
+    // Logging.Log('🟢 handle0_25IntervalScripts() START');
+    try {
+      this._0_25IntervalScripts.forEach((value, _key) => {
+        const [ _entity, script ] = value;
+        try {
+          Scripting.RunScript(script);
+        } catch (error) {
+          Logging.LogError('❌ ScriptEngine 0.25s error: ' + error + ' | Script: ' + (typeof script === 'string' ? script.substring(0, 200) : 'non-string'));
+        }
+      });
+    } catch (e) {
+      // Silently ignore
+    }
+    // Logging.Log('🟢 handle0_25IntervalScripts() END');
   }
 
   /**
@@ -196,14 +202,20 @@ export class ScriptEngine {
    * Handle 0.5 second interval scripts
    */
   handle0_5IntervalScripts(): void {
-    this._0_5IntervalScripts.forEach((value, key) => {
-      const [ entity, script ] = value;
-      try {
-        Scripting.RunScript(script);
-      } catch (error) {
-        Logging.LogError(`Error running 0.5s interval script for ${key} ${entity.id.ToString()}:` + error);
-      }
-    });
+    // Logging.Log('🟡 handle0_5IntervalScripts() START');
+    try {
+      this._0_5IntervalScripts.forEach((value, _key) => {
+        const [ _entity, script ] = value;
+        try {
+          Scripting.RunScript(script);
+        } catch (error) {
+          // Silently ignore script errors
+        }
+      });
+    } catch (error) {
+      // Silently ignore iteration errors
+    }
+    // Logging.Log('🟡 handle0_5IntervalScripts() END');
   }
 
   /**
@@ -234,14 +246,20 @@ export class ScriptEngine {
    * Handle 1 second interval scripts
    */
   handle1_0IntervalScripts(): void {
-    this._1_0IntervalScripts.forEach((value, key) => {
-      const [ entity, script ] = value;
-      try {
-        Scripting.RunScript(script);
-      } catch (error) {
-        Logging.LogError(`Error running 1.0s interval script for ${key} ${entity.id.ToString()}:` + error);
-      }
-    });
+    // Logging.Log('🟠 handle1_0IntervalScripts() START');
+    try {
+      this._1_0IntervalScripts.forEach((value, _key) => {
+        const [ _entity, script ] = value;
+        try {
+          Scripting.RunScript(script);
+        } catch (error) {
+          // Silently ignore script errors
+        }
+      });
+    } catch (error) {
+      // Silently ignore iteration errors
+    }
+    // Logging.Log('🟠 handle1_0IntervalScripts() END');
   }
 
   /**
@@ -272,14 +290,20 @@ export class ScriptEngine {
    * Handle 2 second interval scripts
    */
   handle2_0IntervalScripts(): void {
-    this._2_0IntervalScripts.forEach((value, key) => {
-      const [ entity, script ] = value;
-      try {
-        Scripting.RunScript(script);
-      } catch (error) {
-        Logging.LogError(`Error running 2.0s interval script for ${key} ${entity.id.ToString()}:` + error);
-      }
-    });
+    // Logging.Log('🔴 handle2_0IntervalScripts() START');
+    try {
+      this._2_0IntervalScripts.forEach((value, _key) => {
+        const [ _entity, script ] = value;
+        try {
+          Scripting.RunScript(script);
+        } catch (error) {
+          // Silently ignore script errors
+        }
+      });
+    } catch (error) {
+      // Silently ignore iteration errors
+    }
+    // Logging.Log('🔴 handle2_0IntervalScripts() END');
   }
 
   /**

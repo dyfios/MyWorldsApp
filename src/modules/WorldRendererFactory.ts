@@ -135,6 +135,13 @@ export class StaticSurfaceRenderer extends WorldRendering {
     (globalThis as any).MW_StaticRenderer_OnSunCreated = (entity: LightEntity) => {
       this.onStaticRendererSunCreated(entity);
     };
+
+    // Deferred spawn position callback (retries until character entity is loaded)
+    (globalThis as any).MW_StaticRenderer_SpawnRetries = 0;
+    (globalThis as any).MW_StaticRenderer_ApplySpawn = () => {
+      (globalThis as any).MW_StaticRenderer_SpawnRetries++;
+      this.deferSpawnPosition((globalThis as any).MW_StaticRenderer_SpawnRetries);
+    };
   }
 
   onEntityTemplatesComplete(response: string): void {
@@ -159,6 +166,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
       `, 3000);
 
       let dockButtons: DockButtonInfo[] = [];
+      const worldAddr = this.queryParams.getWorldAddress() || '';
       for (const template of templates['templates']) {
         // Strip file extensions from tags for display using split
         var entityTagParts = template.entity_tag.split('.');
@@ -166,25 +174,40 @@ export class StaticSurfaceRenderer extends WorldRendering {
         var variantTagParts = template.variant_tag.split('.');
         var variantTagClean = variantTagParts.length > 1 ? variantTagParts.slice(0, -1).join('.') : template.variant_tag;
         var displayName = entityTagClean + "_" + variantTagClean;
+
+        // Build full thumbnail URL from the template's thumbnail path
+        var thumbnailUrl = 'assets/img/entity-default.png';
+        if (template.thumbnail) {
+          // template.thumbnail is a relative path — prefix with world address
+          thumbnailUrl = worldAddr + '/public-assets/' + template.thumbnail;
+        } else {
+          // Try to get thumbnail_path from the assets JSON
+          try {
+            const assets = JSON.parse(template["assets"]);
+            if (assets.thumbnail_path) {
+              thumbnailUrl = worldAddr + '/public-assets/' + assets.thumbnail_path;
+            }
+          } catch (_e) { /* no assets JSON or no thumbnail_path */ }
+        }
         
         dockButtons.push({
           name: displayName,
-          thumbnail: template.thumbnail || 'assets/img/entity-default.png',
+          thumbnail: thumbnailUrl,
           onClick: `ENTITY_TEMPLATE.ENTITY_SELECTED('${template.entity_id}','${template.variant_id}');`
         });
         
         // Add entity template to the Tools menu (after Tools tab is created at 5000ms)
         Time.SetTimeout("addTool('" + displayName + 
-          "', '" + (template.thumbnail || 'assets/img/entity-default.png') + 
+          "', '" + thumbnailUrl + 
           "', 'TOOL.ADD_DOCK_BUTTON(ENTITY." + template.entity_id + "." + template.variant_id + 
           ", " + displayName + 
-          ", " + (template.thumbnail || 'assets/img/entity-default.png') + ");')", 6000);
+          ", " + thumbnailUrl + ");')", 6000);
         
         // Also add first few entities to the dock
         var numEntityButtons = parseInt(WorldStorage.GetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS") as string);
         if (numEntityButtons < 7) {
           Time.SetTimeout("addEditToolbarButton('" + displayName +
-            "', '" + (template.thumbnail || 'assets/img/entity-default.png') +
+            "', '" + thumbnailUrl +
             "', 'ENTITY_TEMPLATE.ENTITY_SELECTED(" + template.entity_id + "," +
             template.variant_id + ");')", 3100);
           WorldStorage.SetItem("MYWORLDS.DOCKUI.ENTITY_BUTTONS", (numEntityButtons + 1).toString());
@@ -299,11 +322,72 @@ export class StaticSurfaceRenderer extends WorldRendering {
       Logging.Log('🌐 StaticSurfaceRenderer: Set tiledsurfacerenderer.worldId=' + this.worldMetadata.id);
     }
 
-    // Set up sky (uses worldMetadata.sky config if available, otherwise engine defaults)
-    this.setupSky();
+    // Store world gravity default for PlayerController to apply after character loads
+    Logging.Log('🌍 StaticSurfaceRenderer: Checking gravity settings...');
+    if (this.worldMetadata) {
+      Logging.Log('🌍 StaticSurfaceRenderer: worldMetadata exists');
+      const gravityValue = (this.worldMetadata as any).gravity;
+      Logging.Log('🌍 StaticSurfaceRenderer: gravity value = ' + gravityValue);
+      if (gravityValue === false || gravityValue === 'false') {
+        Logging.Log('🌍 StaticSurfaceRenderer: Setting worldDefaultGravity = false');
+        (globalThis as any).worldDefaultGravity = false;
+      } else if (gravityValue === true || gravityValue === 'true') {
+        Logging.Log('🌍 StaticSurfaceRenderer: Setting worldDefaultGravity = true');
+        (globalThis as any).worldDefaultGravity = true;
+      } else {
+        Logging.Log('🌍 StaticSurfaceRenderer: gravity not specified, leaving default');
+      }
+      Logging.Log('🌍 StaticSurfaceRenderer: worldDefaultGravity is now: ' + (globalThis as any).worldDefaultGravity);
+    } else {
+      Logging.Log('🌍 StaticSurfaceRenderer: No worldMetadata, skipping gravity');
+    }
 
-    // Apply spawn position: URL userPosition > worldMetadata spawn > origin
+    // Set up sky only if sky config is explicitly provided in world metadata
+    if (this.worldMetadata?.sky) {
+      this.setupSky();
+    } else {
+      Logging.Log('📍 StaticSurfaceRenderer: No sky config in metadata, using engine defaults');
+    }
+
+    // Apply spawn position only if spawn config is provided or URL has explicit userPosition
+    if (this.worldMetadata?.spawn || this.queryParams.hasExplicitUserPosition()) {
+      this.deferSpawnPosition();
+    } else {
+      Logging.Log('📍 StaticSurfaceRenderer: No spawn config, using default origin');
+    }
+  }
+
+  /**
+   * Wait for the player character entity to be loaded, then apply spawn position.
+   * Retries every 500ms up to 20 times (10 seconds).
+   */
+  private deferSpawnPosition(retries: number = 0): void {
+    Logging.Log('🟣 deferSpawnPosition() START - retry #' + retries);
+    const maxRetries = 20;
+    const isLoaded = (globalThis as any).playerController?.characterLoaded === true;
+
+    if (!isLoaded) {
+      if (retries < maxRetries) {
+        Logging.Log('🟣 deferSpawnPosition() - character not loaded, scheduling retry');
+        Time.SetTimeout('this.MW_StaticRenderer_ApplySpawn()', 5);
+      } else {
+        Logging.LogWarning('📍 StaticSurfaceRenderer: Gave up waiting for character entity after '
+          + maxRetries + ' retries');
+      }
+      Logging.Log('🟣 deferSpawnPosition() END (early return)');
+      return;
+    }
+
+    // Guard: Only apply spawn position once across all StaticSurfaceRenderer instances
+    if ((globalThis as any).MW_SpawnPositionApplied === true) {
+      Logging.Log('🟣 deferSpawnPosition() - spawn already applied by another renderer, skipping');
+      return;
+    }
+    (globalThis as any).MW_SpawnPositionApplied = true;
+
+    Logging.Log('🟣 deferSpawnPosition() - character loaded, applying spawn position');
     this.applySpawnPosition();
+    Logging.Log('🟣 deferSpawnPosition() END');
   }
 
   /**
@@ -317,9 +401,58 @@ export class StaticSurfaceRenderer extends WorldRendering {
     if (!isOrigin) {
       Logging.Log('📍 StaticSurfaceRenderer: Teleporting player to spawn ('
         + spawnPos.x + ', ' + spawnPos.y + ', ' + spawnPos.z + ')');
-      (globalThis as any).playerController.setMotionModeFree();
+      
+      // Temporarily disable fixHeight to allow Y position to be set
+      const entity = (globalThis as any).playerController?.internalCharacterEntity;
+      if (entity) {
+        Logging.Log('📍 applySpawnPosition: Setting fixHeight=false and InteractionState.Static');
+        entity.fixHeight = false;
+        entity.SetInteractionState(InteractionState.Static);
+      }
+      
       (globalThis as any).playerController.setCharacterPosition(spawnPos);
-      (globalThis as any).playerController.setMotionModePhysical();
+      
+      // Check if position was actually set
+      Time.SetTimeout(`
+        const pos = this.playerController?.internalCharacterEntity?.GetPosition(false);
+        if (pos) {
+          Logging.Log('📍 applySpawnPosition: Position 100ms after set: (' + pos.x + ', ' + pos.y + ', ' + pos.z + ')');
+        }
+      `, 5.0);
+      
+      // Check again after 500ms
+      Time.SetTimeout(`
+        const pos = this.playerController?.internalCharacterEntity?.GetPosition(false);
+        if (pos) {
+          Logging.Log('📍 applySpawnPosition: Position 500ms after set: (' + pos.x + ', ' + pos.y + ', ' + pos.z + ')');
+        }
+      `, 0.5);
+      
+      // Check again after 1s
+      Time.SetTimeout(`
+        const pos = this.playerController?.internalCharacterEntity?.GetPosition(false);
+        if (pos) {
+          Logging.Log('📍 applySpawnPosition: Position 1s after set: (' + pos.x + ', ' + pos.y + ', ' + pos.z + ')');
+        }
+      `, 1.0);
+      
+      // Re-enable fixHeight if gravity is enabled (will snap to nearest ground from spawn)
+      // But give it a frame to settle at the spawn position first
+      const gravityDefault = (globalThis as any).worldDefaultGravity;
+      Logging.Log('📍 applySpawnPosition: gravityDefault = ' + gravityDefault + ' (type: ' + typeof gravityDefault + ')');
+      if (gravityDefault !== false && entity) {
+        Logging.Log('📍 applySpawnPosition: Scheduling delayed re-enable of Physical state (gravityDefault !== false)');
+        // Delay re-enabling physical mode so position has time to apply
+        Time.SetTimeout(`
+          Logging.Log('📍 applySpawnPosition: DELAYED - Re-enabling fixHeight and Physical state');
+          if (this.playerController && this.playerController.internalCharacterEntity) {
+            this.playerController.internalCharacterEntity.fixHeight = true;
+            this.playerController.internalCharacterEntity.SetInteractionState(2); // InteractionState.Physical
+          }
+        `, 0.1);
+      } else {
+        Logging.Log('📍 applySpawnPosition: NOT re-enabling Physical state (gravityDefault === false)');
+      }
     } else {
       Logging.Log('📍 StaticSurfaceRenderer: Spawn at origin, no teleport needed');
     }
@@ -327,9 +460,11 @@ export class StaticSurfaceRenderer extends WorldRendering {
     // Apply spawn rotation if configured and no explicit URL position overrode it
     if (!this.queryParams.hasExplicitUserPosition() && this.worldMetadata?.spawn?.rotation) {
       const r = this.worldMetadata.spawn.rotation;
-      Logging.Log('📍 StaticSurfaceRenderer: Applying spawn rotation: (' + r.x + ', ' + r.y + ', ' + r.z + ', ' + r.w + ')');
-      (globalThis as any).playerController.internalCharacterEntity.SetRotation(
-        new Quaternion(r.x, r.y, r.z, r.w), false);
+      const entity = (globalThis as any).playerController?.internalCharacterEntity;
+      if (entity != null) {
+        Logging.Log('📍 StaticSurfaceRenderer: Applying spawn rotation: (' + r.x + ', ' + r.y + ', ' + r.z + ', ' + r.w + ')');
+        entity.SetRotation(new Quaternion(r.x, r.y, r.z, r.w), false);
+      }
     }
   }
 
@@ -338,7 +473,13 @@ export class StaticSurfaceRenderer extends WorldRendering {
    */
   private setupSky(): void {
     const skyConfig = this.worldMetadata?.sky;
-    const skyType = skyConfig?.type || 'day-night';
+    if (!skyConfig) {
+      // No sky config — this shouldn't be reached due to the guard in initialize(),
+      // but just in case, don't touch the engine's sky state.
+      return;
+    }
+
+    const skyType = skyConfig.type || 'day-night';
 
     // Texture and solid-color modes don't need a sun entity
     if (skyType === 'texture' || skyType === 'solid-color') {
@@ -355,6 +496,10 @@ export class StaticSurfaceRenderer extends WorldRendering {
    * Callback when sun entity is created for sky setup
    */
   private onStaticRendererSunCreated(entity: LightEntity): void {
+    if (entity == null) {
+      Logging.LogError('❌ StaticSurfaceRenderer: onStaticRendererSunCreated received null entity');
+      return;
+    }
     try {
       Logging.Log('☀️ StaticSurfaceRenderer: Sun entity created for sky');
       entity.SetVisibility(true);
@@ -868,56 +1013,63 @@ export class TiledSurfaceRenderer extends WorldRendering {
   }
 
   maintenance(): void {
-    var renderedPos = Vector3.zero;
-    if ((globalThis as any).playerController.internalCharacterEntity != null) {
-      renderedPos = (globalThis as any).playerController.internalCharacterEntity.GetPosition(false);
-      if (!this.characterInitialized) {
-        Environment.SetTrackedCharacterEntity((globalThis as any).playerController.internalCharacterEntity);
-        this.characterInitialized = true;
-      }
-    }
-    var newRegion = this.getRegionIndexForWorldPos(this.getWorldPositionForRenderedPosition(renderedPos));
-    
-    if (this.currentRegion != newRegion) {
-      this.checkAndHandleTerrainBoundaries(this.currentRegion, newRegion);
-      this.currentRegion = newRegion;
-    }
-
-    this.ensureRegionsAreLoaded(this.currentRegion);
-    this.unloadUnnecessaryRegions(this.currentRegion);
-
-    this.ensureCharacterIsInCorrectSession();
-
-    // For now, keep water near user, will want to make more sophisticated
-    if (this.water != null) {
-      if (this.initialWorldLoadInProgress == true) {
-        //this.water.SetInteractionState(InteractionState.Hidden);
-      }
-      else {
-        this.water.SetPosition(new Vector3(
-          renderedPos.x, 127, renderedPos.z), false);
-      }
-    }
-
-    if (this.initialWorldLoadInProgress == true && Object.keys(this.terrainTiles).length >= 9) {
-      // Record the start time the first time we enter this logic block
-      if (this.initialLoadStartTime === null) {
-        this.initialLoadStartTime = (Date as any).now;
-      }
-      
-      const currentTime = (Date as any).now;
-      const loadingTimeElapsed = this.calculateElapsedSeconds(this.initialLoadStartTime!, currentTime);
-      const loadingTimeoutReached = loadingTimeElapsed >= 60; // 60 second timeout
-      
-      if (!this.isAnyTerrainTileLoading() || loadingTimeoutReached) {
-        this.initialWorldLoadInProgress = false;
-        this.water?.SetInteractionState(InteractionState.Static);
-        (globalThis as any).toggleLoadingPanel(false);
-        
-        if (loadingTimeoutReached) {
-          Logging.LogWarning('⏰ TiledSurfaceRenderer: Initial world loading timeout reached (60 seconds) - proceeding despite pending terrain tiles');
+    // Logging.Log('⚪ WorldRendererFactory.maintenance() START');
+    try {
+      var renderedPos = Vector3.zero;
+      const pc = (globalThis as any).playerController;
+      if (pc && pc.internalCharacterEntity != null) {
+        renderedPos = pc.internalCharacterEntity.GetPosition(false);
+        if (!this.characterInitialized) {
+          Environment.SetTrackedCharacterEntity(pc.internalCharacterEntity);
+          this.characterInitialized = true;
         }
       }
+      var newRegion = this.getRegionIndexForWorldPos(this.getWorldPositionForRenderedPosition(renderedPos));
+      
+      if (this.currentRegion != newRegion) {
+        this.checkAndHandleTerrainBoundaries(this.currentRegion, newRegion);
+        this.currentRegion = newRegion;
+      }
+
+      this.ensureRegionsAreLoaded(this.currentRegion);
+      this.unloadUnnecessaryRegions(this.currentRegion);
+
+      this.ensureCharacterIsInCorrectSession();
+
+      // For now, keep water near user, will want to make more sophisticated
+      if (this.water != null) {
+        if (this.initialWorldLoadInProgress == true) {
+          //this.water.SetInteractionState(InteractionState.Hidden);
+        }
+        else {
+          this.water.SetPosition(new Vector3(
+            renderedPos.x, 127, renderedPos.z), false);
+        }
+      }
+
+      if (this.initialWorldLoadInProgress == true && Object.keys(this.terrainTiles).length >= 9) {
+        // Record the start time the first time we enter this logic block
+        if (this.initialLoadStartTime === null) {
+          this.initialLoadStartTime = (Date as any).now;
+        }
+        
+        const currentTime = (Date as any).now;
+        const loadingTimeElapsed = this.calculateElapsedSeconds(this.initialLoadStartTime!, currentTime);
+        const loadingTimeoutReached = loadingTimeElapsed >= 60; // 60 second timeout
+        
+        if (!this.isAnyTerrainTileLoading() || loadingTimeoutReached) {
+          this.initialWorldLoadInProgress = false;
+          this.water?.SetInteractionState(InteractionState.Static);
+          (globalThis as any).toggleLoadingPanel(false);
+          
+          if (loadingTimeoutReached) {
+            Logging.LogWarning('⏰ TiledSurfaceRenderer: Initial world loading timeout reached (60 seconds) - proceeding despite pending terrain tiles');
+          }
+        }
+      }
+      // Logging.Log('⚪ WorldRendererFactory.maintenance() END');
+    } catch (e) {
+      Logging.LogError('❌ WorldRendererFactory.maintenance() ERROR: ' + e);
     }
   }
 
@@ -927,7 +1079,8 @@ export class TiledSurfaceRenderer extends WorldRendering {
    * @param newRegion Current region index
    */
   private checkAndHandleTerrainBoundaries(oldRegion: Vector2Int, newRegion: Vector2Int): void {
-    if ((globalThis as any).playerController.internalCharacterEntity == null) {
+    const pc = (globalThis as any).playerController;
+    if (!pc || pc.internalCharacterEntity == null) {
       return;
     }
 
@@ -936,7 +1089,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
     let rotationNeeded = false;
 
     // Get current character position
-    const renderedPos = (globalThis as any).playerController.internalCharacterEntity.GetPosition(false);
+    const renderedPos = pc.internalCharacterEntity.GetPosition(false);
     const worldPos = this.getWorldPositionForRenderedPosition(renderedPos);
     let newWorldPos = new Vector3(worldPos.x, worldPos.y, worldPos.z);
 
@@ -1443,27 +1596,41 @@ export class TiledSurfaceRenderer extends WorldRendering {
   }
 
   enableWater(water: WaterEntity): void {
+    if (water == null) {
+      Logging.LogError('❌ TiledSurfaceRenderer: enableWater received null water entity');
+      return;
+    }
     Logging.Log("Enabling Water...");
     water.SetInteractionState(InteractionState.Hidden);
     water.SetVisibility(true);
     this.water = water;
 
-    // Resolve spawn position: URL userPosition > world config spawn > origin
+    // Resolve spawn position: URL userPosition > world config spawn > original startPos
     const spawnConfig = this.worldConfig?.["spawn"];
-    const effectiveSpawn = this.queryParams.getSpawnPosition(spawnConfig);
-    this.startPos = effectiveSpawn;
+    if (spawnConfig || this.queryParams.hasExplicitUserPosition()) {
+      const effectiveSpawn = this.queryParams.getSpawnPosition(spawnConfig);
+      this.startPos = effectiveSpawn;
+    }
 
     (globalThis as any).playerController.setMotionModeFree();
     var adjustedPos = this.getRenderedPositionForWorldPosition(this.startPos);
     (globalThis as any).playerController.setCharacterPosition(adjustedPos);
-    (globalThis as any).playerController.setMotionModePhysical();
+
+    // Apply world gravity default, falling back to physical (gravity on)
+    if (this.worldConfig?.["gravity"] === false) {
+      Logging.Log('🌍 TiledSurfaceRenderer: World default gravity is OFF — staying in free motion');
+    } else {
+      (globalThis as any).playerController.setMotionModePhysical();
+    }
 
     // Apply spawn rotation if configured and no explicit URL position overrode it
     if (!this.queryParams.hasExplicitUserPosition() && spawnConfig?.rotation) {
       const r = spawnConfig.rotation;
-      Logging.Log('📍 Spawn: Applying spawn rotation: (' + r.x + ', ' + r.y + ', ' + r.z + ', ' + r.w + ')');
-      (globalThis as any).playerController.internalCharacterEntity.SetRotation(
-        new Quaternion(r.x, r.y, r.z, r.w), false);
+      const entity = (globalThis as any).playerController?.internalCharacterEntity;
+      if (entity != null && (globalThis as any).playerController?.characterLoaded) {
+        Logging.Log('📍 Spawn: Applying spawn rotation: (' + r.x + ', ' + r.y + ', ' + r.z + ', ' + r.w + ')');
+        entity.SetRotation(new Quaternion(r.x, r.y, r.z, r.w), false);
+      }
     }
   }
 
@@ -1478,9 +1645,13 @@ export class TiledSurfaceRenderer extends WorldRendering {
     this.sun.initialize(this.worldConfig).then(() => {
       Logging.Log("✅ Sun controller initialized successfully");
       
-    // Apply sky configuration from world config
+    // Apply sky configuration from world config (if provided), otherwise use engine defaults
     var sunEntity = this.sun?.getSunEntity() || null;
-    applySkyConfig(this.worldConfig["sky"], sunEntity);
+    if (this.worldConfig["sky"]) {
+      applySkyConfig(this.worldConfig["sky"], sunEntity);
+    } else if (sunEntity) {
+      Environment.SetLiteDayNightSky(sunEntity);
+    }
       
     }).catch(error => {
       Logging.LogError("❌ Failed to initialize sun controller: " + error);
@@ -1888,6 +2059,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
     };
 
     (globalThis as any).tiledsurfacerenderer_timeUpdate = () => {
+      // Logging.Log('⏰ tiledsurfacerenderer_timeUpdate() called');
       this.timeUpdate();
     }
 
@@ -2195,6 +2367,10 @@ export class SunController extends WorldRendering {
    * Callback for base light entity creation
    */
   private onBaseLightEntityCreated(entity: LightEntity): void {
+    if (entity == null) {
+      Logging.LogError('❌ SunController: onBaseLightEntityCreated received null entity');
+      return;
+    }
     try {
       Logging.Log('🌟 SunController: Base light entity created');
       
@@ -2216,6 +2392,10 @@ export class SunController extends WorldRendering {
    * Callback for sun light entity creation
    */
   private onSunLightEntityCreated(entity: LightEntity): void {
+    if (entity == null) {
+      Logging.LogError('❌ SunController: onSunLightEntityCreated received null entity');
+      return;
+    }
     try {
       Logging.Log('☀️ SunController: Sun light entity created');
       

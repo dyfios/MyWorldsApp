@@ -555,11 +555,15 @@ function App() {
 
   // Mouse/touch movement tracking for look control
   React.useEffect(() => {
-    // Check if client type is "full" - if so, skip look delta (VR handles its own look)
+    // Check if client type is "full" - if so, skip look delta (desktop handles its own look)
     const urlParams = new URLSearchParams(window.location.search);
     const clientType = urlParams.get('client');
-    if (clientType === 'full') {
-      console.log('[Movement] Client type is "full" - skipping look delta handling');
+    
+    // Also check if native vuplex is present (indicates desktop mode)
+    const isDesktopMode = clientType === 'full' || (window.vuplex && !window.vuplex._listeners);
+    
+    if (isDesktopMode) {
+      console.log('[Movement] Desktop/full mode detected - skipping look delta handling');
       return;
     }
 
@@ -670,8 +674,15 @@ function App() {
     }
   }, []);
 
-  // Handle right-clicks on the background
+  // Handle right-clicks on the background (web mode only - desktop handles natively)
   const handleBackgroundRightClick = useCallback((e) => {
+    // Skip in desktop mode - WebVerse handles right-click natively
+    const urlParams = new URLSearchParams(window.location.search);
+    const clientType = urlParams.get('client');
+    if (clientType === 'full') {
+      return;
+    }
+    
     if (e.target === e.currentTarget) {
       e.preventDefault();
       sendWorldMessage('RIGHT_PRESS()');

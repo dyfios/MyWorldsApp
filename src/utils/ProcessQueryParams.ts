@@ -26,6 +26,8 @@ export interface WorldMetadata {
   stateService?: string; // Used for tiled surface renderer
   sky?: SkyConfig;
   spawn?: SpawnConfig;
+  /** Whether gravity is enabled by default. Defaults to true if omitted. */
+  gravity?: boolean;
 }
 
 export interface QueryParams {

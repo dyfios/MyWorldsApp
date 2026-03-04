@@ -24,6 +24,8 @@ export class PlayerController {
   public activeVehicle: AutomobileEntity | AirplaneEntity | null = null;
   private maintenanceFunctionID: UUID | null = null;
   public cameraMode: 'firstPerson' | 'thirdPerson' = 'thirdPerson';
+  public characterLoaded: boolean = false;
+  private _maintenanceCount: number = 0;
 
   constructor(initialPosition: Vector3, characterName: string, characterId: string | undefined) {
     this.setupGlobalCallbacks();
@@ -47,59 +49,86 @@ export class PlayerController {
   }
 
   maintenance(): void {
-    if (this.inVR) {
-      if (!Input.IsVR) {
-        this.enterNonVRMode();
+    try {
+      // Don't do anything until the character entity is fully loaded
+      if (!this.characterLoaded || this.internalCharacterEntity == null) {
+        return;
       }
-    } else {
-      if (Input.IsVR) {
-        this.enterVRMode();
-      }
-    }
-
-    if (this.inVehicle && this.activeVehicle != null) {
-      // Update player position to match vehicle position
-      this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
-    }
-
-    // Handle mobile control flying (shift=up, space=down) or jump
-    const shiftDown = (globalThis as any).mobileControlShiftDown === true;
-    const spaceDown = (globalThis as any).mobileControlSpaceDown === true;
-    
-    if (!Input.gravityEnabled) {
-      // Flying mode - move at constant speed using position offset
-      const flySpeed = 0.1; // Units per frame
       
-      if (shiftDown) {
-        // Move up
-        const currentPos = this.internalCharacterEntity.GetPosition(false);
-        if (currentPos) {
-          this.internalCharacterEntity.SetPosition(
-            new Vector3(currentPos.x, currentPos.y + flySpeed, currentPos.z), 
-            false, 
-            false
-          );
+      // Debug: Log every 100th maintenance call to track activity
+      this._maintenanceCount++;
+      if (this._maintenanceCount % 100 === 0) {
+        Logging.Log('🔧 PlayerController.maintenance() call #' + this._maintenanceCount);
+      }
+      
+      // Debug: Monitor gravity state changes
+      const currentGravity = Input.gravityEnabled;
+      const currentFixHeight = this.internalCharacterEntity.fixHeight;
+      if ((globalThis as any)._lastGravityState !== currentGravity) {
+        Logging.Log('🚨 GRAVITY CHANGED! gravityEnabled: ' + (globalThis as any)._lastGravityState + ' -> ' + currentGravity);
+        (globalThis as any)._lastGravityState = currentGravity;
+      }
+      if ((globalThis as any)._lastFixHeightState !== currentFixHeight) {
+        Logging.Log('🚨 FIXHEIGHT CHANGED! fixHeight: ' + (globalThis as any)._lastFixHeightState + ' -> ' + currentFixHeight);
+        (globalThis as any)._lastFixHeightState = currentFixHeight;
+      }
+
+      if (this.inVR) {
+        if (!Input.IsVR) {
+          this.enterNonVRMode();
         }
-      } else if (spaceDown) {
-        // Move down
-        const currentPos = this.internalCharacterEntity.GetPosition(false);
-        if (currentPos) {
-          this.internalCharacterEntity.SetPosition(
-            new Vector3(currentPos.x, currentPos.y - flySpeed, currentPos.z), 
-            false, 
-            false
-          );
+      } else {
+        if (Input.IsVR) {
+          this.enterVRMode();
         }
       }
-      // When neither pressed, do nothing - stay at current position
-    } else {
-      // Walking mode - space triggers jump
-      if (spaceDown && Input.jumpEnabled) {
-        // Trigger jump and clear the flag to prevent continuous jumping
-        Logging.Log('📱 PlayerController: JUMPING!');
-        this.internalCharacterEntity.Jump(1);
-        (globalThis as any).mobileControlSpaceDown = false;
+
+      if (this.inVehicle && this.activeVehicle != null) {
+        // Update player position to match vehicle position
+        this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
       }
+
+      // Handle mobile control flying (shift=up, space=down) or jump
+      const shiftDown = (globalThis as any).mobileControlShiftDown === true;
+      const spaceDown = (globalThis as any).mobileControlSpaceDown === true;
+      
+      if (!Input.gravityEnabled) {
+        // Flying mode - move at constant speed using position offset
+        const flySpeed = 0.1; // Units per frame
+        
+        if (shiftDown) {
+          // Move up
+          const currentPos = this.internalCharacterEntity.GetPosition(false);
+          if (currentPos) {
+            this.internalCharacterEntity.SetPosition(
+              new Vector3(currentPos.x, currentPos.y + flySpeed, currentPos.z), 
+              false, 
+              false
+            );
+          }
+        } else if (spaceDown) {
+          // Move down
+          const currentPos = this.internalCharacterEntity.GetPosition(false);
+          if (currentPos) {
+            this.internalCharacterEntity.SetPosition(
+              new Vector3(currentPos.x, currentPos.y - flySpeed, currentPos.z), 
+              false, 
+              false
+            );
+          }
+        }
+        // When neither pressed, do nothing - stay at current position
+      } else {
+        // Walking mode - space triggers jump
+        if (spaceDown && Input.jumpEnabled) {
+          // Trigger jump and clear the flag to prevent continuous jumping
+          Logging.Log('📱 PlayerController: JUMPING!');
+          this.internalCharacterEntity.Jump(1);
+          (globalThis as any).mobileControlSpaceDown = false;
+        }
+      }
+    } catch (e) {
+      // Silently ignore maintenance errors to prevent log spam
     }
   }
 
@@ -267,11 +296,18 @@ export class PlayerController {
    * Callback when player character entity is loaded
    */
   onPlayerCharacterEntityLoaded(entity: any): void {
+    if (entity == null) {
+      Logging.LogError('❌ PlayerController: onPlayerCharacterEntityLoaded received null entity');
+      return;
+    }
     Logging.Log(`✓ Player character entity loaded successfully: ${entity.id}`);
-    entity.SetInteractionState(InteractionState.Physical);
+    // Don't set InteractionState here - let enterNonVRMode handle it based on gravity setting
     entity.SetVisibility(true);
     (globalThis as any).playerController.internalCharacterEntity = entity;
+    this.characterLoaded = true;
+    (globalThis as any).playerController.characterLoaded = true;
     this.enterNonVRMode();
+    // Note: enterNonVRMode now respects worldDefaultGravity setting and sets appropriate InteractionState
   }
 
   /**
@@ -287,13 +323,17 @@ export class PlayerController {
   }
 
   setCharacterPosition(newPosition: Vector3): void {
+    Logging.Log('📍 setCharacterPosition() called: (' + newPosition.x + ', ' + newPosition.y + ', ' + newPosition.z + ') motionMode=' + this.motionMode);
     if (this.internalCharacterEntity != null) {
         var currentTransform = this.internalCharacterEntity.GetTransform();
+        Logging.Log('📍 setCharacterPosition() current: (' + currentTransform.position.x + ', ' + currentTransform.position.y + ', ' + currentTransform.position.z + ')');
         var newMotion = new Vector3(newPosition.x - currentTransform.position.x,
             newPosition.y - currentTransform.position.y, newPosition.z - currentTransform.position.z);
         if (this.motionMode == MotionMode.Physical) {
+            Logging.Log('📍 setCharacterPosition() using Move() for physical mode');
             this.internalCharacterEntity.Move(new Vector3(newMotion.x, newMotion.y, newMotion.z));
         } else {
+            Logging.Log('📍 setCharacterPosition() using SetPosition() for free mode');
             this.internalCharacterEntity.SetPosition(newPosition, false);
         }
     }
@@ -303,26 +343,45 @@ export class PlayerController {
    * Set motion mode to free
    */
   setMotionModeFree(): void {
-    const props = new EntityPhysicalProperties(null, null, null, false, null);
-    (globalThis as any).playerController.internalCharacterEntity.SetPhysicalProperties(props);
+    Logging.Log('🎮 setMotionModeFree() START');
+    if ((globalThis as any).playerController.characterLoaded) {
+      const props = new EntityPhysicalProperties(null, null, null, false, null);
+      (globalThis as any).playerController.internalCharacterEntity.SetPhysicalProperties(props);
+      (globalThis as any).playerController.internalCharacterEntity.fixHeight = false;
+      // Use Static interaction state to prevent ground snapping
+      (globalThis as any).playerController.internalCharacterEntity.SetInteractionState(InteractionState.Static);
+      Logging.Log('🎮 setMotionModeFree() Set InteractionState.Static, fixHeight=false, physics=false');
+    }
     Input.wasdMotionEnabled = true;
     Input.gravityEnabled = false;
-    Input.jumpEnabled = false;
+    Input.jumpEnabled = true; // Keep enabled so space key works for descending
     Input.mouseLookEnabled = true;
     (globalThis as any).playerController.motionMode = MotionMode.Free;
+    Logging.Log('🎮 setMotionModeFree() END - Input.gravityEnabled=' + Input.gravityEnabled);
   }
 
   /**
    * Set motion mode to physical
    */
   setMotionModePhysical(): void {
-    const props = new EntityPhysicalProperties(null, null, null, true, null);
-    (globalThis as any).playerController.internalCharacterEntity.SetPhysicalProperties(props);
+    // Log stack trace to find caller
+    Logging.Log('🎮 setMotionModePhysical() START - CALLER TRACE:');
+    try { throw new Error('trace'); } catch (e: any) { Logging.Log('🎮 Stack: ' + (e.stack || 'no stack')); }
+    if ((globalThis as any).playerController.characterLoaded) {
+      const props = new EntityPhysicalProperties(null, null, null, true, null);
+      (globalThis as any).playerController.internalCharacterEntity.SetPhysicalProperties(props);
+      Logging.Log('🎮 setMotionModePhysical() setting fixHeight=true');
+      (globalThis as any).playerController.internalCharacterEntity.fixHeight = true;
+      // Use Physical interaction state for ground interaction
+      Logging.Log('🎮 setMotionModePhysical() setting InteractionState.Physical');
+      (globalThis as any).playerController.internalCharacterEntity.SetInteractionState(InteractionState.Physical);
+    }
     Input.wasdMotionEnabled = true;
     Input.gravityEnabled = true;
     Input.jumpEnabled = true;
     Input.mouseLookEnabled = true;
     (globalThis as any).playerController.motionMode = MotionMode.Physical;
+    Logging.Log('🎮 setMotionModePhysical() END');
   }
 
   setCameraModeFirstPerson(): void {
@@ -355,18 +414,40 @@ export class PlayerController {
   setFlyingMode(enabled: boolean): void {
     Logging.Log('✈️ PlayerController.setFlyingMode called with: ' + enabled);
     Logging.Log('✈️ PlayerController: Before - Input.gravityEnabled = ' + Input.gravityEnabled);
-    Input.gravityEnabled = !enabled;
+    
+    // If world default gravity is false, never enable gravity
+    const worldGravity = (globalThis as any).worldDefaultGravity;
+    if (worldGravity === false) {
+      Logging.Log('✈️ PlayerController: worldDefaultGravity is false, keeping gravity disabled');
+      Input.gravityEnabled = false;
+    } else {
+      Input.gravityEnabled = !enabled;
+    }
     Logging.Log('✈️ PlayerController: After - Input.gravityEnabled = ' + Input.gravityEnabled);
   }
 
   enterNonVRMode(): void {
+    Logging.Log('🎮 enterNonVRMode() START');
     (globalThis as any).playerController.internalCharacterEntity.PlaceCameraOn();
     Input.SetAvatarEntityByTag((globalThis as any).playerController.internalCharacterEntity.tag);
     Input.SetRigOffset(new Vector3(0, 1.5, -2.75));
     this.internalCharacterEntity.SetRotation(Quaternion.identity, true, false);
-    this.setMotionModePhysical();
+    
+    // Respect world default gravity setting instead of always enabling physical mode
+    const gravityDefault = (globalThis as any).worldDefaultGravity;
+    Logging.Log('🎮 enterNonVRMode() gravityDefault = ' + gravityDefault + ' (type: ' + typeof gravityDefault + ')');
+    Logging.Log('🎮 enterNonVRMode() gravityDefault === false ? ' + (gravityDefault === false));
+    if (gravityDefault === false) {
+      Logging.Log('🎮 enterNonVRMode() calling setMotionModeFree()');
+      this.setMotionModeFree();
+    } else {
+      Logging.Log('🎮 enterNonVRMode() calling setMotionModePhysical() because gravityDefault is not false');
+      this.setMotionModePhysical();
+    }
+    
     this.setCameraModeThirdPerson();
     this.inVR = false;
+    Logging.Log('🎮 enterNonVRMode() END');
   }
 
   jump(amount: number): void {

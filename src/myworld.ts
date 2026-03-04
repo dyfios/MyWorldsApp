@@ -21,6 +21,30 @@ export class MyWorld {
       this.queryParams.parse();
       const worldAddress = this.queryParams.getWorldAddress();
       const clientType = this.queryParams.getClientType();
+      
+      // Initialize world default gravity to true (default), then override if worldMetadata specifies false
+      (globalThis as any).worldDefaultGravity = true;
+      Logging.Log('🌍 MyWorld: Initialized worldDefaultGravity = true (default)');
+      
+      // Set world default gravity EARLY so it's available when character loads
+      const worldMetadata = this.queryParams.getWorldMetadata();
+      Logging.Log('🌍 MyWorld: worldMetadata = ' + JSON.stringify(worldMetadata));
+      if (worldMetadata) {
+        const gravityValue = (worldMetadata as any).gravity;
+        Logging.Log('🌍 MyWorld: gravityValue = ' + gravityValue + ' (type: ' + typeof gravityValue + ')');
+        if (gravityValue === false || gravityValue === 'false') {
+          (globalThis as any).worldDefaultGravity = false;
+          Logging.Log('🌍 MyWorld: Set worldDefaultGravity = false (from worldMetadata)');
+        } else if (gravityValue === true || gravityValue === 'true') {
+          (globalThis as any).worldDefaultGravity = true;
+          Logging.Log('🌍 MyWorld: Set worldDefaultGravity = true (from worldMetadata)');
+        } else {
+          Logging.Log('🌍 MyWorld: gravityValue did not match any condition');
+        }
+      } else {
+        Logging.Log('🌍 MyWorld: No worldMetadata found');
+      }
+      
       Logging.Log('🚀 Step 0b3: worldAddress = ' + (worldAddress || 'undefined'));
       Logging.Log('🚀 Step 0b4: Creating ClientContext with worldAddress...');
       this.context = new ClientContext(clientType, worldAddress);
@@ -105,6 +129,7 @@ export class MyWorld {
   private async initializeWorldTypeSettings(): Promise<void> {
     const worldType = this.queryParams.get('worldType') as string;
     Logging.Log('🌍 Checking world type for initialization...');
+    Logging.Log('🌍 worldType value: "' + worldType + '" (type: ' + typeof worldType + ')');
     
     switch (worldType) {
       case 'mini-world':
@@ -125,9 +150,12 @@ export class MyWorld {
         break;
       default:
         if (worldType) {
-          throw new Error('❓ World Type: ' + worldType + ' - Unknown world type');
+          Logging.LogError('❓ World Type: ' + worldType + ' - Unknown world type');
         } else {
-          throw new Error('🌐 World Type: not specified');
+          Logging.LogWarning('🌐 World Type: not specified - defaulting to mini-world');
+          // Default to mini-world for backwards compatibility
+          await this.setupStaticSurfaceRenderer();
+          this.initializeUISettingsForWorldType('mini-world');
         }
     }
   }

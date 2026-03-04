@@ -205,8 +205,9 @@ export class UIManager {
       mainToolbar.SetInteractionState(InteractionState.Static);
       
       if (typeof mainToolbar.LoadFromURL === 'function') {
-        mainToolbar.LoadFromURL('ui/build/index.html');
-        Logging.Log('📄 UIManager: Loading toolbar HTML from URL');
+        const uiUrl = 'ui/build/index.html?client=' + this.clientType;
+        mainToolbar.LoadFromURL(uiUrl);
+        Logging.Log('📄 UIManager: Loading toolbar HTML from URL: ' + uiUrl);
         // Enable the toolbar after loading (it should be visible after authentication)
         this.enableEditToolbar();
       } else {
@@ -254,8 +255,9 @@ export class UIManager {
               Logging.Log('🔲 UIManager: Panel unfocused successfully');
             }
           }
-          // Also trigger a left press so clicks pass through to placement/interaction
-          if (typeof (globalThis as any).processLeftPress === 'function') {
+          // In web/lite mode, also trigger a left press so clicks pass through to placement/interaction
+          // In desktop/full mode, WebVerse handles left-click natively via VEML inputevent
+          if (this.clientType !== 'full' && typeof (globalThis as any).processLeftPress === 'function') {
             (globalThis as any).processLeftPress();
           }
           break;
@@ -545,8 +547,10 @@ export class UIManager {
                 const lookX = params[0]; // Horizontal look delta
                 const lookY = params[1]; // Vertical look delta
                 
-                // Call Input.SetLook with the look vector
-                Input.SetLook(new Vector2(lookX, lookY));
+                // Call Input.SetLook with the look vector (if available)
+                if (typeof Input !== 'undefined' && typeof Input.SetLook === 'function') {
+                  Input.SetLook(new Vector2(lookX, lookY));
+                }
               } else {
                 Logging.Log('📱 UIManager: Invalid MOBILE_LOOK params: ' + paramString);
               }
@@ -1560,7 +1564,8 @@ export class UIManager {
       vrToolbarHTMLEntity.SetInteractionState(InteractionState.Static);      
       
       // Load the tools HTML page
-      vrToolbarHTMLEntity.LoadFromURL('ui/build/index.html');
+      const uiUrl = 'ui/build/index.html?client=' + this.clientType;
+      vrToolbarHTMLEntity.LoadFromURL(uiUrl);
       
       Logging.Log('VR toolbar created and positioned successfully');
     } catch (error) {
