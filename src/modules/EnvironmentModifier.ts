@@ -390,6 +390,21 @@ export class EnvironmentModifier {
    * Delete an entity
    */
   deleteEntity(entity: BaseEntity): void {
+    const entityId = entity.id?.ToString();
+    Logging.Log('🔨 deleteEntity called for entityId: ' + entityId);
+    
+    const entityManager = (globalThis as any).entityManager;
+    if (!entityManager) {
+      Logging.LogWarning('🔨 EntityManager not found on globalThis');
+    } else {
+      const isFrozen = entityManager.isEntityFrozen(entityId);
+      Logging.Log('🔨 isEntityFrozen(' + entityId + ') = ' + isFrozen);
+    }
+    
+    if (entityId && entityManager?.isEntityFrozen(entityId)) {
+      Logging.Log('🔒 Cannot delete frozen entity: ' + entityId);
+      return;
+    }
     Logging.Log('Deleting entity "' + entity.id + '"');
     entity.Delete(true);
   }

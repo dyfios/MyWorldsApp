@@ -5,10 +5,22 @@
 import { SkyConfig, SpawnConfig } from '../types/config';
 
 export interface AvatarSettings {
+  // Legacy fields
   model?: string;
   offset?: { x: number; y: number; z: number };
   rotation?: { x: number; y: number; z: number; w: number };
   labelOffset?: { x: number; y: number; z: number };
+  
+  // User profile fields
+  id?: string;
+  user_name?: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  account_type?: string;
+  avatar_thumbnail_path?: string;
+  avatar_model_path?: string;
+  last_login_time?: string;
 }
 
 export interface UserPosition {
@@ -243,10 +255,12 @@ export class ProcessQueryParams {
   }
 
   /**
-   * Get avatar model
+   * Get avatar model path
    */
   getAvatarModel(): string | undefined {
-    return this.getAvatarSettings().model;
+    const settings = this.getAvatarSettings();
+    // Support both legacy 'model' field and new 'avatar_model_path' from user profile
+    return settings.avatar_model_path || settings.model;
   }
 
   /**

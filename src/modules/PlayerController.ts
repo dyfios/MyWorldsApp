@@ -3,6 +3,7 @@
  */
 
 import { Position, Rotation } from '../types/config';
+import { AvatarSettings } from '../utils/ProcessQueryParams';
 
 export interface PlayerState {
   position: Position;
@@ -26,6 +27,8 @@ export class PlayerController {
   public cameraMode: 'firstPerson' | 'thirdPerson' = 'thirdPerson';
   public characterLoaded: boolean = false;
   private _maintenanceCount: number = 0;
+  private avatarSettings: AvatarSettings | null = null;
+  private avatarBaseUrl: string | null = null;
 
   constructor(initialPosition: Vector3, characterName: string, characterId: string | undefined) {
     this.setupGlobalCallbacks();
@@ -306,8 +309,71 @@ export class PlayerController {
     (globalThis as any).playerController.internalCharacterEntity = entity;
     this.characterLoaded = true;
     (globalThis as any).playerController.characterLoaded = true;
+    
+    // Apply avatar model if avatarSettings contains a model path
+    this.applyAvatarModel();
+    
     this.enterNonVRMode();
     // Note: enterNonVRMode now respects worldDefaultGravity setting and sets appropriate InteractionState
+  }
+
+  /**
+   * Set avatar settings for this player controller
+   */
+  setAvatarSettings(settings: AvatarSettings, baseUrl?: string): void {
+    this.avatarSettings = settings;
+    this.avatarBaseUrl = baseUrl || null;
+    Logging.Log('🧑 PlayerController: Avatar settings set: ' + JSON.stringify(settings));
+    
+    // If character is already loaded, apply the model immediately
+    if (this.characterLoaded && this.internalCharacterEntity) {
+      this.applyAvatarModel();
+    }
+  }
+
+  /**
+   * Apply avatar model to the character entity
+   */
+  private applyAvatarModel(): void {
+    if (!this.avatarSettings || !this.internalCharacterEntity) {
+      return;
+    }
+
+    // Get model path from avatarSettings (supports both legacy 'model' and new 'avatar_model_path')
+    const modelPath = this.avatarSettings.avatar_model_path || this.avatarSettings.model;
+    if (!modelPath) {
+      Logging.Log('🧑 PlayerController: No avatar model path specified in avatarSettings');
+      return;
+    }
+
+    // Construct full model URL
+    let fullModelUrl = modelPath;
+    if (this.avatarBaseUrl && !modelPath.startsWith('http')) {
+      fullModelUrl = this.avatarBaseUrl + '/avatars/' + modelPath;
+    }
+    Logging.Log('🧑 PlayerController: Loading avatar model: ' + fullModelUrl);
+
+    // Get offset, rotation, and label offset from settings
+    const offset = this.avatarSettings.offset || { x: 0, y: 0, z: 0 };
+    const rotation = this.avatarSettings.rotation || { x: 0, y: 0, z: 0, w: 1 };
+    const labelOffset = this.avatarSettings.labelOffset || { x: 0, y: 2, z: 0 };
+
+    const meshOffset = new Vector3(offset.x, offset.y, offset.z);
+    const meshRotation = new Quaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+    const labelOffsetVec = new Vector3(labelOffset.x, labelOffset.y, labelOffset.z);
+
+    const success = this.internalCharacterEntity.SetCharacterModel(
+      fullModelUrl,
+      meshOffset,
+      meshRotation,
+      labelOffsetVec
+    );
+
+    if (success) {
+      Logging.Log('✓ PlayerController: Avatar model applied successfully');
+    } else {
+      Logging.LogWarning('⚠️ PlayerController: Failed to apply avatar model');
+    }
   }
 
   /**

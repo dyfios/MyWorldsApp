@@ -456,6 +456,7 @@ export class EntityManager {
   entityPlacement: EntityPlacement;
   private entities: Map<string, EntityData> = new Map();
   private worldStorage: Map<string, any> = new Map();
+  private frozenEntities: Set<string> = new Set();
 
   private currentEntityIndex: string = "";
   private currentVariantIndex: string = "";
@@ -469,6 +470,8 @@ export class EntityManager {
   constructor() {
     this.entityPlacement = new EntityPlacement();
     this.setupGlobalCallbacks();
+    // Expose entityManager globally for frozen checks
+    (globalThis as any).entityManager = this;
   }
 
   /**
@@ -514,7 +517,8 @@ export class EntityManager {
       mass: number | undefined,
       autoType: AutomobileType | undefined,
       scripts: string | undefined,
-      placingEntity: boolean | undefined
+      placingEntity: boolean | undefined,
+      frozen: boolean | undefined
     ): string => {
       return this.loadEntity(
         entityIndex,
@@ -534,7 +538,8 @@ export class EntityManager {
         mass,
         autoType,
         scripts,
-        placingEntity
+        placingEntity,
+        frozen
       );
     };
   }
@@ -560,8 +565,16 @@ export class EntityManager {
     mass: number | undefined = undefined,
     autoType: AutomobileType | undefined = undefined,
     scripts: string | undefined = undefined,
-    placingEntity: boolean = false
+    placingEntity: boolean = false,
+    frozen: boolean = false
   ): string {
+    // Store frozen status for this entity
+    Logging.Log('🔒 loadEntity: instanceId=' + instanceId + ', frozen param=' + frozen);
+    if (frozen) {
+      this.frozenEntities.add(instanceId);
+      Logging.Log('🔒 Entity ' + instanceId + ' added to frozenEntities set. Set size now: ' + this.frozenEntities.size);
+    }
+
     let parentEntity = null;
     if (entityParent != null && entityParent != undefined && entityParent !== "" && entityParent != "null") {
       parentEntity = Entity.Get(entityParent);
@@ -617,7 +630,7 @@ export class EntityManager {
         } else {
           onCompleteCallback = 'onMeshEntityLoadedGeneric';
         }
-        MeshEntity.Create(parentEntity, meshObject, meshResources, position, rotation, instanceId,
+        MeshEntity.Create(parentEntity, meshObject, meshResources, position, rotation, scale, false, instanceId,
           onCompleteCallback, false);
         break;
       case 'automobile':
@@ -841,9 +854,22 @@ export class EntityManager {
   }
 
   /**
+   * Check if an entity is frozen (not editable/deletable)
+   */
+  isEntityFrozen(entityId: string): boolean {
+    const frozen = this.frozenEntities.has(entityId);
+    Logging.Log('🔒 isEntityFrozen(' + entityId + ') = ' + frozen + ', frozenEntities size = ' + this.frozenEntities.size);
+    return frozen;
+  }
+
+  /**
    * Delete a mesh entity using WebVerse API
    */
   deleteEntity(entityId: string): boolean {
+    if (this.isEntityFrozen(entityId)) {
+      Logging.LogWarning('🔒 Cannot delete frozen entity: ' + entityId);
+      return false;
+    }
     const webVerseEntity = this.getWebVerseEntity(entityId);
     if (webVerseEntity) {
       const success = webVerseEntity.Delete();

@@ -76,6 +76,15 @@ export class MyWorld {
       await this.context.initializeModules();
       Logging.Log('✓ Modules initialized successfully');
 
+      // 3a. Pass avatar settings to PlayerController
+      const avatarSettings = this.queryParams.getAvatarSettings();
+      const worldAddress = this.queryParams.getWorldAddress();
+      if (avatarSettings && Object.keys(avatarSettings).length > 0) {
+        Logging.Log('🧑 Step 3a: Setting avatar settings on PlayerController...');
+        this.context.modules.player.setAvatarSettings(avatarSettings, worldAddress);
+        Logging.Log('✓ Avatar settings applied');
+      }
+
       // 2a. Start login process after modules are initialized
       Logging.Log('🔐 Step 2a: Initiating login with Identity module...');
       if (this.context.modules.identity) {

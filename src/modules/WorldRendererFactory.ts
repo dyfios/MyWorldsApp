@@ -40,6 +40,7 @@ interface EntityInstance {
   other_write: string | null;
   other_use: string | null;
   other_take: string | null;
+  frozen: boolean;
 }
 
 /**
@@ -68,7 +69,8 @@ export class StaticSurfaceRenderer extends WorldRendering {
     this.identityModule = new Identity();
     // Initialize with default, will be updated in initialize()
     this.restClient = new REST();
-    this.entityManager = new EntityManager();
+    // Use the global EntityManager if available, otherwise create a new one
+    this.entityManager = (globalThis as any).entityManager || new EntityManager();
     this.setupGlobalCallbacks();
   }
 
@@ -411,30 +413,6 @@ export class StaticSurfaceRenderer extends WorldRendering {
       }
       
       (globalThis as any).playerController.setCharacterPosition(spawnPos);
-      
-      // Check if position was actually set
-      Time.SetTimeout(`
-        const pos = this.playerController?.internalCharacterEntity?.GetPosition(false);
-        if (pos) {
-          Logging.Log('📍 applySpawnPosition: Position 100ms after set: (' + pos.x + ', ' + pos.y + ', ' + pos.z + ')');
-        }
-      `, 5.0);
-      
-      // Check again after 500ms
-      Time.SetTimeout(`
-        const pos = this.playerController?.internalCharacterEntity?.GetPosition(false);
-        if (pos) {
-          Logging.Log('📍 applySpawnPosition: Position 500ms after set: (' + pos.x + ', ' + pos.y + ', ' + pos.z + ')');
-        }
-      `, 0.5);
-      
-      // Check again after 1s
-      Time.SetTimeout(`
-        const pos = this.playerController?.internalCharacterEntity?.GetPosition(false);
-        if (pos) {
-          Logging.Log('📍 applySpawnPosition: Position 1s after set: (' + pos.x + ', ' + pos.y + ', ' + pos.z + ')');
-        }
-      `, 1.0);
       
       // Re-enable fixHeight if gravity is enabled (will snap to nearest ground from spawn)
       // But give it a frame to settle at the spawn position first
@@ -795,7 +773,13 @@ export class StaticSurfaceRenderer extends WorldRendering {
           rotation,
           scale,
           meshObject,
-          meshResources
+          meshResources,
+          undefined,        // wheels
+          undefined,        // mass
+          undefined,        // autoType
+          undefined,        // scripts
+          false,            // placingEntity
+          instance.frozen   // frozen flag
         );
 
         Logging.Log(`✅ StaticSurfaceRenderer: Successfully instantiated entity ${entityId} with loaded instance ID ${loadedInstanceId}`);
@@ -929,7 +913,8 @@ export class TiledSurfaceRenderer extends WorldRendering {
     // Initialize with default, will be updated in initialize()
     this.restClient = new REST();
     this.stateServiceClient = new REST();
-    this.entityManager = new EntityManager();
+    // Use the global EntityManager if available, otherwise create a new one
+    this.entityManager = (globalThis as any).entityManager || new EntityManager();
     this.identityModule = new Identity();
     this.setupGlobalCallbacks();
     Time.SetTimeout(`this.toggleLoadingPanel(true)`, 1000);
