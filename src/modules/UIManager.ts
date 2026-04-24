@@ -856,7 +856,14 @@ export class UIManager {
       `;
       
       mainToolbar.ExecuteJavaScript(jsCommand, '');
-      //Logging.Log('✅ UIManager: Loading panel toggle command sent to UI space: ' + show);
+      Logging.Log('✅ UIManager: Loading panel toggle command sent to UI space: show=' + show);
+      if (!show) {
+        // Log stacktrace to find caller
+        try { throw new Error('toggleLoadingPanel(false) caller trace'); } catch (e) {
+          const err = e as Error;
+          Logging.Log('📍 hide caller: ' + (err.stack || 'no stack'));
+        }
+      }
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       Logging.LogError('❌ UIManager: Error in toggleLoadingPanel: ' + errorMessage);
@@ -1332,6 +1339,18 @@ export class UIManager {
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       Logging.LogError('❌ UIManager: Error in addRemoteConsoleMessage: ' + errorMessage);
+    }
+  }
+
+  /**
+   * Surface a transient message to the user. Currently logs only — a proper
+   * toast component can hook this method later without touching callers.
+   */
+  showToast(message: string, severity: 'error' | 'info' = 'info'): void {
+    if (severity === 'error') {
+      Logging.LogWarning(`🔔 [toast/error] ${message}`);
+    } else {
+      Logging.Log(`🔔 [toast] ${message}`);
     }
   }
 

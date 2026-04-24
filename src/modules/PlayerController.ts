@@ -40,7 +40,7 @@ export class PlayerController {
   }
 
   startMaintenance(): void {
-    Logging.Log('Starting PlayerController maintenance interval function');
+    // PlayerController maintenance interval started
     this.maintenanceFunctionID = Time.SetInterval("globalThis.playercontroller_maintenance();", 0.03);
   }
 
@@ -58,23 +58,13 @@ export class PlayerController {
         return;
       }
       
-      // Debug: Log every 100th maintenance call to track activity
       this._maintenanceCount++;
-      if (this._maintenanceCount % 100 === 0) {
-        Logging.Log('🔧 PlayerController.maintenance() call #' + this._maintenanceCount);
-      }
       
       // Debug: Monitor gravity state changes
       const currentGravity = Input.gravityEnabled;
       const currentFixHeight = this.internalCharacterEntity.fixHeight;
-      if ((globalThis as any)._lastGravityState !== currentGravity) {
-        Logging.Log('🚨 GRAVITY CHANGED! gravityEnabled: ' + (globalThis as any)._lastGravityState + ' -> ' + currentGravity);
-        (globalThis as any)._lastGravityState = currentGravity;
-      }
-      if ((globalThis as any)._lastFixHeightState !== currentFixHeight) {
-        Logging.Log('🚨 FIXHEIGHT CHANGED! fixHeight: ' + (globalThis as any)._lastFixHeightState + ' -> ' + currentFixHeight);
-        (globalThis as any)._lastFixHeightState = currentFixHeight;
-      }
+      (globalThis as any)._lastGravityState = currentGravity;
+      (globalThis as any)._lastFixHeightState = currentFixHeight;
 
       if (this.inVR) {
         if (!Input.IsVR) {
@@ -454,12 +444,27 @@ export class PlayerController {
     Camera.SetPosition(new Vector3(0, 0.79, 0), true);
     this.internalCharacterEntity.SetVisibility(false, false);
     this.cameraMode = 'firstPerson';
+    this.toggleCrosshair(true);
   }
 
   setCameraModeThirdPerson(): void {
     Camera.SetPosition(new Vector3(0, 1.5, -2.75), true);
     this.internalCharacterEntity.SetVisibility(true, false);
     this.cameraMode = 'thirdPerson';
+    this.toggleCrosshair(false);
+  }
+
+  private toggleCrosshair(show: boolean): void {
+    try {
+      const mainToolbarId = WorldStorage.GetItem('MAIN-TOOLBAR-ID');
+      if (!mainToolbarId) return;
+      const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+      if (!mainToolbar) return;
+      const js = 'if (window.crosshairAPI) { window.crosshairAPI.' + (show ? 'show' : 'hide') + '(); }';
+      mainToolbar.ExecuteJavaScript(js, '');
+    } catch (_e) {
+      // Crosshair is non-critical — fail silently
+    }
   }
 
   enterVRMode(): void {

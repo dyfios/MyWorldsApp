@@ -4,6 +4,7 @@
 
 import { VOSSynchronizer } from "./VOSSynchronizer";
 import { TiledSurfaceRenderer } from "./WorldRendererFactory";
+import { PendingOpRegistry } from "./PendingOpRegistry";
 
 export class EnvironmentModifier {
   private interactionMode: string = "HAND";
@@ -298,11 +299,28 @@ export class EnvironmentModifier {
 
         var tsr = (globalThis as any).tiledsurfacerenderer as TiledSurfaceRenderer;
 
-        // REST API call to notify server of terrain dig
+        // REST API call to notify server of terrain dig.
+        // Optimistic-with-rollback: if the server rejects, undo by Build at the
+        // same point/brush/layer. Imperfect (won't restore neighbour-merge
+        // exactly) but good enough for v1; v2 can snapshot heights.
         if (tsr && tsr.stateServiceClient) {
+            const registry = (globalThis as any).pendingOps as PendingOpRegistry | undefined;
+            let onFinishedName = "onTerrainDigRESTResponse";
+            if (registry) {
+                const registered = registry.register({
+                    description: 'dig terrain',
+                    rollback: () => {
+                        try {
+                            terrainEntity.Build(alignedHitPoint, TerrainEntityBrushType.roundedCube,
+                                layerToUse, brushSize, true);
+                        } catch (e) { Logging.LogError('[performDig] rollback Build failed: ' + e); }
+                    },
+                });
+                onFinishedName = registered.onFinishedName;
+            }
             tsr.stateServiceClient.sendTerrainDigRequest(
                 terrainIndex, alignedHitPoint, layerToUse, brushSize,
-                userId, userToken, "onTerrainDigRESTResponse");
+                userId, userToken, onFinishedName);
         }
 
         // Synchronize with server about the dig operation
@@ -359,11 +377,26 @@ export class EnvironmentModifier {
 
         var tsr = (globalThis as any).tiledsurfacerenderer as TiledSurfaceRenderer;
 
-        // REST API call to notify server of terrain dig
+        // REST API call to notify server of terrain build.
+        // Optimistic-with-rollback: undo via Dig at the same point/brush/layer.
         if (tsr && tsr.stateServiceClient) {
+            const registry = (globalThis as any).pendingOps as PendingOpRegistry | undefined;
+            let onFinishedName = "onTerrainBuildRESTResponse";
+            if (registry) {
+                const registered = registry.register({
+                    description: 'build terrain',
+                    rollback: () => {
+                        try {
+                            terrainEntity.Dig(alignedHitPoint, TerrainEntityBrushType.roundedCube,
+                                layer, brushSize, true);
+                        } catch (e) { Logging.LogError('[performBuild] rollback Dig failed: ' + e); }
+                    },
+                });
+                onFinishedName = registered.onFinishedName;
+            }
             tsr.stateServiceClient.sendTerrainBuildRequest(
                 terrainIndex, alignedHitPoint, layer, brushSize,
-                userId, userToken, "onTerrainBuildRESTResponse");
+                userId, userToken, onFinishedName);
         }
 
         // Synchronize with server about the dig operation

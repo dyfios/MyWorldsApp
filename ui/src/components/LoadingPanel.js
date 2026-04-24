@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './LoadingPanel.css';
 
 const LoadingPanel = () => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
   const [message, setMessage] = useState('Loading...');
 
   // API: Show loading panel
@@ -13,6 +13,8 @@ const LoadingPanel = () => {
 
   // API: Hide loading panel
   const hideLoading = () => {
+    console.log('[LoadingPanel] hideLoading() called');
+    console.trace('[LoadingPanel] hide caller');
     setIsVisible(false);
   };
 
@@ -39,6 +41,7 @@ const LoadingPanel = () => {
     };
   }, [isVisible, message]);
 
+  console.log('[LoadingPanel] render: isVisible=' + isVisible);
   if (!isVisible) {
     return null;
   }

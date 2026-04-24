@@ -420,13 +420,7 @@ export class Identity {
         Logging.Log('⚠️ No pending world manifest request found - may not be using planet renderer');
       }
 
-      // Start the main UI and render loop after login and world loading setup is complete
-      Logging.Log('🔄 Starting main UI and render loop after login...');
-      /*if (typeof (globalThis as any).startRenderLoop === 'function') {
-        (globalThis as any).startRenderLoop();
-      } else {
-        Logging.LogError('❌ startRenderLoop function not available');
-      }*/
+      // startRenderLoop is called from onLoginSuccess() below — not needed here
       
       if (data.success && data.token) {
         Logging.Log('✅ Identity: Lite auth successful for user: ' + (data.username || 'unknown'));

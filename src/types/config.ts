@@ -20,6 +20,22 @@ export interface VariantConfig {
   orientations?: OrientationConfig[];
   meshUrl?: string;
   scriptUrl?: string;
+
+  // Phase 1 additions — all optional, consumed by specific entity types.
+  // Light
+  lightType?: 'point' | 'spot' | 'directional';
+  color?: { r: number; g: number; b: number; a?: number };
+  intensity?: number;
+  range?: number;
+  temperature?: number;
+  innerSpotAngle?: number;
+  outerSpotAngle?: number;
+  // Audio
+  clipUrl?: string;
+  loop?: boolean;
+  volume?: number;
+  pitch?: number;
+  autoplay?: boolean;
 }
 
 export interface OrientationConfig {

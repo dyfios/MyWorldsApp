@@ -13,6 +13,7 @@ import { SyncManager } from './SyncManager';
 import { UIManager } from './UIManager';
 import { WorldRendererFactory } from './WorldRendererFactory';
 import { EnvironmentModifier } from './EnvironmentModifier';
+import { PendingOpRegistry } from './PendingOpRegistry';
 
 /**
  * Modules container
@@ -29,6 +30,7 @@ export class Modules {
   ui: UIManager;
   worldRendering: WorldRendererFactory;
   environmentModifier: EnvironmentModifier;
+  pendingOps: PendingOpRegistry;
 
   constructor(clientType?: string, worldAddress?: string) {
     try {
@@ -56,6 +58,10 @@ export class Modules {
       Context.DefineContext('WorldRendererFactory', this.worldRendering);
       Logging.Log('⚙️ Step 3k: Creating Environment Modifier module...');
       this.environmentModifier = new EnvironmentModifier();
+      Logging.Log('⚙️ Step 3l: Creating PendingOp Registry module...');
+      this.pendingOps = new PendingOpRegistry();
+      this.pendingOps.setToastHandler((msg, sev) => this.ui.showToast(msg, sev));
+      (globalThis as any).pendingOps = this.pendingOps;
       Logging.Log('⚙️ All modules created successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -84,6 +90,7 @@ export class Modules {
    * Clean up all modules
    */
   dispose(): void {
+    this.pendingOps.dispose();
     this.input.dispose();
     this.sync.disconnect();
     this.ui.dispose();

@@ -5,6 +5,7 @@ import ButtonDock from './components/ButtonDock';
 import ChatConsole from './components/ChatConsole';
 import PopupMenu from './components/PopupMenu';
 import LoadingPanel from './components/LoadingPanel';
+import Crosshair from './components/Crosshair';
 import MobileControls from './components/MobileControls';
 import { useUISettings } from './hooks/useUISettings';
 
@@ -757,6 +758,7 @@ function App() {
       />
 
       <LoadingPanel />
+      <Crosshair />
     </div>
   );
 }

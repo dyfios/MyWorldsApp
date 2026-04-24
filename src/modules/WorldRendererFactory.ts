@@ -10,6 +10,11 @@ import { DockButtonInfo } from './UIManager';
 import { Identity } from './Identity';
 import { SyncManager } from './SyncManager';
 import { applySkyConfig } from './SkyPresets';
+// NOTE: GlobeRenderer is loaded via dynamic import in initializePlanetRenderer()
+// to avoid Vite UMD bundling order issues (GlobeRenderer extends WorldRendering,
+// which is defined later in this file). Jint/Acornima cannot parse Vite's
+// class-as-property-value pattern for inlined dynamic imports, so we access the
+// module via property lookup instead of destructuring.
 
 /**
  * Entity instance format received from the server
@@ -144,6 +149,13 @@ export class StaticSurfaceRenderer extends WorldRendering {
       (globalThis as any).MW_StaticRenderer_SpawnRetries++;
       this.deferSpawnPosition((globalThis as any).MW_StaticRenderer_SpawnRetries);
     };
+
+    // Poll callback for waiting until player is on the ground before hiding loading panel
+    let groundCheckCount = 0;
+    (globalThis as any).MW_StaticRenderer_WaitForGround = () => {
+      groundCheckCount++;
+      this.waitForPlayerOnGround(groundCheckCount);
+    };
   }
 
   onEntityTemplatesComplete(response: string): void {
@@ -232,6 +244,8 @@ export class StaticSurfaceRenderer extends WorldRendering {
     Logging.Log('🎯 StaticSurfaceRenderer: onError callback invoked');
     const errorMessage = error.message || 'Unknown error';
     Logging.LogError('❌ StaticSurfaceRenderer: Failed to request entity templates: ' + errorMessage);
+    // Templates failed but still wait for player to settle before hiding
+    this.waitForPlayerOnGround(0);
   }
 
   onEntityInstancesComplete(response: string): void {
@@ -268,9 +282,11 @@ export class StaticSurfaceRenderer extends WorldRendering {
                   Logging.Log('🎯 Calling instantiateEntities with ' + assets.length + ' instances');
                   staticRenderer.instantiateEntities(assets);
                 } else {
-                  Logging.LogError('❌ Entity instances response missing or invalid "instances" array. Response keys: ' 
+                  Logging.LogError('❌ Entity instances response missing or invalid "instances" array. Response keys: '
                     + Object.keys(instances || {}).join(', '));
                 }
+                // Entities loaded — now wait for player to reach the ground
+                this.waitForPlayerOnGround(0);
               } else {
                 Logging.LogError('❌ instantiateEntities method not found on StaticSurfaceRenderer');
               }
@@ -295,6 +311,8 @@ export class StaticSurfaceRenderer extends WorldRendering {
     Logging.Log('🎯 StaticSurfaceRenderer: onEntityInstancesError callback invoked');
     const errorMessage = error.message || 'Unknown error';
     Logging.LogError('❌ StaticSurfaceRenderer: Failed to request entity instances: ' + errorMessage);
+    // Instances failed but still wait for player to settle before hiding
+    this.waitForPlayerOnGround(0);
   }
 
   async initialize(): Promise<void> {
@@ -317,6 +335,9 @@ export class StaticSurfaceRenderer extends WorldRendering {
     }
 
     Logging.Log('StaticSurfaceRenderer initialized');
+
+    // Loading panel is visible by default (React LoadingPanel starts with isVisible=true).
+    // It will be hidden when the player character is positioned on the surface.
 
     // Update the tiledsurfacerenderer stub with worldId from metadata
     if (this.worldMetadata && this.worldMetadata.id && (globalThis as any).tiledsurfacerenderer) {
@@ -357,6 +378,83 @@ export class StaticSurfaceRenderer extends WorldRendering {
     } else {
       Logging.Log('📍 StaticSurfaceRenderer: No spawn config, using default origin');
     }
+
+    // Loading panel hide is deferred until entities finish loading,
+    // then polls until player is on the ground. See onEntityInstancesComplete.
+  }
+
+  /**
+   * Poll until the player character has loaded and stopped falling,
+   * then hide the loading panel. Retries every 500ms, gives up after 30s.
+   */
+  private waitForPlayerOnGround(checks: number = 0): void {
+    const maxChecks = 600; // 5 min at 500ms intervals
+    const pc = (globalThis as any).playerController;
+
+    if (!pc || !pc.characterLoaded || !pc.internalCharacterEntity) {
+      if (checks < maxChecks) {
+        Time.SetTimeout('globalThis.MW_StaticRenderer_WaitForGround && globalThis.MW_StaticRenderer_WaitForGround();', 0.5);
+        return;
+      }
+      Logging.LogWarning('⏰ StaticSurfaceRenderer: Gave up waiting for character to load (30s) — hiding loading panel');
+      if (typeof (globalThis as any).toggleLoadingPanel === 'function') {
+        (globalThis as any).toggleLoadingPanel(false);
+      }
+      return;
+    }
+
+    // Character is loaded — check if Y position has stabilized (not falling)
+    const pos = pc.internalCharacterEntity.GetPosition(false);
+    const lastY = (globalThis as any).MW_StaticRenderer_LastY as number | undefined;
+    const stableCount = ((globalThis as any).MW_StaticRenderer_StableCount as number) || 0;
+    const hasEverMoved = (globalThis as any).MW_StaticRenderer_HasMoved === true;
+
+    // Track whether Y has ever changed (physics is active)
+    if (lastY !== undefined && Math.abs(pos.y - lastY) > 0.01) {
+      (globalThis as any).MW_StaticRenderer_HasMoved = true;
+      (globalThis as any).MW_StaticRenderer_StableCount = 0;
+    } else if (hasEverMoved && lastY !== undefined && Math.abs(pos.y - lastY) < 0.05 && pos.y > -1000
+      && pc.internalCharacterEntity.fixHeight === true) {
+      // Only count stable readings after physics has moved the character,
+      // position is reasonable (not in void), and fixHeight is true (grounded)
+      (globalThis as any).MW_StaticRenderer_StableCount = stableCount + 1;
+    } else {
+      // Reset stable count if conditions aren't met
+      (globalThis as any).MW_StaticRenderer_StableCount = 0;
+    }
+
+    (globalThis as any).MW_StaticRenderer_LastY = pos.y;
+
+    Logging.Log('📍 groundCheck #' + checks + ': y=' + pos.y + ' lastY=' + lastY
+      + ' fixHeight=' + pc.internalCharacterEntity.fixHeight
+      + ' hasMoved=' + hasEverMoved + ' stable=' + (globalThis as any).MW_StaticRenderer_StableCount);
+
+    if ((globalThis as any).MW_StaticRenderer_StableCount >= 3) {
+      // 3 consecutive stable readings (~1.5s) after physics moved the character
+      Logging.Log('📍 StaticSurfaceRenderer: Player on ground at y=' + pos.y + ' — hiding loading panel');
+      if (typeof (globalThis as any).toggleLoadingPanel === 'function') {
+        (globalThis as any).toggleLoadingPanel(false);
+      }
+      delete (globalThis as any).MW_StaticRenderer_WaitForGround;
+      delete (globalThis as any).MW_StaticRenderer_LastY;
+      delete (globalThis as any).MW_StaticRenderer_StableCount;
+      delete (globalThis as any).MW_StaticRenderer_HasMoved;
+      return;
+    }
+
+    // Still waiting — check again
+    if (checks < maxChecks) {
+      Time.SetTimeout('globalThis.MW_StaticRenderer_WaitForGround && globalThis.MW_StaticRenderer_WaitForGround();', 0.5);
+    } else {
+      Logging.LogWarning('⏰ StaticSurfaceRenderer: Gave up waiting for player to settle (30s) — hiding loading panel');
+      if (typeof (globalThis as any).toggleLoadingPanel === 'function') {
+        (globalThis as any).toggleLoadingPanel(false);
+      }
+      delete (globalThis as any).MW_StaticRenderer_WaitForGround;
+      delete (globalThis as any).MW_StaticRenderer_LastY;
+      delete (globalThis as any).MW_StaticRenderer_StableCount;
+      delete (globalThis as any).MW_StaticRenderer_HasMoved;
+    }
   }
 
   /**
@@ -375,6 +473,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
       } else {
         Logging.LogWarning('📍 StaticSurfaceRenderer: Gave up waiting for character entity after '
           + maxRetries + ' retries');
+        // Loading panel hide is handled by waitForPlayerOnGround()
       }
       Logging.Log('🟣 deferSpawnPosition() END (early return)');
       return;
@@ -434,6 +533,8 @@ export class StaticSurfaceRenderer extends WorldRendering {
     } else {
       Logging.Log('📍 StaticSurfaceRenderer: Spawn at origin, no teleport needed');
     }
+
+    // Loading panel hide is handled by waitForPlayerOnGround()
 
     // Apply spawn rotation if configured and no explicit URL position overrode it
     if (!this.queryParams.hasExplicitUserPosition() && this.worldMetadata?.spawn?.rotation) {
@@ -981,7 +1082,7 @@ export class TiledSurfaceRenderer extends WorldRendering {
   }
 
   startMaintenance(): void {
-    Logging.Log('Starting TiledSurfaceRenderer maintenance interval function');
+    // TiledSurfaceRenderer maintenance interval started
     this.maintenanceFunctionID = Time.SetInterval("tiledsurfacerenderer_maintenance();", 0.5);
     this.timeFunctionID = Time.SetInterval("tiledsurfacerenderer_timeUpdate();", 5);
   }
@@ -2510,6 +2611,7 @@ export class SunController extends WorldRendering {
  */
 export class WorldRendererFactory {
   private renderers: WorldRendering[] = [];
+  private globeRenderer: WorldRendering | null = null;
 
   async createAndLoadRenderers(): Promise<void> {
     // Create appropriate renderers based on config
@@ -2522,6 +2624,25 @@ export class WorldRendererFactory {
     this.renderers.push(sunController);
 
     Logging.Log('All renderers loaded');
+  }
+
+  /**
+   * Planet worlds initialize lazily on join — WorldConfig is not known at
+   * factory construction. Callers (world-type routing) invoke this after the
+   * planet world metadata is resolved.
+   */
+  async initializePlanetRenderer(config: any): Promise<void> {
+    const mod = await import('./planet/GlobeRenderer');
+    const GlobeRendererClass = mod.GlobeRenderer;
+    const globe = new GlobeRendererClass();
+    await globe.initialize(config);
+    this.globeRenderer = globe;
+    this.renderers.push(globe);
+    Logging.Log('GlobeRenderer activated');
+  }
+
+  getGlobeRenderer(): WorldRendering | null {
+    return this.globeRenderer;
   }
 
   /**

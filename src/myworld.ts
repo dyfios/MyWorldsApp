@@ -7,6 +7,9 @@ import { ClientContext } from './modules/ClientContext';
 import { ProcessQueryParams } from './utils/ProcessQueryParams';
 import { StaticSurfaceRenderer, TiledSurfaceRenderer } from './modules/WorldRendererFactory';
 import { UIManager } from './modules/UIManager';
+import { SpikeMeshLoader } from './modules/planet/SpikeMeshLoader';
+import { EntityTypeSmokeTest } from './testing/EntityTypeSmokeTest';
+import { DEFAULT_FIXTURES } from './testing/fixtures';
 
 export class MyWorld {
   private context: ClientContext;
@@ -75,6 +78,16 @@ export class MyWorld {
       Logging.Log('⚙️ Step 3: Initializing core modules...');
       await this.context.initializeModules();
       Logging.Log('✓ Modules initialized successfully');
+
+      // Entity-type smoke test mode — bypass login/REST/render-loop and run
+      // the harness against the in-process EntityManager. See
+      // docs/tech-spec-entity-type-smoke.md.
+      if (this.queryParams.get('testMode') === 'entities') {
+        Logging.Log('🧪 testMode=entities active — running smoke test');
+        await new EntityTypeSmokeTest(this.context).run(DEFAULT_FIXTURES);
+        Logging.Log('🧪 Smoke test complete — app idling for inspection');
+        return;
+      }
 
       // 3a. Pass avatar settings to PlayerController
       const avatarSettings = this.queryParams.getAvatarSettings();
@@ -157,6 +170,17 @@ export class MyWorld {
         Logging.Log('🌌 World Type: galaxy - Initializing for galactic-scale world rendering');
         // TODO: Add galaxy specific initialization here
         break;
+      case 'spike1': {
+        // Story 1.1 — throwaway 6-platform parity smoke. Remove after sign-off.
+        Logging.Log('🧪 World Type: spike1 - SPIKE1 mesh round-trip loader');
+        const meshUrl = this.queryParams.get('spikeMeshUrl') as string | undefined;
+        if (!meshUrl) {
+          Logging.LogError('❌ spike1: missing spikeMeshUrl query param');
+          break;
+        }
+        new SpikeMeshLoader({ meshUrl }).load();
+        break;
+      }
       default:
         if (worldType) {
           Logging.LogError('❓ World Type: ' + worldType + ' - Unknown world type');

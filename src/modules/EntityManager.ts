@@ -7,6 +7,7 @@ import { EntityData } from '../types/entity';
 import { ScriptEngine } from './ScriptEngine';
 import { VOSSynchronizer } from './VOSSynchronizer';
 import { TiledSurfaceRenderer } from './WorldRendererFactory';
+import { PendingOpRegistry } from './PendingOpRegistry';
 
 export class EntityPlacement {
   public placingEntity: BaseEntity | null = null;
@@ -261,9 +262,25 @@ export class EntityPlacement {
       Logging.Log('[stopPlacing] tsr=' + (tsr ? 'exists' : 'null') + ' tsr.restClient=' + (tsr?.restClient ? 'exists' : 'null') + ' worldId=' + worldId + ' userId=' + userId + ' userToken=' + (userToken ? 'present' : 'empty'));
       if (tsr && tsr.restClient && worldId) {
         Logging.Log('[stopPlacing] Sending REST create-entity-instance request: pos=' + regionPos.x + ',' + regionPos.y + ',' + regionPos.z);
+
+        // Optimistic-with-rollback: register the placed entity so the registry
+        // can destroy it if the server rejects or the request times out.
+        const placedEntity = this.placingEntity;
+        const registry = (globalThis as any).pendingOps as PendingOpRegistry | undefined;
+        let onFinishedName = "onCompleteCallback";
+        if (registry && placedEntity) {
+          const registered = registry.register({
+            description: 'place entity',
+            rollback: () => {
+              try { placedEntity.Delete(); } catch (e) { Logging.LogError('[stopPlacing] rollback Delete failed: ' + e); }
+            },
+          });
+          onFinishedName = registered.onFinishedName;
+        }
+
         tsr.restClient.sendPositionEntityRequest(
           worldId, this.entityID, this.variantID,
-          this.instanceID, regionPos, rot, userId, userToken, "onCompleteCallback");
+          this.instanceID, regionPos, rot, userId, userToken, onFinishedName);
         // VOS sync only available in planet/tiled mode
         var wsync = (globalThis as any).wsync_instance as VOSSynchronizer;
         if (wsync && terrainIndex && tsr.regionSynchronizers
@@ -495,6 +512,22 @@ export class EntityManager {
       this.onAutomobileEntityLoadedGenericPlacing(entity);
     };
 
+    (globalThis as any).onLightEntityLoadedGeneric = (entity: LightEntity) => {
+      this.onLightEntityLoadedGeneric(entity);
+    };
+
+    (globalThis as any).onAudioEntityLoadedGeneric = (entity: AudioEntity) => {
+      this.onAudioEntityLoadedGeneric(entity);
+    };
+
+    (globalThis as any).onContainerEntityLoadedGeneric = (entity: ContainerEntity) => {
+      this.onContainerEntityLoadedGeneric(entity);
+    };
+
+    (globalThis as any).onVoxelEntityLoadedGeneric = (entity: VoxelEntity) => {
+      this.onVoxelEntityLoadedGeneric(entity);
+    };
+
     (globalThis as any).triggerEntityInstancesAfterTemplates = () => {
       this.triggerEntityInstancesAfterTemplates();
     };
@@ -518,7 +551,8 @@ export class EntityManager {
       autoType: AutomobileType | undefined,
       scripts: string | undefined,
       placingEntity: boolean | undefined,
-      frozen: boolean | undefined
+      frozen: boolean | undefined,
+      typeExtras?: Record<string, any>
     ): string => {
       return this.loadEntity(
         entityIndex,
@@ -539,7 +573,8 @@ export class EntityManager {
         autoType,
         scripts,
         placingEntity,
-        frozen
+        frozen,
+        typeExtras
       );
     };
   }
@@ -566,7 +601,8 @@ export class EntityManager {
     autoType: AutomobileType | undefined = undefined,
     scripts: string | undefined = undefined,
     placingEntity: boolean = false,
-    frozen: boolean = false
+    frozen: boolean = false,
+    typeExtras?: Record<string, any>
   ): string {
     // Store frozen status for this entity
     Logging.Log('🔒 loadEntity: instanceId=' + instanceId + ', frozen param=' + frozen);
@@ -615,50 +651,90 @@ export class EntityManager {
         wheels: wheels,
         mass: mass,
         scripts: scripts,
-        type: type
+        type: type,
+        typeExtras: typeExtras
       };
       Logging.Log('[loadEntity] Stored pending placement for instanceId=' + instanceId);
+    }
+    // Always stash typeExtras for new types so their load callbacks can apply
+    // per-type props (light color, audio volume, etc.) regardless of placement path.
+    if (typeExtras) {
+      if (!(globalThis as any).pendingTypeExtras) {
+        (globalThis as any).pendingTypeExtras = {};
+      }
+      (globalThis as any).pendingTypeExtras[instanceId] = typeExtras;
     }
     if (type == null || type === "") {
       type = "mesh";
     }
+    this.createEntityByType(parentEntity, type, instanceId, instanceTag, position, rotation, scale,
+      meshObject, meshResources, automobileWheels, mass, autoType, placingEntity);
+
+    return instanceId;
+  }
+
+  /**
+   * Dispatches entity creation to the appropriate WebVerse entity class based on type.
+   * Extracted from loadEntity so compound-child instantiation can reuse it.
+   */
+  private createEntityByType(
+    parentEntity: BaseEntity | null,
+    type: string,
+    instanceId: string,
+    instanceTag: string | undefined,
+    position: Vector3,
+    rotation: Quaternion,
+    scale: Vector3,
+    meshObject: string,
+    meshResources: string[],
+    automobileWheels: AutomobileEntityWheel[],
+    mass: number | undefined,
+    autoType: AutomobileType | undefined,
+    placingEntity: boolean
+  ): void {
     switch (type) {
       case 'mesh':
-        var onCompleteCallback = 'onMeshEntityLoadedGeneric';
-        if (placingEntity) {
-          onCompleteCallback = 'onMeshEntityLoadedGenericPlacing';
-        } else {
-          onCompleteCallback = 'onMeshEntityLoadedGeneric';
-        }
+        var onCompleteCallback = placingEntity
+          ? 'onMeshEntityLoadedGenericPlacing'
+          : 'onMeshEntityLoadedGeneric';
         MeshEntity.Create(parentEntity, meshObject, meshResources, position, rotation, scale, false, instanceId,
           onCompleteCallback, false);
         break;
       case 'automobile':
-        if (!wheels || mass === undefined || autoType === undefined) {
+        if (!automobileWheels.length || mass === undefined || autoType === undefined) {
           throw new Error('Missing automobile parameters: wheels, mass, or autoType');
         }
-        if (placingEntity) {
-          AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, automobileWheels,
-            mass, autoType, instanceId, instanceTag, 'onAutomobileEntityLoadedGenericPlacing', false);
-          break;
-        } else {
-          AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, automobileWheels,
-            mass, autoType, instanceId, instanceTag, 'onAutomobileEntityLoadedGeneric', false);
-        }
+        AutomobileEntity.Create(parentEntity, meshObject, meshResources, position, rotation, automobileWheels,
+          mass, autoType, instanceId, instanceTag,
+          placingEntity ? 'onAutomobileEntityLoadedGenericPlacing' : 'onAutomobileEntityLoadedGeneric',
+          false);
         break;
       case 'airplane':
         if (mass === undefined) {
           throw new Error('Missing airplane parameter: mass');
         }
-
         AirplaneEntity.Create(parentEntity, meshObject, meshResources, position, rotation, mass,
           instanceId, instanceTag, 'onAirplaneEntityLoadedGeneric', false);
+        break;
+      case 'light':
+        LightEntity.Create(parentEntity, position, rotation, instanceId, instanceTag,
+          'onLightEntityLoadedGeneric');
+        break;
+      case 'audio':
+        AudioEntity.Create(parentEntity, position, rotation, instanceId, instanceTag,
+          'onAudioEntityLoadedGeneric');
+        break;
+      case 'container':
+        ContainerEntity.Create(parentEntity, position, rotation, scale, false, instanceTag, instanceId,
+          'onContainerEntityLoadedGeneric');
+        break;
+      case 'voxel':
+        VoxelEntity.Create(parentEntity, position, rotation, scale, instanceId, instanceTag,
+          'onVoxelEntityLoadedGeneric');
         break;
       default:
         throw new Error(`Unknown entity type: ${type}`);
     }
-
-    return instanceId;
   }
 
   /**
@@ -860,6 +936,102 @@ export class EntityManager {
     const frozen = this.frozenEntities.has(entityId);
     Logging.Log('🔒 isEntityFrozen(' + entityId + ') = ' + frozen + ', frozenEntities size = ' + this.frozenEntities.size);
     return frozen;
+  }
+
+  /**
+   * Load and apply type-specific props for entities whose Create() signatures
+   * don't accept them. Looks up typeExtras stashed during loadEntity by
+   * instanceId.
+   */
+  private consumeTypeExtras(entity: BaseEntity): Record<string, any> | undefined {
+    const idStr = entity.id?.ToString ? entity.id.ToString() : String(entity.id || '');
+    if (!idStr) return undefined;
+    const map = (globalThis as any).pendingTypeExtras as Record<string, Record<string, any>> | undefined;
+    if (!map) return undefined;
+    const extras = map[idStr];
+    if (extras) delete map[idStr];
+    return extras;
+  }
+
+  onLightEntityLoadedGeneric(entity: LightEntity): void {
+    if (entity == null) {
+      Logging.LogError('❌ EntityManager: onLightEntityLoadedGeneric received null entity');
+      return;
+    }
+    Logging.Log(`✓ Light entity loaded successfully: ${entity.id}`);
+    const x = this.consumeTypeExtras(entity);
+    if (!x) return;
+    try {
+      if (x.lightType) {
+        const lt = x.lightType === 'point' ? LightType.Point
+          : x.lightType === 'spot' ? LightType.Spot
+          : x.lightType === 'directional' ? LightType.Directional
+          : null;
+        if (lt !== null) entity.SetLightType(lt);
+      }
+      // Compose SetLightProperties call based on what's provided.
+      const color = x.color ? new Color(x.color.r, x.color.g, x.color.b, x.color.a ?? 1) : null;
+      const temperature = typeof x.temperature === 'number' ? x.temperature : 0;
+      const intensity = typeof x.intensity === 'number' ? x.intensity : 1;
+      const range = typeof x.range === 'number' ? x.range : undefined;
+
+      if (x.lightType === 'spot' && range !== undefined && color) {
+        entity.SetLightProperties(range, x.innerSpotAngle ?? 30, x.outerSpotAngle ?? 45,
+          color, temperature, intensity);
+      } else if (range !== undefined && !color) {
+        entity.SetLightProperties(range, intensity);
+      } else if (color) {
+        entity.SetLightProperties(color, temperature, intensity);
+      }
+    } catch (err) {
+      Logging.LogError('❌ onLightEntityLoadedGeneric: failed to apply extras: ' + err);
+    }
+  }
+
+  onAudioEntityLoadedGeneric(entity: AudioEntity): void {
+    if (entity == null) {
+      Logging.LogError('❌ EntityManager: onAudioEntityLoadedGeneric received null entity');
+      return;
+    }
+    Logging.Log(`✓ Audio entity loaded successfully: ${entity.id}`);
+    const x = this.consumeTypeExtras(entity);
+    if (!x) return;
+    try {
+      if (typeof x.loop === 'boolean') entity.loop = x.loop;
+      if (typeof x.volume === 'number') entity.volume = x.volume;
+      if (typeof x.pitch === 'number') entity.pitch = x.pitch;
+      if (typeof x.clipUrl === 'string' && x.clipUrl.length > 0) {
+        const ok = entity.LoadAudioClipFromWAV(x.clipUrl);
+        if (!ok) {
+          Logging.LogWarning('⚠️ AudioEntity: LoadAudioClipFromWAV returned false for ' + x.clipUrl +
+            ' (only .wav supported)');
+        } else if (x.autoplay === true) {
+          entity.Play();
+        }
+      }
+    } catch (err) {
+      Logging.LogError('❌ onAudioEntityLoadedGeneric: failed to apply extras: ' + err);
+    }
+  }
+
+  onContainerEntityLoadedGeneric(entity: ContainerEntity): void {
+    if (entity == null) {
+      Logging.LogError('❌ EntityManager: onContainerEntityLoadedGeneric received null entity');
+      return;
+    }
+    Logging.Log(`✓ Container entity loaded successfully: ${entity.id}`);
+    // No type-specific props to apply.
+    this.consumeTypeExtras(entity);
+  }
+
+  onVoxelEntityLoadedGeneric(entity: VoxelEntity): void {
+    if (entity == null) {
+      Logging.LogError('❌ EntityManager: onVoxelEntityLoadedGeneric received null entity');
+      return;
+    }
+    Logging.Log(`✓ Voxel entity loaded successfully: ${entity.id}`);
+    // Voxel authoring (SetBlock / SetBlockInfo) is out of scope for Phase 1.
+    this.consumeTypeExtras(entity);
   }
 
   /**

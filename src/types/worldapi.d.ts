@@ -1758,6 +1758,44 @@ declare class BaseEntity {
     /** Tag of the entity. */
     tag: string;
 
+    // --- Event System (Phase 1) ---
+
+    /**
+     * Register an event listener on this entity.
+     * @param event The event name (use Events.Entity or Events.Collision constants).
+     * @param callback The function to invoke when the event fires.
+     * @returns An unsubscribe function that removes this listener when called.
+     */
+    on<K extends keyof BaseEntityEventMap>(event: K, callback: BaseEntityEventMap[K]): () => boolean;
+    on(event: string, callback: (...args: any[]) => void): () => boolean;
+
+    /**
+     * Register a one-time event listener that auto-removes after first invocation.
+     */
+    once<K extends keyof BaseEntityEventMap>(event: K, callback: BaseEntityEventMap[K]): () => boolean;
+    once(event: string, callback: (...args: any[]) => void): () => boolean;
+
+    /**
+     * Remove a specific event listener.
+     */
+    off(event: string, callback: (...args: any[]) => void): void;
+
+    /**
+     * Remove all event listeners for an event.
+     */
+    off(event: string): void;
+
+    /**
+     * Debug utilities for this entity's event system.
+     */
+    readonly debug: {
+        /**
+         * List all active event listeners on this entity.
+         * @returns Array of objects with event name and listener count.
+         */
+        listListeners(): Array<{ event: string; count: number }>;
+    };
+
     /** Constructor for the entity. */
     constructor();
 
@@ -4888,6 +4926,49 @@ declare class World {
      * @param url The URL of the Web Page to load.
      */
     static LoadWebPage(url: string): void;
+
+    // --- Event System (Phase 1) ---
+
+    /**
+     * Current API version for the World API event system.
+     */
+    static readonly apiVersion: string;
+
+    /**
+     * Register a World event listener.
+     * @param event The event name (use Events.World constants for autocomplete).
+     * @param callback The function to invoke when the event fires.
+     * @returns An unsubscribe function that removes this listener when called.
+     */
+    static on<K extends keyof WorldEventMap>(event: K, callback: WorldEventMap[K]): () => boolean;
+    static on(event: string, callback: (...args: any[]) => void): () => boolean;
+
+    /**
+     * Register a one-time World event listener that auto-removes after first invocation.
+     */
+    static once<K extends keyof WorldEventMap>(event: K, callback: WorldEventMap[K]): () => boolean;
+    static once(event: string, callback: (...args: any[]) => void): () => boolean;
+
+    /**
+     * Remove a specific World event listener.
+     */
+    static off(event: string, callback: (...args: any[]) => void): void;
+
+    /**
+     * Remove all World event listeners for an event.
+     */
+    static off(event: string): void;
+
+    /**
+     * Debug utilities for World event introspection.
+     */
+    static readonly debug: {
+        /**
+         * List all active World event listeners.
+         * @returns Array of objects with event name and listener count.
+         */
+        listListeners(): Array<{ event: string; count: number }>;
+    };
 }
 
 /**
@@ -4908,3 +4989,91 @@ declare class WorldStorage {
      */
     static GetItem(key: string): string | null;
 }
+
+// ============================================================================
+// Event System Types (Phase 1)
+// ============================================================================
+
+/**
+ * Event map for BaseEntity lifecycle events.
+ * Provides typed callback signatures for entity events.
+ */
+interface BaseEntityEventMap {
+    /** Fires when the entity is created and registered. */
+    "spawn": () => void;
+    /** Fires before the entity is removed. */
+    "destroy": () => void;
+    /** Fires when the entity's position changes via SetPosition. */
+    "position": () => void;
+    /** Fires when the entity's rotation changes via SetRotation/SetEulerRotation. */
+    "rotation": () => void;
+    /** Fires when the entity's scale changes via SetScale. */
+    "scale": () => void;
+    /** Fires when the entity's visibility changes via SetVisibility. */
+    "visibility": () => void;
+    /** Fires when another entity enters the collision zone. */
+    "collision:enter": (other: BaseEntity) => void;
+    /** Fires when another entity exits the collision zone. */
+    "collision:exit": (other: BaseEntity) => void;
+}
+
+/**
+ * Event map for World lifecycle events.
+ * Provides typed callback signatures for world events.
+ */
+interface WorldEventMap {
+    /** Fires when a world begins loading (acts as "beforeunload" for previous world). */
+    "load": () => void;
+    /** Fires when a world has fully loaded and is interactive. */
+    "ready": () => void;
+    /** Fires when a world loading error occurs. Callback receives error info. */
+    "error": (error: { message: string }) => void;
+}
+
+/**
+ * Constants object for all event names in the World API event system.
+ * Use these constants instead of string literals for autocomplete and typo prevention.
+ *
+ * @example
+ * ```javascript
+ * World.on(Events.World.Ready, () => { console.log("World loaded!"); });
+ * entity.on(Events.Entity.Spawn, () => { console.log("Entity spawned!"); });
+ * ```
+ */
+declare const Events: {
+    readonly World: {
+        /** Fires when a world begins loading. */
+        readonly Load: "load";
+        /** Fires when a world has fully loaded and is interactive. */
+        readonly Ready: "ready";
+        /** Fires when a world loading error occurs. */
+        readonly Error: "error";
+    };
+    readonly Entity: {
+        /** Fires when an entity is created and registered. */
+        readonly Spawn: "spawn";
+        /** Fires before an entity is removed. */
+        readonly Destroy: "destroy";
+        /** Fires when an entity's position changes. */
+        readonly Position: "position";
+        /** Fires when an entity's rotation changes. */
+        readonly Rotation: "rotation";
+        /** Fires when an entity's scale changes. */
+        readonly Scale: "scale";
+        /** Fires when an entity's visibility changes. */
+        readonly Visibility: "visibility";
+    };
+    readonly Collision: {
+        /** Fires when another entity enters the collision zone. */
+        readonly Enter: "collision:enter";
+        /** Fires when another entity exits the collision zone. */
+        readonly Exit: "collision:exit";
+    };
+};
+
+/**
+ * Validate if an event name is a recognized event constant.
+ * @param eventName The event name to check.
+ * @returns True if the event name is recognized, false otherwise.
+ */
+declare function EventsIsValid(eventName: string): boolean;
