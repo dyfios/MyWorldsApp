@@ -149,12 +149,24 @@ export class GlobeRenderer extends WorldRendering {
     if (!this.terrainEntity) return;
     const source = this.deps.chunkSource;
     if (!source) {
-      await this.terrainEntity.load(key, []);
+      // Scaffold mode — synthesize a 1x1 zero-height "chunk" so the layer
+      // still exercises its slot lifecycle without a real backend.
+      await this.terrainEntity.load(key, {
+        planetId: '',
+        face: key.face,
+        lod: key.lod,
+        cx: key.cx,
+        cy: key.cy,
+        length: 1,
+        width: 1,
+        height: 1,
+        heights: [[0]],
+      });
       return;
     }
     try {
       const chunk = await source.requestChunk(key.face, key.lod, key.cx, key.cy);
-      await this.terrainEntity.load(key, chunk.heights);
+      await this.terrainEntity.load(key, chunk);
     } catch (err) {
       try {
         Logging?.LogError?.(`GlobeRenderer: chunk fetch failed for ${key.face}:${key.lod}:${key.cx}:${key.cy} — ${(err as Error).message}`);
