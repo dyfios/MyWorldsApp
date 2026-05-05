@@ -376,14 +376,85 @@ export class MyWorld {
       const chunkSource = await this.maybeBuildAndConnectChunkSource(planetSceneConfig.planetId);
 
       const worldConfig: WorldConfig = { planet: planetSceneConfig };
-      const deps = chunkSource ? { chunkSource } : undefined;
+      const candidateProvider = this.buildSingleChunkCandidateProvider();
+      const deps = { chunkSource: chunkSource ?? undefined, candidateProvider };
       await this.context.modules.worldRendering.initializePlanetRenderer(worldConfig, deps);
       Logging.Log('✓ GlobeRenderer setup completed for planet world' +
         (chunkSource ? ' (chunk source connected)' : ' (scaffold mode — no chunk source)'));
+
+      // Wire the per-frame tick driver. Time.SetInterval at 0.5s mirrors the
+      // legacy TiledSurfaceRenderer maintenance cadence — granular enough for
+      // chunk streaming without wasting frames.
+      this.startGlobeTickInterval();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ Failed to setup planet renderer: ' + errorMessage);
       throw error;
+    }
+  }
+
+  /**
+   * Build a candidate provider that always returns a single fixed chunk.
+   * Reads `face`, `lod`, `cx`, `cy` URL params (defaults: 0, 5, 15, 15 — a
+   * mid-face non-corner tile that GlobeRenderer's close-range layer can
+   * handle). This is the simplest possible "which chunks to load" — enough
+   * to prove the GlobeRenderer pipeline end-to-end. A real cube-sphere
+   * camera-distance candidate provider follows in a later increment.
+   */
+  private buildSingleChunkCandidateProvider(): () => Array<{ face: 0|1|2|3|4|5; lod: number; cx: number; cy: number }> {
+    const face = Number(this.queryParams.get('face') ?? 0);
+    const lod = Number(this.queryParams.get('lod') ?? 5);
+    const cx = Number(this.queryParams.get('cx') ?? 15);
+    const cy = Number(this.queryParams.get('cy') ?? 15);
+    if (face < 0 || face > 5 || !Number.isInteger(face)) {
+      Logging.LogWarning('🌍 candidate provider: face out of [0,5], using 0');
+    }
+    const safeFace = (Math.max(0, Math.min(5, Math.trunc(face))) as 0|1|2|3|4|5);
+    const candidate = { face: safeFace, lod, cx, cy };
+    Logging.Log('🌍 candidate provider: single chunk face=' + candidate.face +
+      ' lod=' + candidate.lod + ' cx=' + candidate.cx + ' cy=' + candidate.cy);
+    return () => [candidate];
+  }
+
+  /**
+   * Pump GlobeRenderer.tick at 0.5s intervals. Camera position comes from the
+   * tracked character entity; altitude is hard-coded for the MVP so we always
+   * land in the close-range (TerrainEntity) phase.
+   */
+  private startGlobeTickInterval(): void {
+    const fnName = 'globerenderer_tick';
+    (globalThis as Record<string, unknown>)[fnName] = (): void => {
+      try {
+        const factory = this.context.modules.worldRendering;
+        const globe = factory.getGlobeRenderer?.();
+        if (!globe) return;
+        const pc = (globalThis as Record<string, unknown>).playerController as
+          | { internalCharacterEntity?: { GetPosition?: (rel: boolean) => { x: number; y: number; z: number } } }
+          | undefined;
+        let position = { x: 0, y: 0, z: 0 };
+        if (pc?.internalCharacterEntity?.GetPosition) {
+          try { position = pc.internalCharacterEntity.GetPosition(false); } catch (_e) { /* ignore */ }
+        }
+        const camera = {
+          position,
+          velocity: { x: 0, y: 0, z: 0 },
+          // Hard-code altitude so phaseForAltitude → TerrainEntity. A future
+          // increment derives this from world position relative to the planet
+          // center.
+          altitudeMeters: 100,
+        };
+        // tick is async but Time.SetInterval is fire-and-forget — best effort.
+        void (globe as { tick?: (c: typeof camera) => Promise<void> }).tick?.(camera);
+      } catch (e) {
+        Logging.LogError('❌ GlobeRenderer tick error: ' + (e instanceof Error ? e.message : String(e)));
+      }
+    };
+    try {
+      Time.SetInterval(`${fnName}();`, 0.5);
+      Logging.Log('🌍 GlobeRenderer tick interval started (0.5s)');
+    } catch (e) {
+      Logging.LogWarning('🌍 Could not start tick interval (Time global missing?): ' +
+        (e instanceof Error ? e.message : String(e)));
     }
   }
 
