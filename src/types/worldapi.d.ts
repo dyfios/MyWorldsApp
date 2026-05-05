@@ -1623,21 +1623,19 @@ declare enum TerrainEntityBrushType {
  */
 declare interface TerrainEntityLayer {
     /** Diffuse texture path. */
-    diffuse: string;
+    diffuseTexture: string;
     /** Normal texture path. */
-    normal: string;
+    normalTexture: string;
     /** Mask texture path. */
-    mask: string;
+    maskTexture: string;
     /** Specular value. */
     specular: Color;
-    /** Metallic value. */
+    /** Metallic value (0-1). */
     metallic: number;
-    /** Smoothness value. */
+    /** Smoothness value (0-1). */
     smoothness: number;
-    /** Tile size. */
-    tileSize: Vector2;
-    /** Tile offset. */
-    tileOffset: Vector2;
+    /** Size factor (int) applied to terrain texture tiling. */
+    sizeFactor: number;
 }
 
 /**
@@ -3707,44 +3705,60 @@ declare class HTTPNetworking {
 
 /**
  * Class for MQTT client (available when USE_WEBINTERFACE is defined).
+ *
+ * Callbacks: each callback string is the name of a global JS function. The
+ * wrapper invokes it via `timeHandler.CallAsynchronously` with positional
+ * args (matches the HTTPNetworking pattern). Empty string disables a callback.
  */
 declare class MQTTClient {
-    /** Constructor for MQTT client. */
-    constructor();
-
     /**
-     * Connect to MQTT broker.
+     * Construct an MQTT client. Does not connect — call `Connect()` after.
      * @param host Broker host.
      * @param port Broker port.
-     * @param clientId Client ID.
-     * @param onConnect Callback function name for connection.
+     * @param useTLS Use TLS for the connection.
+     * @param transport "tcp" or "websockets".
+     * @param onConnected Global function name. Called with no args.
+     * @param onDisconnected Global function name. Called with (code: number, msg: string).
+     * @param onStateChanged Global function name. Called with (from: string, to: string).
+     * @param onError Global function name. Called with (msg: string).
+     * @param path WebSocket path. Defaults to "/mqtt"; ignored for tcp transport.
      */
-    Connect(host: string, port: number, clientId: string, onConnect: string): void;
+    constructor(
+        host: string,
+        port: number,
+        useTLS: boolean,
+        transport: string,
+        onConnected: string,
+        onDisconnected: string,
+        onStateChanged: string,
+        onError: string,
+        path?: string,
+    );
 
-    /**
-     * Disconnect from MQTT broker.
-     */
-    Disconnect(): void;
+    /** Connect the client. Returns true if dispatched, false if not initialized. */
+    Connect(): boolean;
+
+    /** Disconnect. Returns true if dispatched. */
+    Disconnect(): boolean;
 
     /**
      * Subscribe to a topic.
-     * @param topic Topic to subscribe to.
-     * @param onMessage Callback function name for messages.
+     * @param topic MQTT topic (wildcards allowed).
+     * @param onAcknowledged Global function name. Called with (ackMsg: string).
+     * @param onMessage Global function name. Called with (topic, topicName, payload) all strings.
+     *                  payload is UTF-8-decoded from the MQTTMessage's BufferSegment.
      */
-    Subscribe(topic: string, onMessage: string): void;
+    Subscribe(topic: string, onAcknowledged: string, onMessage: string): boolean;
 
     /**
      * Unsubscribe from a topic.
-     * @param topic Topic to unsubscribe from.
+     * @param topic MQTT topic.
+     * @param onAcknowledged Global function name. Called with (ackMsg: string).
      */
-    Unsubscribe(topic: string): void;
+    UnSubscribe(topic: string, onAcknowledged: string): boolean;
 
-    /**
-     * Publish a message.
-     * @param topic Topic to publish to.
-     * @param message Message to publish.
-     */
-    Publish(topic: string, message: string): void;
+    /** Publish a message. Returns true if dispatched. */
+    Publish(topic: string, message: string): boolean;
 }
 
 /**

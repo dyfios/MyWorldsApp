@@ -8,6 +8,7 @@ import { ProcessQueryParams } from './utils/ProcessQueryParams';
 import { StaticSurfaceRenderer, TiledSurfaceRenderer } from './modules/WorldRendererFactory';
 import { UIManager } from './modules/UIManager';
 import { SpikeMeshLoader } from './modules/planet/SpikeMeshLoader';
+import { PlanetMvpLoader } from './modules/planet/PlanetMvpLoader';
 import { EntityTypeSmokeTest } from './testing/EntityTypeSmokeTest';
 import { DEFAULT_FIXTURES } from './testing/fixtures';
 
@@ -170,15 +171,60 @@ export class MyWorld {
         Logging.Log('🌌 World Type: galaxy - Initializing for galactic-scale world rendering');
         // TODO: Add galaxy specific initialization here
         break;
+      case 'planet-mvp': {
+        // Phase 2 follow-up — minimum viable end-to-end planet test.
+        // Connects MQTT to a wos2 plugin-planet, requests one chunk,
+        // renders it as a TerrainEntity. Not the full GlobeRenderer
+        // pipeline; just proves the chain works with real APIs.
+        Logging.Log('🪐 World Type: planet-mvp - minimum viable planet loader');
+        const planetId = this.queryParams.get('planetId') as string | undefined;
+        const mqttHostRaw = this.queryParams.get('mqttHost') as string | undefined;
+        const mqttPortRaw = this.queryParams.get('mqttPort') as string | undefined;
+        const mqttTransportRaw = this.queryParams.get('mqttTransport') as string | undefined;
+        const mqttHost = mqttHostRaw ?? 'localhost';
+        const mqttPort = mqttPortRaw ? Number(mqttPortRaw) : 1884;
+        const mqttTransport = mqttTransportRaw ?? 'tcp';
+        if (!planetId) {
+          Logging.LogError('❌ planet-mvp: missing planetId query param');
+          break;
+        }
+        if (!Number.isFinite(mqttPort) || mqttPort <= 0) {
+          Logging.LogError('❌ planet-mvp: invalid mqttPort: ' + mqttPortRaw);
+          break;
+        }
+        Logging.Log('🪐 planet-mvp: planetId=' + planetId + ' mqtt=' + mqttHost + ':' + mqttPort + '/' + mqttTransport);
+        try {
+          new PlanetMvpLoader({ planetId, mqttHost, mqttPort, mqttTransport }).load();
+          Logging.Log('🪐 planet-mvp: load() returned without throwing');
+        } catch (err) {
+          const e = err as Error;
+          Logging.Log('🪐 planet-mvp CAUGHT: ' + (e?.message ?? String(err)));
+          if (e?.stack) Logging.Log('🪐 planet-mvp stack: ' + e.stack);
+        }
+        break;
+      }
       case 'spike1': {
         // Story 1.1 — throwaway 6-platform parity smoke. Remove after sign-off.
         Logging.Log('🧪 World Type: spike1 - SPIKE1 mesh round-trip loader');
         const meshUrl = this.queryParams.get('spikeMeshUrl') as string | undefined;
+        Logging.Log('🧪 SPIKE1-DBG: meshUrl after .get() = ' + JSON.stringify(meshUrl));
         if (!meshUrl) {
           Logging.LogError('❌ spike1: missing spikeMeshUrl query param');
           break;
         }
-        new SpikeMeshLoader({ meshUrl }).load();
+        try {
+          Logging.Log('🧪 SPIKE1-DBG: about to construct SpikeMeshLoader');
+          const loader = new SpikeMeshLoader({ meshUrl });
+          Logging.Log('🧪 SPIKE1-DBG: constructed; about to call load()');
+          loader.load();
+          Logging.Log('🧪 SPIKE1-DBG: load() returned without throwing');
+        } catch (err) {
+          const e = err as Error;
+          Logging.Log('🧪 SPIKE1-DBG: CAUGHT: ' + (e && e.message ? e.message : String(err)));
+          if (e && e.stack) {
+            Logging.Log('🧪 SPIKE1-DBG: stack: ' + e.stack);
+          }
+        }
         break;
       }
       default:
