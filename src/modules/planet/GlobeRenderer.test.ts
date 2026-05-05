@@ -91,6 +91,46 @@ describe('GlobeRenderer.tick', () => {
     await r.tick(camera);
     expect(called).toBe(1);
   });
+
+  it('fetches chunks from chunkSource for TerrainEntity-phase candidates', async () => {
+    // Camera at altitude=500m → phaseForAltitude returns TerrainEntity. Pick
+    // a non-corner chunk so canHandle is true.
+    const requested: Array<[number, number, number, number]> = [];
+    const fakeSource = {
+      requestChunk: (face: number, lod: number, cx: number, cy: number) => {
+        requested.push([face, lod, cx, cy]);
+        return Promise.resolve({
+          planetId: 'test-planet',
+          face, lod, cx, cy,
+          length: 1000, width: 1000, height: 100,
+          heights: [[0]],
+        });
+      },
+      dispose: () => {},
+    };
+    const r = new GlobeRenderer({
+      isWebGL: false,
+      chunkSource: fakeSource,
+      candidateProvider: () => [{ face: 0, lod: 5, cx: 15, cy: 15 }],
+    });
+    await r.initialize(minimalPlanetConfig as never);
+    await r.tick(camera);
+    expect(requested).toEqual([[0, 5, 15, 15]]);
+  });
+
+  it('logs and continues when chunkSource.requestChunk rejects (does not throw)', async () => {
+    const fakeSource = {
+      requestChunk: () => Promise.reject(new Error('upstream gone')),
+      dispose: () => {},
+    };
+    const r = new GlobeRenderer({
+      isWebGL: false,
+      chunkSource: fakeSource,
+      candidateProvider: () => [{ face: 0, lod: 5, cx: 15, cy: 15 }],
+    });
+    await r.initialize(minimalPlanetConfig as never);
+    await expect(r.tick(camera)).resolves.toBeUndefined();
+  });
 });
 
 describe('GlobeRenderer.dispose', () => {

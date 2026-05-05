@@ -2630,11 +2630,16 @@ export class WorldRendererFactory {
    * Planet worlds initialize lazily on join — WorldConfig is not known at
    * factory construction. Callers (world-type routing) invoke this after the
    * planet world metadata is resolved.
+   *
+   * `deps` is forwarded into GlobeRenderer's constructor — typically used to
+   * pass an MqttChunkSource so the close-range layer can fetch real chunk
+   * heights from wos-plugin-planet. Without it, GlobeRenderer runs in
+   * scaffold mode (lifecycle works, no terrain renders).
    */
-  async initializePlanetRenderer(config: any): Promise<void> {
+  async initializePlanetRenderer(config: any, deps?: any): Promise<void> {
     const mod = await import('./planet/GlobeRenderer');
     const GlobeRendererClass = mod.GlobeRenderer;
-    const globe = new GlobeRendererClass();
+    const globe = new GlobeRendererClass(deps);
     await globe.initialize(config);
     this.globeRenderer = globe;
     this.renderers.push(globe);

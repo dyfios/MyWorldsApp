@@ -22,6 +22,7 @@ import {
   WEBGL_BUDGET,
   RenderPhase,
   ChunkKey,
+  IChunkSource,
 } from './types.js';
 import { ChunkStreamer, CameraState, ILayerAdapter } from './ChunkStreamer.js';
 import { ImpostorSphere } from './ImpostorSphere.js';
@@ -37,6 +38,13 @@ export interface GlobeRendererDeps {
   playerAvatarEntity?: unknown;
   /** Override chunk candidates (tests only). */
   candidateProvider?: (camera: CameraState) => ChunkKey[];
+  /**
+   * Chunk-fetch backend. When provided, GlobeRenderer fetches chunk data
+   * before passing heights to the close-range layer. Without it, layers
+   * still track slot lifecycle but no real terrain renders (scaffold mode).
+   * Production wiring constructs an MqttChunkSource here.
+   */
+  chunkSource?: IChunkSource;
 }
 
 export class GlobeRenderer extends WorldRendering {
@@ -121,14 +129,36 @@ export class GlobeRenderer extends WorldRendering {
         return;
       case RenderPhase.TerrainEntity:
         if (this.terrainEntity?.canHandle(key)) {
-          // Heights fetched on demand in real integration — scaffold passes [].
-          await this.terrainEntity.load(key, []);
+          await this.fetchAndLoadTerrain(key);
         } else {
           await this.tileMesh?.load(key);
         }
         return;
       case RenderPhase.Unloaded:
         return;
+    }
+  }
+
+  /**
+   * Pulls a chunk from the injected source (when present) and hands its
+   * heights to the close-range layer. Scaffold mode (no chunkSource) passes
+   * an empty matrix — preserves existing layer-slot lifecycle so callers
+   * without a real backend still get a valid streamer state machine.
+   */
+  private async fetchAndLoadTerrain(key: ChunkKey): Promise<void> {
+    if (!this.terrainEntity) return;
+    const source = this.deps.chunkSource;
+    if (!source) {
+      await this.terrainEntity.load(key, []);
+      return;
+    }
+    try {
+      const chunk = await source.requestChunk(key.face, key.lod, key.cx, key.cy);
+      await this.terrainEntity.load(key, chunk.heights);
+    } catch (err) {
+      try {
+        Logging?.LogError?.(`GlobeRenderer: chunk fetch failed for ${key.face}:${key.lod}:${key.cx}:${key.cy} — ${(err as Error).message}`);
+      } catch (_e) { /* runtime may not be present in tests */ }
     }
   }
 

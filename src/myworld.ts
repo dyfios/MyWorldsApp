@@ -9,6 +9,7 @@ import { StaticSurfaceRenderer } from './modules/WorldRendererFactory';
 import { UIManager } from './modules/UIManager';
 import { SpikeMeshLoader } from './modules/planet/SpikeMeshLoader';
 import { PlanetMvpLoader } from './modules/planet/PlanetMvpLoader';
+import { MqttChunkSource } from './modules/planet/MqttChunkSource';
 import type { PlanetSceneConfig } from './modules/planet/types';
 import type { WorldConfig } from './types/config';
 import { EntityTypeSmokeTest } from './testing/EntityTypeSmokeTest';
@@ -351,6 +352,13 @@ export class MyWorld {
   /**
    * Set up planet renderer for planet world type. Routes through GlobeRenderer
    * (Epic 6) instead of the legacy TiledSurfaceRenderer flow.
+   *
+   * Reads MQTT connection params from URL: `mqttHost`, `mqttPort`,
+   * `mqttTransport` (defaulting to websockets:9001 — TCP currently fails
+   * outbound from WebVerse hosts). When all three are present (or defaults
+   * acceptable) an MqttChunkSource is constructed, connected, and handed to
+   * GlobeRenderer so the close-range layer fetches real chunks from
+   * wos-plugin-planet. Without them, GlobeRenderer runs in scaffold mode.
    */
   private async setupPlanetRenderer(): Promise<void> {
     try {
@@ -365,13 +373,58 @@ export class MyWorld {
         ' radius=' + planetSceneConfig.radiusMeters + 'm' +
         ' nExp=' + planetSceneConfig.nExponent);
 
+      const chunkSource = await this.maybeBuildAndConnectChunkSource(planetSceneConfig.planetId);
+
       const worldConfig: WorldConfig = { planet: planetSceneConfig };
-      await this.context.modules.worldRendering.initializePlanetRenderer(worldConfig);
-      Logging.Log('✓ GlobeRenderer setup completed for planet world');
+      const deps = chunkSource ? { chunkSource } : undefined;
+      await this.context.modules.worldRendering.initializePlanetRenderer(worldConfig, deps);
+      Logging.Log('✓ GlobeRenderer setup completed for planet world' +
+        (chunkSource ? ' (chunk source connected)' : ' (scaffold mode — no chunk source)'));
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ Failed to setup planet renderer: ' + errorMessage);
       throw error;
+    }
+  }
+
+  /**
+   * Construct + connect an MqttChunkSource if the URL provided MQTT params.
+   * Returns null when params are missing or the connect fails — caller falls
+   * back to scaffold mode in either case.
+   */
+  private async maybeBuildAndConnectChunkSource(planetId: string): Promise<MqttChunkSource | null> {
+    const mqttHost = this.queryParams.get('mqttHost') as string | undefined;
+    if (!mqttHost) {
+      Logging.Log('🌍 No mqttHost query param — running GlobeRenderer in scaffold mode');
+      return null;
+    }
+    const mqttPortRaw = this.queryParams.get('mqttPort') as string | undefined;
+    const mqttPort = mqttPortRaw ? Number(mqttPortRaw) : 9001;
+    if (!Number.isFinite(mqttPort) || mqttPort <= 0) {
+      Logging.LogError('❌ planet world: invalid mqttPort: ' + mqttPortRaw);
+      return null;
+    }
+    const transportRaw = (this.queryParams.get('mqttTransport') as string | undefined) ?? 'websockets';
+    if (transportRaw !== 'tcp' && transportRaw !== 'websockets') {
+      Logging.LogError('❌ planet world: mqttTransport must be tcp or websockets, got: ' + transportRaw);
+      return null;
+    }
+
+    const source = new MqttChunkSource({
+      planetId,
+      mqttHost,
+      mqttPort,
+      mqttTransport: transportRaw,
+    });
+    try {
+      await source.connect();
+      Logging.Log('🌍 MqttChunkSource connected (' + transportRaw + ' ' + mqttHost + ':' + mqttPort + ')');
+      return source;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      Logging.LogError('❌ MqttChunkSource connect failed: ' + msg);
+      try { source.dispose(); } catch (_e) { /* best-effort */ }
+      return null;
     }
   }
 

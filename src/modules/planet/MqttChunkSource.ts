@@ -18,29 +18,14 @@
  * single-shot smoke tests.
  */
 
+import type { ChunkData, IChunkSource } from './types.js';
+
 declare const Logging: { Log: (m: string) => void; LogWarning: (m: string) => void };
 declare const UUID: { NewUUID: () => { ToString: () => string } };
 
-/** Shape of a successful chunk response payload from wos-plugin-planet. */
-export interface ChunkData {
-  planetId: string;
-  face: number;
-  lod: number;
-  cx: number;
-  cy: number;
-  /** World-space side length in meters. */
-  length: number;
-  /** World-space side width in meters. */
-  width: number;
-  /** Vertical envelope in meters (max altitude the plugin guarantees). */
-  height: number;
-  /** Row-major heights matrix in meters (may include negatives for ocean). */
-  heights: number[][];
-  /** Optional metadata fields the plugin may include. */
-  revision?: number;
-  planet_config_hash?: string;
-  terrainType?: string;
-}
+// Re-export so existing callers (`import { ChunkData } from './MqttChunkSource'`)
+// keep working — `IChunkSource` and `ChunkData` are canonical in `./types`.
+export type { ChunkData, IChunkSource };
 
 export interface MqttChunkSourceOptions {
   planetId: string;
@@ -65,7 +50,7 @@ interface ChunkResponseMessage {
   chunk?: ChunkData;
 }
 
-export class MqttChunkSource {
+export class MqttChunkSource implements IChunkSource {
   private readonly opts: MqttChunkSourceOptions;
   private client: MQTTClient | null = null;
   private readonly responseTopic: string;
