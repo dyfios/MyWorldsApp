@@ -196,6 +196,18 @@ describe('MqttChunkSource.connect', () => {
     src.dispose();
     await expect(src.connect()).rejects.toThrow(/disposed/);
   });
+
+  it('rejects connect on configurable timeout when broker never SUBACKs', async () => {
+    const src = new MqttChunkSource({
+      planetId: 'p1',
+      mqttHost: 'h',
+      mqttPort: 9001,
+      connectTimeoutMs: 20,
+    });
+    // Don't fire onConnected/onSubAck — simulate unreachable broker.
+    await expect(src.connect()).rejects.toThrow(/connect timeout/);
+    src.dispose();
+  });
 });
 
 describe('MqttChunkSource.requestChunk', () => {

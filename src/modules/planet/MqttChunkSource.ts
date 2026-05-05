@@ -35,6 +35,8 @@ export interface MqttChunkSourceOptions {
   mqttTransport?: 'tcp' | 'websockets';
   /** Per-request timeout. Default 15000ms. */
   requestTimeoutMs?: number;
+  /** Connect timeout (TCP/WS handshake + SUBACK). Default 10000ms. */
+  connectTimeoutMs?: number;
 }
 
 interface PendingRequest {
@@ -58,6 +60,7 @@ export class MqttChunkSource implements IChunkSource {
   private connectPromise: Promise<void> | null = null;
   private connectResolve: (() => void) | null = null;
   private connectReject: ((err: Error) => void) | null = null;
+  private connectTimer: ReturnType<typeof setTimeout> | null = null;
   private subscribed = false;
   private disposed = false;
   private readonly pending = new Map<string, PendingRequest>();
@@ -86,6 +89,11 @@ export class MqttChunkSource implements IChunkSource {
       this.connectResolve = resolve;
       this.connectReject = reject;
     });
+
+    const connectTimeoutMs = this.opts.connectTimeoutMs ?? 10000;
+    this.connectTimer = setTimeout(() => {
+      this.failConnect(new Error(`${this.tag}: connect timeout after ${connectTimeoutMs}ms (broker unreachable?)`));
+    }, connectTimeoutMs);
 
     this.installCallbacks();
 
@@ -162,6 +170,10 @@ export class MqttChunkSource implements IChunkSource {
     }
     this.pending.clear();
 
+    if (this.connectTimer) {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = null;
+    }
     if (this.connectReject) {
       this.connectReject(new Error(`${this.tag}: disposed before connection completed`));
       this.connectReject = null;
@@ -220,6 +232,10 @@ export class MqttChunkSource implements IChunkSource {
 
   private onSubAck(): void {
     this.subscribed = true;
+    if (this.connectTimer) {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = null;
+    }
     if (this.connectResolve) {
       this.connectResolve();
       this.connectResolve = null;
@@ -278,6 +294,10 @@ export class MqttChunkSource implements IChunkSource {
   }
 
   private failConnect(err: Error): void {
+    if (this.connectTimer) {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = null;
+    }
     if (this.connectReject) {
       this.connectReject(err);
       this.connectReject = null;
