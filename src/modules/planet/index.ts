@@ -9,3 +9,4 @@ export * from './TerrainEntityLayer.js';
 export * from './GlobeRenderer.js';
 export * from './TerrainModify.js';
 export * from './ReconnectManager.js';
+export * from './MqttChunkSource.js';
