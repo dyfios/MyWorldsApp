@@ -149,19 +149,8 @@ export class GlobeRenderer extends WorldRendering {
     if (!this.terrainEntity) return;
     const source = this.deps.chunkSource;
     if (!source) {
-      // Scaffold mode — synthesize a 1x1 zero-height "chunk" so the layer
-      // still exercises its slot lifecycle without a real backend.
-      await this.terrainEntity.load(key, {
-        planetId: '',
-        face: key.face,
-        lod: key.lod,
-        cx: key.cx,
-        cy: key.cy,
-        length: 1,
-        width: 1,
-        height: 1,
-        heights: [[0]],
-      });
+      // Scaffold mode — no chunkSource means no real terrain to render.
+      // Skip entirely so the world isn't littered with placeholder tiles.
       return;
     }
     try {
