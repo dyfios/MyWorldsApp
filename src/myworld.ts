@@ -5,10 +5,12 @@
 
 import { ClientContext } from './modules/ClientContext';
 import { ProcessQueryParams } from './utils/ProcessQueryParams';
-import { StaticSurfaceRenderer, TiledSurfaceRenderer } from './modules/WorldRendererFactory';
+import { StaticSurfaceRenderer } from './modules/WorldRendererFactory';
 import { UIManager } from './modules/UIManager';
 import { SpikeMeshLoader } from './modules/planet/SpikeMeshLoader';
 import { PlanetMvpLoader } from './modules/planet/PlanetMvpLoader';
+import type { PlanetSceneConfig } from './modules/planet/types';
+import type { WorldConfig } from './types/config';
 import { EntityTypeSmokeTest } from './testing/EntityTypeSmokeTest';
 import { DEFAULT_FIXTURES } from './testing/fixtures';
 
@@ -317,23 +319,55 @@ export class MyWorld {
   }
 
   /**
-   * Set up planet renderer for planet world type
+   * Build a PlanetSceneConfig from URL query params. `planetId` is required;
+   * other fields fall back to MVP-friendly defaults so a minimal launch URL
+   * `?worldType=planet&planetId=<id>` can boot. Production launches will
+   * supply real biomeMapUrl + chunkServiceBaseUrl from the world manifest.
+   */
+  private buildPlanetSceneConfig(): PlanetSceneConfig | null {
+    const planetId = this.queryParams.get('planetId') as string | undefined;
+    if (!planetId) {
+      Logging.LogError('❌ planet world: missing planetId query param');
+      return null;
+    }
+    const radiusRaw = this.queryParams.get('radiusMeters') as string | undefined;
+    const nExpRaw = this.queryParams.get('nExponent') as string | undefined;
+    const biomeMapUrl = (this.queryParams.get('biomeMapUrl') as string | undefined) ?? '';
+    const chunkServiceBaseUrl = (this.queryParams.get('chunkServiceBaseUrl') as string | undefined) ?? '';
+
+    const radiusMeters = radiusRaw ? Number(radiusRaw) : 25_000;
+    const nExponent = nExpRaw ? Number(nExpRaw) : 5;
+    if (!Number.isFinite(radiusMeters) || radiusMeters <= 0) {
+      Logging.LogError('❌ planet world: invalid radiusMeters: ' + radiusRaw);
+      return null;
+    }
+    if (!Number.isFinite(nExponent) || nExponent < 0) {
+      Logging.LogError('❌ planet world: invalid nExponent: ' + nExpRaw);
+      return null;
+    }
+    return { planetId, radiusMeters, nExponent, biomeMapUrl, chunkServiceBaseUrl };
+  }
+
+  /**
+   * Set up planet renderer for planet world type. Routes through GlobeRenderer
+   * (Epic 6) instead of the legacy TiledSurfaceRenderer flow.
    */
   private async setupPlanetRenderer(): Promise<void> {
     try {
-      Logging.Log('🏗️ Setting up planet renderer for planet world type...');
+      Logging.Log('🌍 Setting up GlobeRenderer for planet world type...');
 
-      // Use the imported TiledSurfaceRenderer
+      const planetSceneConfig = this.buildPlanetSceneConfig();
+      if (!planetSceneConfig) {
+        // buildPlanetSceneConfig logged the specific error; nothing to do.
+        return;
+      }
+      Logging.Log('🌍 Planet config: id=' + planetSceneConfig.planetId +
+        ' radius=' + planetSceneConfig.radiusMeters + 'm' +
+        ' nExp=' + planetSceneConfig.nExponent);
 
-      Logging.Log('🏗️ Step 1: Creating TiledSurfaceRenderer instance...');
-      const tiledRenderer = new TiledSurfaceRenderer();
-
-      Logging.Log('🏗️ Step 2: Initializing tiled surface renderer...');
-      await tiledRenderer.initialize();
-
-      Logging.Log('🏗️ Step 3: Loading world manifest...');
-      tiledRenderer.loadWorldManifest();
-
+      const worldConfig: WorldConfig = { planet: planetSceneConfig };
+      await this.context.modules.worldRendering.initializePlanetRenderer(worldConfig);
+      Logging.Log('✓ GlobeRenderer setup completed for planet world');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       Logging.LogError('❌ Failed to setup planet renderer: ' + errorMessage);

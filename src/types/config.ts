@@ -2,10 +2,14 @@
  * Core configuration types for MyWorlds
  */
 
+import type { PlanetSceneConfig } from '../modules/planet/types.js';
+
 export interface WorldConfig {
   entities?: EntityConfig[];
   terrain?: TerrainConfig;
   worldUri?: string;
+  /** Present only for `worldType=planet`. Drives GlobeRenderer initialization. */
+  planet?: PlanetSceneConfig;
 }
 
 export interface EntityConfig {
