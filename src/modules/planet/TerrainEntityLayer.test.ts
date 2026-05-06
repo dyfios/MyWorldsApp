@@ -117,7 +117,7 @@ describe('TerrainEntityLayer with WebVerse runtime globals', () => {
     height: number;
     heights: number[][];
     layers: unknown[];
-    position: { y: number };
+    position: { x: number; y: number; z: number };
     onLoaded: string;
   }
 
@@ -135,7 +135,7 @@ describe('TerrainEntityLayer with WebVerse runtime globals', () => {
         heights: number[][],
         layers: unknown[],
         _layerMasks: unknown,
-        position: { y: number },
+        position: { x: number; y: number; z: number },
         _rotation: unknown,
         _id?: string,
         _tag?: string,
@@ -177,24 +177,26 @@ describe('TerrainEntityLayer with WebVerse runtime globals', () => {
     lastEntity = null;
   };
 
-  it('calls TerrainEntity.CreateHeightmap with shifted heights and tight envelope', async () => {
+  it('shifts heights by fixed sea-level offset and positions tile in XZ grid', async () => {
     installRuntime();
     try {
       const layer = new TerrainEntityLayer(cfg, false);
-      const key = k(0, 5, 15, 15);
-      // Heights span -34 to +18 = 53m of relief; should normalize to [0..52]
-      // and produce a tight envelope of ~54m, with position.y = -34.
+      const key = k(0, 5, 17, 16); // non-corner; cx=17, cy=16
       const heightsBeforeShift = [[-34, -10], [5, 18]];
-      await layer.load(key, chunk(key, heightsBeforeShift));
+      const c0 = chunk(key, heightsBeforeShift);
+      c0.length = 1227; c0.width = 1227; c0.height = 1500;
+      await layer.load(key, c0);
       expect(createCalls.length).toBe(1);
       const c = createCalls[0]!;
-      // Heights mutated in place — minimum should now be 0.
-      const hMin = Math.min(...c.heights.flat());
-      const hMax = Math.max(...c.heights.flat());
-      expect(hMin).toBe(0);
-      expect(hMax).toBe(52);
-      expect(c.height).toBeGreaterThan(52);
-      expect(c.position.y).toBe(-34);
+      // FIXED offset (300m) applied to every value — adjacent tiles align.
+      expect(Math.min(...c.heights.flat())).toBe(-34 + 300);
+      expect(Math.max(...c.heights.flat())).toBe(18 + 300);
+      // Envelope = chunk's declared height (plugin's CHUNK_HEIGHT_ENVELOPE).
+      expect(c.height).toBe(1500);
+      // Position: cx*length on X, -300 on Y, cy*width on Z.
+      expect((c.position as { x: number; y: number; z: number }).x).toBe(17 * 1227);
+      expect(c.position.y).toBe(-300);
+      expect((c.position as { x: number; y: number; z: number }).z).toBe(16 * 1227);
       expect(c.layers.length).toBe(1);
     } finally {
       uninstallRuntime();

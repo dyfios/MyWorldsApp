@@ -394,12 +394,12 @@ export class MyWorld {
   }
 
   /**
-   * Build a candidate provider that always returns a single fixed chunk.
+   * Build a candidate provider that returns a 3×3 ring around a base chunk.
    * Reads `face`, `lod`, `cx`, `cy` URL params (defaults: 0, 5, 15, 15 — a
    * mid-face non-corner tile that GlobeRenderer's close-range layer can
-   * handle). This is the simplest possible "which chunks to load" — enough
-   * to prove the GlobeRenderer pipeline end-to-end. A real cube-sphere
-   * camera-distance candidate provider follows in a later increment.
+   * handle). The ring is clamped to face boundaries — V1 doesn't traverse
+   * cube-corner edges. A real cube-sphere camera-distance candidate provider
+   * (with proper edge crossing) follows in a later increment.
    */
   private buildSingleChunkCandidateProvider(): () => Array<{ face: 0|1|2|3|4|5; lod: number; cx: number; cy: number }> {
     const face = Number(this.queryParams.get('face') ?? 0);
@@ -410,10 +410,23 @@ export class MyWorld {
       Logging.LogWarning('🌍 candidate provider: face out of [0,5], using 0');
     }
     const safeFace = (Math.max(0, Math.min(5, Math.trunc(face))) as 0|1|2|3|4|5);
-    const candidate = { face: safeFace, lod, cx, cy };
-    Logging.Log('🌍 candidate provider: single chunk face=' + candidate.face +
-      ' lod=' + candidate.lod + ' cx=' + candidate.cx + ' cy=' + candidate.cy);
-    return () => [candidate];
+    const cellsPerEdge = 1 << lod; // 2^lod tiles per face edge
+
+    // Build a 3×3 ring around the base chunk, clamped to face bounds. Center
+    // first so the streamer's velocity-bias prefers it; corners last.
+    const ring: Array<{ face: 0|1|2|3|4|5; lod: number; cx: number; cy: number }> = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const ncx = cx + dx;
+        const ncy = cy + dy;
+        if (ncx < 0 || ncx >= cellsPerEdge) continue;
+        if (ncy < 0 || ncy >= cellsPerEdge) continue;
+        ring.push({ face: safeFace, lod, cx: ncx, cy: ncy });
+      }
+    }
+    Logging.Log('🌍 candidate provider: 3×3 ring around face=' + safeFace +
+      ' lod=' + lod + ' cx=' + cx + ' cy=' + cy + ' (' + ring.length + ' chunks)');
+    return () => ring;
   }
 
   /**

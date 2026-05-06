@@ -19,6 +19,18 @@
 import { ChunkKey, chunkKeyString, PlanetSceneConfig, ChunkData } from './types.js';
 import { shouldUseTerrainEntity } from './CubeCornerPolicy.js';
 
+/**
+ * Fixed planet-wide sea-level offset (meters below world Y=0). Heights from
+ * the plugin range roughly [-300, +700] for V1 25km planets — shifting by
+ * +300 keeps everything positive so Unity TerrainData (which clamps [0..1])
+ * doesn't lose the ocean depth, and using the same offset on every chunk
+ * means adjacent chunks render at the same baseline.
+ *
+ * V1 single value; later this becomes per-planet config from the world
+ * manifest so deeper-ocean planets can scale appropriately.
+ */
+const SEA_LEVEL_OFFSET_METERS = 300;
+
 interface RuntimeEntity {
   SetVisibility?: (v: boolean) => void;
   SetInteractionState?: (s: number) => void;
@@ -85,33 +97,21 @@ export class TerrainEntityLayer {
       return;
     }
 
-    // Shift heights so chunk minimum sits at 0 (Unity clamps negatives), and
-    // place the terrain at world Y = original min so absolute elevation is
-    // preserved. Mutates `chunk.heights` in place — caller (GlobeRenderer's
-    // chunkSource fetch) does not retain the matrix beyond this call.
-    let hMin = Infinity;
-    let hMax = -Infinity;
+    // Shift every height by the planet-wide sea-level offset so all values
+    // are ≥0 (Unity TerrainData.SetHeights clamps negatives to 0). Using a
+    // FIXED offset across all chunks — instead of per-chunk min — means
+    // adjacent tiles align cleanly at their shared boundary.
+    // Mutates `chunk.heights` in place; the matrix isn't retained by caller.
     for (let r = 0; r < chunk.heights.length; r++) {
       const row = chunk.heights[r]!;
       for (let i = 0; i < row.length; i++) {
-        const v = row[i]!;
-        if (v < hMin) hMin = v;
-        if (v > hMax) hMax = v;
+        row[i]! += SEA_LEVEL_OFFSET_METERS;
       }
     }
-    const yOffset = hMin < 0 ? hMin : 0;
-    if (yOffset < 0) {
-      const shift = -yOffset;
-      for (let r = 0; r < chunk.heights.length; r++) {
-        const row = chunk.heights[r]!;
-        for (let i = 0; i < row.length; i++) {
-          row[i]! += shift;
-        }
-      }
-    }
-    // Tight envelope so Unity uses full [0..1] heightmap precision for the
-    // relief that's actually present (instead of squeezing 50m into 1/1500).
-    const tightHeight = Math.max(1, hMax - yOffset + 1);
+    // Use the plugin-declared height envelope so all chunks share the same
+    // vertical scale. Unity stores heightmap in [0..1] = value / envelope;
+    // rendered relief is still in real meters via terrainData.size.y.
+    const envelope = chunk.height;
 
     // `specular` must be a real Color instance — Jint won't auto-construct
     // from a {r,g,b,a} object literal.
@@ -148,16 +148,24 @@ export class TerrainEntityLayer {
       } catch (_e) { /* best-effort */ }
     };
 
+    // Tile placement: lay chunks out as a flat XZ grid keyed by (cx, cy).
+    // Position.y = -SEA_LEVEL_OFFSET_METERS so the heightmap [0..envelope]
+    // renders at world Y in [-SEA_LEVEL_OFFSET, envelope - SEA_LEVEL_OFFSET].
+    // V1 simplification — proper cube-sphere tile placement (with rotations
+    // onto the actual sphere surface) is a future increment.
+    const worldX = chunk.cx * chunk.length;
+    const worldZ = chunk.cy * chunk.width;
+
     try {
       w.TerrainEntity.CreateHeightmap(
         null,
         chunk.length,
         chunk.width,
-        tightHeight,
+        envelope,
         chunk.heights,
         [stubLayer],
         {},
-        new w.Vector3(0, yOffset, 0),
+        new w.Vector3(worldX, -SEA_LEVEL_OFFSET_METERS, worldZ),
         w.Quaternion.identity,
         entityId,
         `planet-tile-${id}`,
