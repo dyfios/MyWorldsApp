@@ -390,18 +390,15 @@ export class MyWorld {
         ' nExp=' + planetSceneConfig.nExponent);
 
       // Build chunkSource synchronously and kick off connect FIRE-AND-FORGET.
-      // We never await it from this critical path — even a hung connect must
-      // not block worldType setup. requestChunk rejects until subscribed;
-      // GlobeRenderer's fetchAndLoadTerrain already swallows fetch errors,
-      // so unconnected ticks are a no-op until the broker comes online.
+      // Connect is callback-based (no Promise crossing the network boundary
+      // — JINT microtask scheduling is unreliable for callback-resolved
+      // Promises). requestChunk fires synchronously; rendering happens in
+      // its onSuccess callback when the MQTT response arrives.
       const chunkSource = this.buildChunkSource(planetSceneConfig.planetId);
       if (chunkSource) {
-        chunkSource.connect().then(
+        chunkSource.connect(
           () => { Logging.Log('🌍 MqttChunkSource connected — chunks will start fetching'); },
-          (err: unknown) => {
-            const msg = err instanceof Error ? err.message : String(err);
-            Logging.LogError('❌ MqttChunkSource connect failed: ' + msg);
-          },
+          (err: Error) => { Logging.LogError('❌ MqttChunkSource connect failed: ' + err.message); },
         );
       }
 

@@ -91,11 +91,28 @@ export interface ChunkData {
 }
 
 /**
+ * Callback pair used by chunk-fetching APIs. Promise-free on purpose —
+ * see MqttChunkSource for why (JINT microtask scheduling unreliable).
+ */
+export interface ChunkRequestCallbacks {
+  onSuccess: (chunk: ChunkData) => void;
+  onError?: (err: Error) => void;
+}
+
+/**
  * Minimal interface GlobeRenderer needs from any chunk-fetching backend.
- * The MQTT-backed concrete implementation lives in MqttChunkSource; tests
- * can supply an in-memory mock without dragging the MQTT runtime in.
+ * Callback-driven — `requestChunk` returns void, results delivered later
+ * via callbacks. The MQTT-backed concrete implementation lives in
+ * MqttChunkSource; tests can supply an in-memory mock that fires callbacks
+ * synchronously without dragging MQTT/Promise infrastructure in.
  */
 export interface IChunkSource {
-  requestChunk(face: number, lod: number, cx: number, cy: number): Promise<ChunkData>;
+  requestChunk(
+    face: number,
+    lod: number,
+    cx: number,
+    cy: number,
+    callbacks: ChunkRequestCallbacks,
+  ): void;
   dispose(): void;
 }

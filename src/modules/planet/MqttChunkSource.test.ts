@@ -126,16 +126,6 @@ afterEach(() => {
 
 // ---- Tests -----------------------------------------------------------------
 
-/**
- * `dispose()` rejects any in-flight connect promise — tests that don't await
- * connect to completion must attach a no-op .catch so the rejection isn't
- * surfaced as Unhandled.
- */
-function silenceUnhandled<T>(p: Promise<T>): Promise<T> {
-  p.catch(() => { /* expected: dispose-induced rejection */ });
-  return p;
-}
-
 describe('MqttChunkSource.connect', () => {
   it('constructs MQTTClient with provided host/port/transport and dispatches Connect', () => {
     const src = new MqttChunkSource({
@@ -144,7 +134,7 @@ describe('MqttChunkSource.connect', () => {
       mqttPort: 9001,
       mqttTransport: 'websockets',
     });
-    silenceUnhandled(src.connect());
+    src.connect();
     const m = FakeMQTTClient.lastInstance!;
     expect(m).not.toBeNull();
     expect(m.ctor.host).toBe('192.168.1.143');
@@ -157,79 +147,94 @@ describe('MqttChunkSource.connect', () => {
 
   it('defaults transport to websockets when not specified', () => {
     const src = new MqttChunkSource({ planetId: 'p1', mqttHost: 'h', mqttPort: 9001 });
-    silenceUnhandled(src.connect());
+    src.connect();
     expect(FakeMQTTClient.lastInstance!.ctor.transport).toBe('websockets');
     src.dispose();
   });
 
-  it('subscribes to a unique response topic when broker fires onConnected', async () => {
+  it('fires onConnected once SUBACK arrives', () => {
+    let connected = false;
     const src = new MqttChunkSource({ planetId: 'p1', mqttHost: 'h', mqttPort: 9001 });
-    const p = src.connect();
+    src.connect(() => { connected = true; });
     const m = FakeMQTTClient.lastInstance!;
-    fireGlobal(m.ctor.onConnected); // simulate broker connect event
+    fireGlobal(m.ctor.onConnected);
     expect(m.subscribes.length).toBe(1);
     expect(m.subscribes[0].topic).toMatch(/^mwapp\/planet\/response\//);
     fireGlobal(m.subscribes[0].onAcknowledged, 'ok');
-    await expect(p).resolves.toBeUndefined();
+    expect(connected).toBe(true);
+    expect(src.isConnected()).toBe(true);
     src.dispose();
   });
 
-  it('rejects connect promise on disconnect before subscribe-ack', async () => {
+  it('fires onError when broker disconnects before SUBACK', () => {
+    let errMsg: string | null = null;
     const src = new MqttChunkSource({ planetId: 'p1', mqttHost: 'h', mqttPort: 9001 });
-    const p = src.connect();
+    src.connect(undefined, (e) => { errMsg = e.message; });
     const m = FakeMQTTClient.lastInstance!;
     fireGlobal(m.ctor.onDisconnected, 128, 'TCP closed by remote peer');
-    await expect(p).rejects.toThrow(/disconnected.*128.*TCP closed/);
+    expect(errMsg).toMatch(/disconnected.*128.*TCP closed/);
     src.dispose();
   });
 
-  it('returns the same promise on repeated connect() calls', () => {
+  it('fires onConnected immediately if already connected when called again', () => {
     const src = new MqttChunkSource({ planetId: 'p1', mqttHost: 'h', mqttPort: 9001 });
-    const p1 = silenceUnhandled(src.connect());
-    const p2 = silenceUnhandled(src.connect());
-    expect(p1).toBe(p2);
+    src.connect();
+    const m = FakeMQTTClient.lastInstance!;
+    fireGlobal(m.ctor.onConnected);
+    fireGlobal(m.subscribes[0].onAcknowledged, 'ok');
+    expect(src.isConnected()).toBe(true);
+
+    let secondConnectFired = false;
+    src.connect(() => { secondConnectFired = true; });
+    expect(secondConnectFired).toBe(true);
+    // No second MQTTClient instance was created.
+    expect(FakeMQTTClient.instances.length).toBe(1);
     src.dispose();
   });
 
-  it('rejects connect after dispose', async () => {
+  it('fires onError immediately when called after dispose', () => {
+    let errMsg: string | null = null;
     const src = new MqttChunkSource({ planetId: 'p1', mqttHost: 'h', mqttPort: 9001 });
     src.dispose();
-    await expect(src.connect()).rejects.toThrow(/disposed/);
+    src.connect(undefined, (e) => { errMsg = e.message; });
+    expect(errMsg).toMatch(/disposed/);
   });
 
-  it('rejects connect on configurable timeout when broker never SUBACKs', async () => {
+  it('fires onError on configurable connect timeout when broker never SUBACKs', async () => {
+    let errMsg: string | null = null;
     const src = new MqttChunkSource({
       planetId: 'p1',
       mqttHost: 'h',
       mqttPort: 9001,
       connectTimeoutMs: 20,
     });
+    src.connect(undefined, (e) => { errMsg = e.message; });
     // Don't fire onConnected/onSubAck — simulate unreachable broker.
-    await expect(src.connect()).rejects.toThrow(/connect timeout/);
+    await new Promise((r) => setTimeout(r, 40));
+    expect(errMsg).toMatch(/connect timeout/);
     src.dispose();
   });
 });
 
 describe('MqttChunkSource.requestChunk', () => {
   // Helper: connect + subscribe-ack the source so requestChunk is usable.
-  async function connectedSource(): Promise<{ src: MqttChunkSource; mqtt: FakeMQTTClient }> {
+  function connectedSource(opts: Partial<{ requestTimeoutMs: number }> = {}): { src: MqttChunkSource; mqtt: FakeMQTTClient } {
     const src = new MqttChunkSource({
       planetId: 'smoke-planet',
       mqttHost: 'h',
       mqttPort: 9001,
-      requestTimeoutMs: 50,
+      requestTimeoutMs: opts.requestTimeoutMs ?? 50,
     });
-    const p = src.connect();
+    src.connect();
     const mqtt = FakeMQTTClient.lastInstance!;
     fireGlobal(mqtt.ctor.onConnected);
     fireGlobal(mqtt.subscribes[0].onAcknowledged, 'ok');
-    await p;
     return { src, mqtt };
   }
 
-  it('publishes to the planet request topic with face/lod/cx/cy + correlation-id', async () => {
-    const { src, mqtt } = await connectedSource();
-    silenceUnhandled(src.requestChunk(0, 2, 1, 1));
+  it('publishes to the planet request topic with face/lod/cx/cy + correlation-id', () => {
+    const { src, mqtt } = connectedSource();
+    src.requestChunk(0, 2, 1, 1, { onSuccess: () => {} });
     expect(mqtt.publishes.length).toBe(1);
     expect(mqtt.publishes[0].topic).toBe('wos/planet/smoke-planet/chunk/request');
     const sent = JSON.parse(mqtt.publishes[0].message);
@@ -242,92 +247,93 @@ describe('MqttChunkSource.requestChunk', () => {
     src.dispose();
   });
 
-  it('resolves with chunk data when a matching success response arrives', async () => {
-    const { src, mqtt } = await connectedSource();
-    const promise = src.requestChunk(0, 2, 0, 0);
+  it('fires onSuccess with chunk data when matching response arrives', () => {
+    const { src, mqtt } = connectedSource();
+    let received: ChunkData | null = null;
+    src.requestChunk(0, 2, 0, 0, { onSuccess: (c) => { received = c; } });
     const corrId = JSON.parse(mqtt.publishes[0].message)['correlation-id'];
     const chunk: ChunkData = {
       planetId: 'smoke-planet',
-      face: 0,
-      lod: 2,
-      cx: 0,
-      cy: 0,
-      length: 9817,
-      width: 9817,
-      height: 1500,
-      heights: [
-        [0, 1],
-        [2, 3],
-      ],
+      face: 0, lod: 2, cx: 0, cy: 0,
+      length: 9817, width: 9817, height: 1500,
+      heights: [[0, 1], [2, 3]],
     };
     fireGlobal(mqtt.subscribes[0].onMessage, '', '', JSON.stringify({
       'correlation-id': corrId,
       success: true,
       chunk,
     }));
-    await expect(promise).resolves.toMatchObject({ planetId: 'smoke-planet', face: 0 });
+    expect(received).not.toBeNull();
+    expect(received!.planetId).toBe('smoke-planet');
+    expect(received!.face).toBe(0);
     src.dispose();
   });
 
-  it('rejects when the response indicates an error', async () => {
-    const { src, mqtt } = await connectedSource();
-    const promise = src.requestChunk(0, 2, 0, 0);
+  it('fires onError when response indicates an error', () => {
+    const { src, mqtt } = connectedSource();
+    let errMsg: string | null = null;
+    src.requestChunk(0, 2, 0, 0, {
+      onSuccess: () => {},
+      onError: (e) => { errMsg = e.message; },
+    });
     const corrId = JSON.parse(mqtt.publishes[0].message)['correlation-id'];
     fireGlobal(mqtt.subscribes[0].onMessage, '', '', JSON.stringify({
       'correlation-id': corrId,
       success: false,
       error: { code: 'NOT_FOUND', message: 'planet not found' },
     }));
-    await expect(promise).rejects.toThrow(/NOT_FOUND.*planet not found/);
+    expect(errMsg).toMatch(/NOT_FOUND.*planet not found/);
     src.dispose();
   });
 
-  it('ignores responses with unknown correlation-id', async () => {
-    const { src, mqtt } = await connectedSource();
-    // Track settlement with a single .then handler that catches both branches
-    // — guarantees the pending rejection is handled even if dispose() fires
-    // before any other consumer is attached.
-    let outcome: { status: 'fulfilled' | 'rejected'; reason?: unknown } | null = null;
-    src.requestChunk(0, 2, 0, 0).then(
-      () => { outcome = { status: 'fulfilled' }; },
-      (e: unknown) => { outcome = { status: 'rejected', reason: e }; },
-    );
-
+  it('ignores responses with unknown correlation-id', () => {
+    const { src, mqtt } = connectedSource();
+    let settled = false;
+    src.requestChunk(0, 2, 0, 0, {
+      onSuccess: () => { settled = true; },
+      onError: () => { settled = true; },
+    });
     fireGlobal(mqtt.subscribes[0].onMessage, '', '', JSON.stringify({
       'correlation-id': 'not-mine',
       success: true,
       chunk: { planetId: 'x', face: 0, lod: 0, cx: 0, cy: 0, length: 1, width: 1, height: 1, heights: [[0]] },
     }));
-    // Yield: confirm the unknown response did NOT settle the request.
-    await new Promise((r) => setTimeout(r, 5));
-    expect(outcome).toBeNull();
-
-    src.dispose();
-    // Allow microtask to deliver the rejection to our handler.
-    await new Promise((r) => setTimeout(r, 0));
-    expect(outcome).not.toBeNull();
-    expect(outcome!.status).toBe('rejected');
-    expect((outcome!.reason as Error).message).toMatch(/disposed/);
-  });
-
-  it('rejects with timeout when no response arrives in requestTimeoutMs', async () => {
-    const { src } = await connectedSource();
-    const promise = src.requestChunk(0, 2, 0, 0);
-    await expect(promise).rejects.toThrow(/timeout/);
+    expect(settled).toBe(false);
     src.dispose();
   });
 
-  it('rejects all pending requests on disconnect', async () => {
-    const { src, mqtt } = await connectedSource();
-    const p = src.requestChunk(0, 2, 0, 0);
+  it('fires onError after configurable request timeout', async () => {
+    const { src } = connectedSource({ requestTimeoutMs: 10 });
+    let errMsg: string | null = null;
+    src.requestChunk(0, 2, 0, 0, {
+      onSuccess: () => {},
+      onError: (e) => { errMsg = e.message; },
+    });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(errMsg).toMatch(/timeout/);
+    src.dispose();
+  });
+
+  it('fires onError on every pending request when broker disconnects', () => {
+    const { src, mqtt } = connectedSource();
+    let errMsg: string | null = null;
+    src.requestChunk(0, 2, 0, 0, {
+      onSuccess: () => {},
+      onError: (e) => { errMsg = e.message; },
+    });
     fireGlobal(mqtt.ctor.onDisconnected, 128, 'TCP closed');
-    await expect(p).rejects.toThrow(/disconnected/);
+    expect(errMsg).toMatch(/disconnected/);
     src.dispose();
   });
 
-  it('rejects requestChunk before connect() completes', async () => {
+  it('fires onError synchronously when called before connect completes', () => {
     const src = new MqttChunkSource({ planetId: 'p', mqttHost: 'h', mqttPort: 9001 });
-    await expect(src.requestChunk(0, 2, 0, 0)).rejects.toThrow(/not connected/);
+    let errMsg: string | null = null;
+    src.requestChunk(0, 2, 0, 0, {
+      onSuccess: () => {},
+      onError: (e) => { errMsg = e.message; },
+    });
+    expect(errMsg).toMatch(/not connected/);
     src.dispose();
   });
 });
@@ -335,7 +341,7 @@ describe('MqttChunkSource.requestChunk', () => {
 describe('MqttChunkSource.dispose', () => {
   it('clears global callbacks', () => {
     const src = new MqttChunkSource({ planetId: 'p', mqttHost: 'h', mqttPort: 9001 });
-    silenceUnhandled(src.connect());
+    src.connect();
     const mqtt = FakeMQTTClient.lastInstance!;
     const cbName = mqtt.ctor.onConnected;
     expect(typeof (globalThis as Record<string, unknown>)[cbName]).toBe('function');
@@ -345,7 +351,7 @@ describe('MqttChunkSource.dispose', () => {
 
   it('disconnects the MQTT client', () => {
     const src = new MqttChunkSource({ planetId: 'p', mqttHost: 'h', mqttPort: 9001 });
-    silenceUnhandled(src.connect());
+    src.connect();
     const mqtt = FakeMQTTClient.lastInstance!;
     src.dispose();
     expect(mqtt.disconnectCalls).toBe(1);
@@ -354,9 +360,9 @@ describe('MqttChunkSource.dispose', () => {
   it('two simultaneous instances use distinct response topics + callback names', () => {
     const a = new MqttChunkSource({ planetId: 'p', mqttHost: 'h', mqttPort: 9001 });
     const b = new MqttChunkSource({ planetId: 'p', mqttHost: 'h', mqttPort: 9001 });
-    silenceUnhandled(a.connect());
+    a.connect();
     const ma = FakeMQTTClient.instances[0];
-    silenceUnhandled(b.connect());
+    b.connect();
     const mb = FakeMQTTClient.instances[1];
     expect(ma.ctor.onConnected).not.toBe(mb.ctor.onConnected);
     a.dispose();
@@ -365,8 +371,43 @@ describe('MqttChunkSource.dispose', () => {
 
   it('dispose is idempotent', () => {
     const src = new MqttChunkSource({ planetId: 'p', mqttHost: 'h', mqttPort: 9001 });
-    silenceUnhandled(src.connect());
+    src.connect();
     src.dispose();
     expect(() => src.dispose()).not.toThrow();
+  });
+
+  it('fires pending request onError with disposed message', () => {
+    const src = new MqttChunkSource({ planetId: 'p', mqttHost: 'h', mqttPort: 9001 });
+    src.connect();
+    const mqtt = FakeMQTTClient.lastInstance!;
+    fireGlobal(mqtt.ctor.onConnected);
+    fireGlobal(mqtt.subscribes[0].onAcknowledged, 'ok');
+    let errMsg: string | null = null;
+    src.requestChunk(0, 2, 0, 0, {
+      onSuccess: () => {},
+      onError: (e) => { errMsg = e.message; },
+    });
+    src.dispose();
+    expect(errMsg).toMatch(/disposed/);
+  });
+});
+
+describe('MqttChunkSource.requestChunkPromise (Promise wrapper)', () => {
+  it('resolves on success response', async () => {
+    const src = new MqttChunkSource({ planetId: 'p', mqttHost: 'h', mqttPort: 9001 });
+    src.connect();
+    const mqtt = FakeMQTTClient.lastInstance!;
+    fireGlobal(mqtt.ctor.onConnected);
+    fireGlobal(mqtt.subscribes[0].onAcknowledged, 'ok');
+
+    const promise = src.requestChunkPromise(0, 2, 0, 0);
+    const corrId = JSON.parse(mqtt.publishes[0].message)['correlation-id'];
+    fireGlobal(mqtt.subscribes[0].onMessage, '', '', JSON.stringify({
+      'correlation-id': corrId,
+      success: true,
+      chunk: { planetId: 'p', face: 0, lod: 2, cx: 0, cy: 0, length: 1, width: 1, height: 1, heights: [[0]] },
+    }));
+    await expect(promise).resolves.toMatchObject({ planetId: 'p' });
+    src.dispose();
   });
 });

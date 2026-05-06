@@ -129,7 +129,10 @@ export class GlobeRenderer extends WorldRendering {
         return;
       case RenderPhase.TerrainEntity:
         if (this.terrainEntity?.canHandle(key)) {
-          await this.fetchAndLoadTerrain(key);
+          // Fire-and-forget — the chunk-source callback owns rendering when
+          // the response arrives. NOT awaited because the entire MQTT path
+          // is callback-driven (no Promise crossing the network boundary).
+          this.fetchAndLoadTerrain(key);
         } else {
           await this.tileMesh?.load(key);
         }
@@ -145,22 +148,31 @@ export class GlobeRenderer extends WorldRendering {
    * an empty matrix — preserves existing layer-slot lifecycle so callers
    * without a real backend still get a valid streamer state machine.
    */
-  private async fetchAndLoadTerrain(key: ChunkKey): Promise<void> {
+  private fetchAndLoadTerrain(key: ChunkKey): void {
     if (!this.terrainEntity) return;
     const source = this.deps.chunkSource;
     if (!source) {
       // Scaffold mode — no chunkSource means no real terrain to render.
-      // Skip entirely so the world isn't littered with placeholder tiles.
       return;
     }
-    try {
-      const chunk = await source.requestChunk(key.face, key.lod, key.cx, key.cy);
-      await this.terrainEntity.load(key, chunk);
-    } catch (err) {
-      try {
-        Logging?.LogError?.(`GlobeRenderer: chunk fetch failed for ${key.face}:${key.lod}:${key.cx}:${key.cy} — ${(err as Error).message}`);
-      } catch (_e) { /* runtime may not be present in tests */ }
-    }
+    source.requestChunk(key.face, key.lod, key.cx, key.cy, {
+      onSuccess: (chunk) => {
+        // Layer.load is sync in body (Promise of already-resolved void).
+        // Fire-and-forget; nothing here to await.
+        try {
+          this.terrainEntity?.load(key, chunk);
+        } catch (e) {
+          try {
+            Logging?.LogError?.(`GlobeRenderer: terrain.load failed for ${key.face}:${key.lod}:${key.cx}:${key.cy} — ${(e as Error).message}`);
+          } catch (_e) { /* runtime may not be present in tests */ }
+        }
+      },
+      onError: (err) => {
+        try {
+          Logging?.LogError?.(`GlobeRenderer: chunk fetch failed for ${key.face}:${key.lod}:${key.cx}:${key.cy} — ${err.message}`);
+        } catch (_e) { /* runtime may not be present in tests */ }
+      },
+    });
   }
 
   private unloadFromLayers(key: ChunkKey): void {

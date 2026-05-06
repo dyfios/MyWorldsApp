@@ -97,9 +97,9 @@ describe('GlobeRenderer.tick', () => {
     // a non-corner chunk so canHandle is true.
     const requested: Array<[number, number, number, number]> = [];
     const fakeSource = {
-      requestChunk: (face: number, lod: number, cx: number, cy: number) => {
+      requestChunk: (face: number, lod: number, cx: number, cy: number, callbacks: { onSuccess: (c: unknown) => void }) => {
         requested.push([face, lod, cx, cy]);
-        return Promise.resolve({
+        callbacks.onSuccess({
           planetId: 'test-planet',
           face, lod, cx, cy,
           length: 1000, width: 1000, height: 100,
@@ -118,9 +118,11 @@ describe('GlobeRenderer.tick', () => {
     expect(requested).toEqual([[0, 5, 15, 15]]);
   });
 
-  it('logs and continues when chunkSource.requestChunk rejects (does not throw)', async () => {
+  it('logs and continues when chunkSource.requestChunk fires onError', async () => {
     const fakeSource = {
-      requestChunk: () => Promise.reject(new Error('upstream gone')),
+      requestChunk: (_face: number, _lod: number, _cx: number, _cy: number, callbacks: { onError?: (e: Error) => void }) => {
+        callbacks.onError?.(new Error('upstream gone'));
+      },
       dispose: () => {},
     };
     const r = new GlobeRenderer({
