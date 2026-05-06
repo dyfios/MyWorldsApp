@@ -93,7 +93,7 @@ export class TerrainEntityLayer {
     return shouldUseTerrainEntity(key, this.isWebGL);
   }
 
-  async load(key: ChunkKey, chunk: ChunkData): Promise<void> {
+  load(key: ChunkKey, chunk: ChunkData): void {
     if (!this.canHandle(key)) return;
     const id = chunkKeyString(key);
     if (this.tiles.has(id)) return;

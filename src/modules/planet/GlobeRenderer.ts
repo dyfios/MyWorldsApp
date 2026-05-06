@@ -94,13 +94,13 @@ export class GlobeRenderer extends WorldRendering {
     } catch (_e) { /* runtime may not be present in tests */ }
   }
 
-  /** Single frame / tick entry point. Wired by WorldRendererFactory.maintenance. */
-  async tick(camera: CameraState): Promise<void> {
+  /** Single frame / tick entry point. Synchronous — see ILayerAdapter doc. */
+  tick(camera: CameraState): void {
     if (!this.streamer) return;
     const candidates = this.deps.candidateProvider
       ? this.deps.candidateProvider(camera)
       : [];
-    await this.streamer.update(camera, candidates);
+    this.streamer.update(camera, candidates);
   }
 
   dispose(): void {
@@ -119,22 +119,23 @@ export class GlobeRenderer extends WorldRendering {
 
   // ---- Internals ---------------------------------------------------------
 
-  private async loadInLayer(key: ChunkKey, phase: RenderPhase): Promise<void> {
+  private loadInLayer(key: ChunkKey, phase: RenderPhase): void {
     switch (phase) {
       case RenderPhase.Impostor:
         this.impostor?.setVisible(true);
         return;
       case RenderPhase.TileMesh:
-        await this.tileMesh?.load(key);
+        // tileMesh.load returns void already; no await needed.
+        void this.tileMesh?.load(key);
         return;
       case RenderPhase.TerrainEntity:
         if (this.terrainEntity?.canHandle(key)) {
           // Fire-and-forget — the chunk-source callback owns rendering when
-          // the response arrives. NOT awaited because the entire MQTT path
-          // is callback-driven (no Promise crossing the network boundary).
+          // the response arrives. The entire MQTT path is callback-driven
+          // (no Promise crossing the network boundary).
           this.fetchAndLoadTerrain(key);
         } else {
-          await this.tileMesh?.load(key);
+          void this.tileMesh?.load(key);
         }
         return;
       case RenderPhase.Unloaded:

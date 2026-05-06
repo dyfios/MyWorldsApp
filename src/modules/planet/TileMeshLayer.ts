@@ -29,7 +29,7 @@ export class TileMeshLayer {
       `/tile/${key.face}/${key.lod}/${key.cx}/${key.cy}.glb`;
   }
 
-  async load(key: ChunkKey): Promise<void> {
+  load(key: ChunkKey): void {
     const id = chunkKeyString(key);
     if (this.tiles.has(id)) return;
     this.tiles.set(id, { key, meshEntityId: null });

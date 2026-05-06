@@ -60,21 +60,21 @@ describe('GlobeRenderer.initialize', () => {
     const r = new GlobeRenderer({ isWebGL: false });
     await r.initialize(minimalPlanetConfig as never);
     // After init, tick should not throw — proves streamer is wired.
-    await expect(r.tick(camera)).resolves.toBeUndefined();
+    expect(() => r.tick(camera)).not.toThrow();
   });
 
   it('initializes with WEBGL_BUDGET when isWebGL=true', async () => {
     const r = new GlobeRenderer({ isWebGL: true });
     await r.initialize(minimalPlanetConfig as never);
     // Same surface — just confirming the flag path doesn't crash.
-    await expect(r.tick(camera)).resolves.toBeUndefined();
+    expect(() => r.tick(camera)).not.toThrow();
   });
 });
 
 describe('GlobeRenderer.tick', () => {
   it('is a no-op before initialize (no streamer wired yet)', async () => {
     const r = new GlobeRenderer();
-    await expect(r.tick(camera)).resolves.toBeUndefined();
+    expect(() => r.tick(camera)).not.toThrow();
   });
 
   it('passes candidates from candidateProvider through the streamer', async () => {
@@ -88,7 +88,7 @@ describe('GlobeRenderer.tick', () => {
       },
     });
     await r.initialize(minimalPlanetConfig as never);
-    await r.tick(camera);
+    r.tick(camera);
     expect(called).toBe(1);
   });
 
@@ -114,7 +114,7 @@ describe('GlobeRenderer.tick', () => {
       candidateProvider: () => [{ face: 0, lod: 5, cx: 15, cy: 15 }],
     });
     await r.initialize(minimalPlanetConfig as never);
-    await r.tick(camera);
+    r.tick(camera);
     expect(requested).toEqual([[0, 5, 15, 15]]);
   });
 
@@ -131,7 +131,7 @@ describe('GlobeRenderer.tick', () => {
       candidateProvider: () => [{ face: 0, lod: 5, cx: 15, cy: 15 }],
     });
     await r.initialize(minimalPlanetConfig as never);
-    await expect(r.tick(camera)).resolves.toBeUndefined();
+    expect(() => r.tick(camera)).not.toThrow();
   });
 });
 
@@ -146,7 +146,7 @@ describe('GlobeRenderer.dispose', () => {
     await r.initialize(minimalPlanetConfig as never);
     r.dispose();
     // After dispose, streamer is null again — tick must short-circuit.
-    await expect(r.tick(camera)).resolves.toBeUndefined();
+    expect(() => r.tick(camera)).not.toThrow();
   });
 
   it('is idempotent', async () => {

@@ -33,7 +33,14 @@ export interface CameraState {
 }
 
 export interface ILayerAdapter {
-  load(key: ChunkKey, phase: RenderPhase): Promise<void>;
+  /**
+   * Load a chunk into the layer. SYNCHRONOUS — actual async work (chunk
+   * fetch, runtime entity creation) is callback-driven and fire-and-forget
+   * so this returns immediately. JINT's microtask scheduler can't be relied
+   * on for await-of-Promise resumption, so we keep the streamer's hot path
+   * Promise-free.
+   */
+  load(key: ChunkKey, phase: RenderPhase): void;
   unload(key: ChunkKey): void;
   setPhase(key: ChunkKey, phase: RenderPhase): void;
 }
@@ -63,8 +70,11 @@ export class ChunkStreamer {
     this.budget = budget;
   }
 
-  /** Mark-and-sweep style update. Call every frame or tile boundary. */
-  async update(camera: CameraState, candidates: ChunkKey[]): Promise<void> {
+  /**
+   * Mark-and-sweep style update. Synchronous — all layer operations are
+   * fire-and-forget. Call every frame or tile boundary.
+   */
+  update(camera: CameraState, candidates: ChunkKey[]): void {
     this.tick++;
     const phase = phaseForAltitude(camera.altitudeMeters);
     const touched = new Set<string>();
@@ -80,7 +90,7 @@ export class ChunkStreamer {
       if (!existing) {
         const entry: Entry = { key, phase, lastTick: this.tick };
         this.entries.set(id, entry);
-        await this.layer.load(key, phase);
+        this.layer.load(key, phase);
       } else {
         existing.lastTick = this.tick;
         if (existing.phase !== phase) {
