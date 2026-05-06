@@ -71,10 +71,21 @@ export class TerrainEntityLayer {
   private readonly cfg: PlanetSceneConfig;
   private readonly tiles = new Map<string, LoadedTerrainTile>();
   private readonly isWebGL: boolean;
+  /**
+   * World-space origin in chunk coordinates. Pinned from `cfg.originChunk`
+   * if provided, otherwise lazy-pinned to the first chunk loaded. Subsequent
+   * chunks render at their (cx - originCx, cy - originCy) offset.
+   */
+  private originCx: number | null = null;
+  private originCy: number | null = null;
 
   constructor(cfg: PlanetSceneConfig, isWebGL: boolean) {
     this.cfg = cfg;
     this.isWebGL = isWebGL;
+    if (cfg.originChunk) {
+      this.originCx = cfg.originChunk.cx;
+      this.originCy = cfg.originChunk.cy;
+    }
   }
 
   /** Returns false when this tile must fall back to TileMesh (corners / WebGL). */
@@ -148,13 +159,21 @@ export class TerrainEntityLayer {
       } catch (_e) { /* best-effort */ }
     };
 
-    // Tile placement: lay chunks out as a flat XZ grid keyed by (cx, cy).
+    // Tile placement: lay chunks out as a flat XZ grid keyed by (cx, cy)
+    // RELATIVE to the layer's origin chunk. The origin is the URL-supplied
+    // base chunk (or the first chunk loaded if not configured) — this puts
+    // the player's nominal landing spot at world (0, *, 0) instead of way
+    // off in absolute (cx*length, _, cy*width) space.
     // Position.y = -SEA_LEVEL_OFFSET_METERS so the heightmap [0..envelope]
     // renders at world Y in [-SEA_LEVEL_OFFSET, envelope - SEA_LEVEL_OFFSET].
     // V1 simplification — proper cube-sphere tile placement (with rotations
     // onto the actual sphere surface) is a future increment.
-    const worldX = chunk.cx * chunk.length;
-    const worldZ = chunk.cy * chunk.width;
+    if (this.originCx === null || this.originCy === null) {
+      this.originCx = chunk.cx;
+      this.originCy = chunk.cy;
+    }
+    const worldX = (chunk.cx - this.originCx) * chunk.length;
+    const worldZ = (chunk.cy - this.originCy) * chunk.width;
 
     try {
       w.TerrainEntity.CreateHeightmap(

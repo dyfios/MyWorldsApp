@@ -346,7 +346,19 @@ export class MyWorld {
       Logging.LogError('❌ planet world: invalid nExponent: ' + nExpRaw);
       return null;
     }
-    return { planetId, radiusMeters, nExponent, biomeMapUrl, chunkServiceBaseUrl };
+    // The same URL params drive both the candidate provider's center AND the
+    // tile-placement origin so the player spawns inside their 3×3 patch.
+    const face = (Math.max(0, Math.min(5, Math.trunc(Number(this.queryParams.get('face') ?? 0)))) as 0|1|2|3|4|5);
+    const originCx = Number(this.queryParams.get('cx') ?? 15);
+    const originCy = Number(this.queryParams.get('cy') ?? 15);
+    return {
+      planetId,
+      radiusMeters,
+      nExponent,
+      biomeMapUrl,
+      chunkServiceBaseUrl,
+      originChunk: { face, cx: originCx, cy: originCy },
+    };
   }
 
   /**

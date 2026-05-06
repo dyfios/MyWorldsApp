@@ -177,27 +177,73 @@ describe('TerrainEntityLayer with WebVerse runtime globals', () => {
     lastEntity = null;
   };
 
-  it('shifts heights by fixed sea-level offset and positions tile in XZ grid', async () => {
+  it('shifts heights by fixed sea-level offset and positions tiles relative to origin chunk', async () => {
+    installRuntime();
+    try {
+      // Pin origin so positions are deterministic regardless of load order.
+      const layer = new TerrainEntityLayer(
+        { ...cfg, originChunk: { face: 0, cx: 16, cy: 16 } },
+        false,
+      );
+      const heightsBeforeShift = [[-34, -10], [5, 18]];
+
+      // Load center chunk: should sit at world (0, -300, 0).
+      const center = k(0, 5, 16, 16);
+      const cCenter = chunk(center, heightsBeforeShift);
+      cCenter.length = 1227; cCenter.width = 1227; cCenter.height = 1500;
+      await layer.load(center, cCenter);
+      expect(createCalls.length).toBe(1);
+      const ccCenter = createCalls[0]!;
+      expect(ccCenter.position.x).toBe(0);
+      expect(ccCenter.position.y).toBe(-300);
+      expect(ccCenter.position.z).toBe(0);
+      // FIXED offset (300m) applied to every value.
+      expect(Math.min(...ccCenter.heights.flat())).toBe(-34 + 300);
+      expect(Math.max(...ccCenter.heights.flat())).toBe(18 + 300);
+      // Envelope = chunk's declared height (plugin's CHUNK_HEIGHT_ENVELOPE).
+      expect(ccCenter.height).toBe(1500);
+      expect(ccCenter.layers.length).toBe(1);
+
+      // Load east neighbor (cx=17): should sit at world (+1227, -300, 0).
+      const east = k(0, 5, 17, 16);
+      const cEast = chunk(east, [[-34, -10], [5, 18]]);
+      cEast.length = 1227; cEast.width = 1227; cEast.height = 1500;
+      await layer.load(east, cEast);
+      const ccEast = createCalls[1]!;
+      expect(ccEast.position.x).toBe(1227);
+      expect(ccEast.position.y).toBe(-300);
+      expect(ccEast.position.z).toBe(0);
+
+      // Load south neighbor (cy=17): should sit at (0, -300, +1227).
+      const south = k(0, 5, 16, 17);
+      const cSouth = chunk(south, [[-34, -10], [5, 18]]);
+      cSouth.length = 1227; cSouth.width = 1227; cSouth.height = 1500;
+      await layer.load(south, cSouth);
+      const ccSouth = createCalls[2]!;
+      expect(ccSouth.position.x).toBe(0);
+      expect(ccSouth.position.z).toBe(1227);
+    } finally {
+      uninstallRuntime();
+    }
+  });
+
+  it('lazy-pins origin to first chunk loaded when cfg.originChunk is absent', async () => {
     installRuntime();
     try {
       const layer = new TerrainEntityLayer(cfg, false);
-      const key = k(0, 5, 17, 16); // non-corner; cx=17, cy=16
-      const heightsBeforeShift = [[-34, -10], [5, 18]];
-      const c0 = chunk(key, heightsBeforeShift);
-      c0.length = 1227; c0.width = 1227; c0.height = 1500;
-      await layer.load(key, c0);
-      expect(createCalls.length).toBe(1);
-      const c = createCalls[0]!;
-      // FIXED offset (300m) applied to every value — adjacent tiles align.
-      expect(Math.min(...c.heights.flat())).toBe(-34 + 300);
-      expect(Math.max(...c.heights.flat())).toBe(18 + 300);
-      // Envelope = chunk's declared height (plugin's CHUNK_HEIGHT_ENVELOPE).
-      expect(c.height).toBe(1500);
-      // Position: cx*length on X, -300 on Y, cy*width on Z.
-      expect((c.position as { x: number; y: number; z: number }).x).toBe(17 * 1227);
-      expect(c.position.y).toBe(-300);
-      expect((c.position as { x: number; y: number; z: number }).z).toBe(16 * 1227);
-      expect(c.layers.length).toBe(1);
+      const k1 = k(0, 5, 20, 20);
+      const c1 = chunk(k1, [[0, 0], [0, 0]]);
+      c1.length = 1000; c1.width = 1000;
+      await layer.load(k1, c1);
+      expect(createCalls[0]!.position.x).toBe(0);
+      expect(createCalls[0]!.position.z).toBe(0);
+
+      const k2 = k(0, 5, 21, 20);
+      const c2 = chunk(k2, [[0, 0], [0, 0]]);
+      c2.length = 1000; c2.width = 1000;
+      await layer.load(k2, c2);
+      expect(createCalls[1]!.position.x).toBe(1000);
+      expect(createCalls[1]!.position.z).toBe(0);
     } finally {
       uninstallRuntime();
     }

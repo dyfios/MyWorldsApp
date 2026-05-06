@@ -37,6 +37,14 @@ export interface PlanetSceneConfig {
   nExponent: number;
   biomeMapUrl: string;
   chunkServiceBaseUrl: string;
+  /**
+   * Reference chunk used as world-space origin for tile placement. When set,
+   * each chunk renders at world position
+   *   ((chunk.cx - originChunk.cx) * length, ..., (chunk.cy - originChunk.cy) * width).
+   * Without it, TerrainEntityLayer pins the origin to the first chunk it
+   * loads — which is order-dependent and rarely what callers want.
+   */
+  originChunk?: { face: CubeFace; cx: number; cy: number };
 }
 
 /** LRU streaming budget. Halved on WebGL per AC 6.3. */
