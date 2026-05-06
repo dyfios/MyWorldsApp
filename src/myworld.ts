@@ -3,6 +3,10 @@
  * Orchestrates the client startup sequence
  */
 
+// Patch setTimeout/clearTimeout into the JINT runtime BEFORE any module that
+// might use them (MqttChunkSource etc.). Idempotent in Node test envs.
+import './utils/runtime-polyfills';
+
 import { ClientContext } from './modules/ClientContext';
 import { ProcessQueryParams } from './utils/ProcessQueryParams';
 import { StaticSurfaceRenderer } from './modules/WorldRendererFactory';
