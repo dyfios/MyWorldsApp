@@ -389,14 +389,28 @@ export class MyWorld {
         ' radius=' + planetSceneConfig.radiusMeters + 'm' +
         ' nExp=' + planetSceneConfig.nExponent);
 
-      const chunkSource = await this.maybeBuildAndConnectChunkSource(planetSceneConfig.planetId);
+      // Build chunkSource synchronously and kick off connect FIRE-AND-FORGET.
+      // We never await it from this critical path — even a hung connect must
+      // not block worldType setup. requestChunk rejects until subscribed;
+      // GlobeRenderer's fetchAndLoadTerrain already swallows fetch errors,
+      // so unconnected ticks are a no-op until the broker comes online.
+      const chunkSource = this.buildChunkSource(planetSceneConfig.planetId);
+      if (chunkSource) {
+        chunkSource.connect().then(
+          () => { Logging.Log('🌍 MqttChunkSource connected — chunks will start fetching'); },
+          (err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            Logging.LogError('❌ MqttChunkSource connect failed: ' + msg);
+          },
+        );
+      }
 
       const worldConfig: WorldConfig = { planet: planetSceneConfig };
       const candidateProvider = this.buildSingleChunkCandidateProvider();
       const deps = { chunkSource: chunkSource ?? undefined, candidateProvider };
       await this.context.modules.worldRendering.initializePlanetRenderer(worldConfig, deps);
       Logging.Log('✓ GlobeRenderer setup completed for planet world' +
-        (chunkSource ? ' (chunk source connected)' : ' (scaffold mode — no chunk source)'));
+        (chunkSource ? ' (connect pending — terrain will appear once broker subscribes)' : ' (scaffold mode — no chunk source)'));
 
       // Wire the per-frame tick driver. Time.SetInterval at 0.5s mirrors the
       // legacy TiledSurfaceRenderer maintenance cadence — granular enough for
@@ -488,11 +502,11 @@ export class MyWorld {
   }
 
   /**
-   * Construct + connect an MqttChunkSource if the URL provided MQTT params.
-   * Returns null when params are missing or the connect fails — caller falls
-   * back to scaffold mode in either case.
+   * Construct an MqttChunkSource if the URL provided MQTT params. Does NOT
+   * connect — the caller kicks off connect fire-and-forget so world setup
+   * never blocks on broker state.
    */
-  private async maybeBuildAndConnectChunkSource(planetId: string): Promise<MqttChunkSource | null> {
+  private buildChunkSource(planetId: string): MqttChunkSource | null {
     const mqttHost = this.queryParams.get('mqttHost') as string | undefined;
     if (!mqttHost) {
       Logging.Log('🌍 No mqttHost query param — running GlobeRenderer in scaffold mode');
@@ -510,22 +524,13 @@ export class MyWorld {
       return null;
     }
 
-    const source = new MqttChunkSource({
+    Logging.Log('🌍 Building MqttChunkSource (' + transportRaw + ' ' + mqttHost + ':' + mqttPort + ')');
+    return new MqttChunkSource({
       planetId,
       mqttHost,
       mqttPort,
       mqttTransport: transportRaw,
     });
-    try {
-      await source.connect();
-      Logging.Log('🌍 MqttChunkSource connected (' + transportRaw + ' ' + mqttHost + ':' + mqttPort + ')');
-      return source;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      Logging.LogError('❌ MqttChunkSource connect failed: ' + msg);
-      try { source.dispose(); } catch (_e) { /* best-effort */ }
-      return null;
-    }
   }
 
   /**
