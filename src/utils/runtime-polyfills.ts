@@ -58,8 +58,11 @@ if (typeof g.setTimeout !== 'function') {
           logging?.LogError?.('setTimeout callback threw: ' + (e instanceof Error ? e.message : String(e)));
         }
       };
-      // Time.SetTimeout takes seconds. Default 0ms → fire next tick (use 0).
-      Time.SetTimeout(`${cbName}();`, (ms ?? 0) / 1000);
+      // Time.SetTimeout takes MILLISECONDS (per ExecutionTask.millisecondsRemaining
+      // in WebVerse-Runtime/.../JavascriptHandler.cs). The d.ts is unit-agnostic
+      // so this was originally divided-by-1000 — that bug fired every timeout
+      // ~1000× too early and made MqttChunkSource look unreachable.
+      Time.SetTimeout(`${cbName}();`, ms ?? 0);
       return id;
     };
 
