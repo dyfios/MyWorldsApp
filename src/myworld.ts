@@ -521,12 +521,21 @@ export class MyWorld {
       return null;
     }
 
-    Logging.Log('🌍 Building MqttChunkSource (' + transportRaw + ' ' + mqttHost + ':' + mqttPort + ')');
+    // Per-request timeout: 60s default. With 9 concurrent chunks at lod=5
+    // (~1M noise samples each), sequential generation in the plugin can
+    // legitimately push the last response well past 15s. Override via
+    // `?chunkTimeoutMs=...` if you need to debug a slow planet.
+    const chunkTimeoutRaw = this.queryParams.get('chunkTimeoutMs') as string | undefined;
+    const chunkTimeoutMs = chunkTimeoutRaw ? Number(chunkTimeoutRaw) : 60_000;
+
+    Logging.Log('🌍 Building MqttChunkSource (' + transportRaw + ' ' + mqttHost + ':' + mqttPort +
+      ' timeout=' + chunkTimeoutMs + 'ms)');
     return new MqttChunkSource({
       planetId,
       mqttHost,
       mqttPort,
       mqttTransport: transportRaw,
+      requestTimeoutMs: chunkTimeoutMs,
     });
   }
 
