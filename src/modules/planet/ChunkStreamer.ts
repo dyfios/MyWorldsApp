@@ -34,13 +34,18 @@ export interface CameraState {
 
 export interface ILayerAdapter {
   /**
-   * Load a chunk into the layer. SYNCHRONOUS — actual async work (chunk
-   * fetch, runtime entity creation) is callback-driven and fire-and-forget
-   * so this returns immediately. JINT's microtask scheduler can't be relied
-   * on for await-of-Promise resumption, so we keep the streamer's hot path
-   * Promise-free.
+   * Kick off loading a chunk into the layer. SYNCHRONOUS — actual async
+   * work (chunk fetch, runtime entity creation) is callback-driven and
+   * fire-and-forget so this returns immediately. JINT's microtask scheduler
+   * can't be relied on for await-of-Promise resumption, so the streamer's
+   * hot path stays Promise-free.
+   *
+   * Returns `true` if the load was accepted (the layer is now responsible
+   * for this slot) or `false` if it was rejected upstream — e.g. the chunk
+   * source isn't connected yet. On `false`, the streamer must NOT track an
+   * entry; it should try again on the next tick.
    */
-  load(key: ChunkKey, phase: RenderPhase): void;
+  load(key: ChunkKey, phase: RenderPhase): boolean;
   unload(key: ChunkKey): void;
   setPhase(key: ChunkKey, phase: RenderPhase): void;
 }
@@ -85,13 +90,17 @@ export class ChunkStreamer {
 
     for (const key of sorted) {
       const id = chunkKeyString(key);
-      touched.add(id);
       const existing = this.entries.get(id);
       if (!existing) {
-        const entry: Entry = { key, phase, lastTick: this.tick };
-        this.entries.set(id, entry);
-        this.layer.load(key, phase);
+        // Only track the entry if the layer accepted the load. Rejected
+        // loads (e.g. chunk source not connected yet) leave the slot empty
+        // so we retry on the next tick once the dependency is ready.
+        if (this.layer.load(key, phase)) {
+          this.entries.set(id, { key, phase, lastTick: this.tick });
+          touched.add(id);
+        }
       } else {
+        touched.add(id);
         existing.lastTick = this.tick;
         if (existing.phase !== phase) {
           existing.phase = phase;

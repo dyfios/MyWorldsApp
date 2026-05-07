@@ -115,4 +115,12 @@ export interface IChunkSource {
     callbacks: ChunkRequestCallbacks,
   ): void;
   dispose(): void;
+  /**
+   * Optional readiness probe. When present and returning false, callers
+   * (notably GlobeRenderer's loadInLayer) defer requests so the streamer
+   * retries on the next tick instead of marking the slot as loaded with
+   * a "not connected" failure. Mocks that fire callbacks synchronously
+   * can omit this — absence is treated as "always ready."
+   */
+  isConnected?(): boolean;
 }

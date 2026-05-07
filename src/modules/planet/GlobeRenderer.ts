@@ -80,7 +80,7 @@ export class GlobeRenderer extends WorldRendering {
     await this.impostor.initialize();
 
     const layer: ILayerAdapter = {
-      load: async (key, phase) => this.loadInLayer(key, phase),
+      load: (key, phase) => this.loadInLayer(key, phase),
       unload: (key) => this.unloadFromLayers(key),
       setPhase: (key, phase) => this.setPhaseInLayers(key, phase),
     };
@@ -119,27 +119,29 @@ export class GlobeRenderer extends WorldRendering {
 
   // ---- Internals ---------------------------------------------------------
 
-  private loadInLayer(key: ChunkKey, phase: RenderPhase): void {
+  private loadInLayer(key: ChunkKey, phase: RenderPhase): boolean {
     switch (phase) {
       case RenderPhase.Impostor:
         this.impostor?.setVisible(true);
-        return;
+        return true;
       case RenderPhase.TileMesh:
-        // tileMesh.load returns void already; no await needed.
-        void this.tileMesh?.load(key);
-        return;
+        this.tileMesh?.load(key);
+        return true;
       case RenderPhase.TerrainEntity:
         if (this.terrainEntity?.canHandle(key)) {
-          // Fire-and-forget — the chunk-source callback owns rendering when
-          // the response arrives. The entire MQTT path is callback-driven
-          // (no Promise crossing the network boundary).
+          // Only accept the slot if the chunk source is ready — otherwise
+          // return false so the streamer retries this chunk next tick once
+          // connect completes.
+          const source = this.deps.chunkSource;
+          if (!source) return false; // scaffold mode — never accept slots
+          if (!sourceReady(source)) return false;
           this.fetchAndLoadTerrain(key);
-        } else {
-          void this.tileMesh?.load(key);
+          return true;
         }
-        return;
+        this.tileMesh?.load(key);
+        return true;
       case RenderPhase.Unloaded:
-        return;
+        return true;
     }
   }
 
@@ -202,6 +204,15 @@ export class GlobeRenderer extends WorldRendering {
       } catch (_e) { /* ignore */ }
     }
   }
+}
+
+/**
+ * True when the source is ready to accept a chunk request. Sources without
+ * an `isConnected` probe are treated as always ready (synchronous test
+ * mocks). Centralized so multiple call sites stay consistent.
+ */
+function sourceReady(source: IChunkSource): boolean {
+  return typeof source.isConnected === 'function' ? source.isConnected() : true;
 }
 
 function detectWebGL(): boolean {

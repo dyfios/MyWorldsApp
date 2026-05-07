@@ -32,8 +32,9 @@ function makeRecorder(): RecorderLayer {
     loads: [],
     unloads: [],
     setPhases: [],
-    async load(key, phase) {
+    load(key, phase) {
       r.loads.push({ key, phase });
+      return true;
     },
     unload(key) {
       r.unloads.push(key);
@@ -77,7 +78,7 @@ describe('ChunkStreamer.update', () => {
 
   it('loads new chunks on first update', async () => {
     const candidates = [k(0, 5, 0, 0), k(0, 5, 0, 1)];
-    await streamer.update(camera(500), candidates);
+    streamer.update(camera(500), candidates);
     expect(layer.loads).toHaveLength(2);
     expect(layer.loads.every((l) => l.phase === RenderPhase.TerrainEntity)).toBe(true);
     expect(streamer.size()).toBe(2);
@@ -85,33 +86,33 @@ describe('ChunkStreamer.update', () => {
 
   it('does not re-load chunks already tracked', async () => {
     const candidates = [k(0, 5, 0, 0)];
-    await streamer.update(camera(500), candidates);
-    await streamer.update(camera(500), candidates);
+    streamer.update(camera(500), candidates);
+    streamer.update(camera(500), candidates);
     expect(layer.loads).toHaveLength(1);
     expect(streamer.size()).toBe(1);
   });
 
   it('unloads chunks no longer in candidate set', async () => {
-    await streamer.update(camera(500), [k(0, 5, 0, 0), k(0, 5, 0, 1)]);
+    streamer.update(camera(500), [k(0, 5, 0, 0), k(0, 5, 0, 1)]);
     layer.unloads.length = 0;
-    await streamer.update(camera(500), [k(0, 5, 0, 0)]); // dropped (0,1)
+    streamer.update(camera(500), [k(0, 5, 0, 0)]); // dropped (0,1)
     expect(layer.unloads).toHaveLength(1);
     expect(layer.unloads[0]).toEqual(k(0, 5, 0, 1));
     expect(streamer.size()).toBe(1);
   });
 
   it('promotes phase when altitude crosses threshold', async () => {
-    await streamer.update(camera(500), [k(0, 5, 0, 0)]); // TerrainEntity
+    streamer.update(camera(500), [k(0, 5, 0, 0)]); // TerrainEntity
     layer.setPhases.length = 0;
-    await streamer.update(camera(20_000), [k(0, 5, 0, 0)]); // Impostor
+    streamer.update(camera(20_000), [k(0, 5, 0, 0)]); // Impostor
     expect(layer.setPhases).toHaveLength(1);
     expect(layer.setPhases[0].phase).toBe(RenderPhase.Impostor);
   });
 
   it('does not call setPhase when phase is unchanged', async () => {
-    await streamer.update(camera(500), [k(0, 5, 0, 0)]);
+    streamer.update(camera(500), [k(0, 5, 0, 0)]);
     layer.setPhases.length = 0;
-    await streamer.update(camera(800), [k(0, 5, 0, 0)]); // still TerrainEntity
+    streamer.update(camera(800), [k(0, 5, 0, 0)]); // still TerrainEntity
     expect(layer.setPhases).toHaveLength(0);
   });
 });
@@ -122,7 +123,7 @@ describe('ChunkStreamer LRU eviction', () => {
     const streamer = new ChunkStreamer(layer, BUDGET); // cap=4
 
     // Tick 1: load 4 chunks (at cap, no eviction)
-    await streamer.update(camera(500), [
+    streamer.update(camera(500), [
       k(0, 5, 0, 0),
       k(0, 5, 0, 1),
       k(0, 5, 0, 2),
@@ -136,7 +137,7 @@ describe('ChunkStreamer LRU eviction', () => {
     // Actually: the sweep DOES run first and removes chunks not in the candidate set.
     // To test LRU specifically, we need the candidate set itself to exceed cap.
     layer.loads.length = 0;
-    await streamer.update(camera(500), [
+    streamer.update(camera(500), [
       k(0, 5, 0, 0),
       k(0, 5, 0, 1),
       k(0, 5, 0, 2),
@@ -155,14 +156,14 @@ describe('ChunkStreamer LRU eviction', () => {
     const layer = makeRecorder();
     const streamer = new ChunkStreamer(layer, BUDGET);
 
-    await streamer.update(camera(500), [k(0, 5, 0, 0), k(0, 5, 0, 1)]); // tick 1
-    await streamer.update(camera(500), [k(0, 5, 0, 0)]); // tick 2 — (0,1) culled by sweep
+    streamer.update(camera(500), [k(0, 5, 0, 0), k(0, 5, 0, 1)]); // tick 1
+    streamer.update(camera(500), [k(0, 5, 0, 0)]); // tick 2 — (0,1) culled by sweep
     expect(streamer.size()).toBe(1);
 
     // Now request 5 fresh candidates (cap=4). All have lastTick=tick3 except (0,0)
     // which has lastTick=tick3 too after refresh. Eviction picks one arbitrarily;
     // size bounded.
-    await streamer.update(camera(500), [
+    streamer.update(camera(500), [
       k(0, 5, 0, 0),
       k(0, 5, 1, 0),
       k(0, 5, 1, 1),
@@ -177,7 +178,7 @@ describe('ChunkStreamer.disposeAll', () => {
   it('unloads every tracked chunk and clears state', async () => {
     const layer = makeRecorder();
     const streamer = new ChunkStreamer(layer, BUDGET);
-    await streamer.update(camera(500), [k(0, 5, 0, 0), k(0, 5, 0, 1)]);
+    streamer.update(camera(500), [k(0, 5, 0, 0), k(0, 5, 0, 1)]);
     layer.unloads.length = 0;
     streamer.disposeAll();
     expect(layer.unloads).toHaveLength(2);
