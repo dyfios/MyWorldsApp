@@ -113,12 +113,24 @@ export class TerrainEntityLayer {
     // FIXED offset across all chunks — instead of per-chunk min — means
     // adjacent tiles align cleanly at their shared boundary.
     // Mutates `chunk.heights` in place; the matrix isn't retained by caller.
+    let rawMin = Infinity;
+    let rawMax = -Infinity;
     for (let r = 0; r < chunk.heights.length; r++) {
       const row = chunk.heights[r]!;
       for (let i = 0; i < row.length; i++) {
-        row[i]! += SEA_LEVEL_OFFSET_METERS;
+        const v = row[i]!;
+        if (v < rawMin) rawMin = v;
+        if (v > rawMax) rawMax = v;
+        row[i] = v + SEA_LEVEL_OFFSET_METERS;
       }
     }
+    // Diagnostic: print raw plugin-side min/max so we can tell at a glance
+    // whether neighboring chunks share value ranges (visible boundary cliffs
+    // are bugs) or differ wildly (cliffs are real geography).
+    try {
+      const w2 = globalThis as unknown as { Logging?: { Log?: (m: string) => void } };
+      w2.Logging?.Log?.(`tile ${id} raw min=${rawMin.toFixed(1)} max=${rawMax.toFixed(1)} range=${(rawMax - rawMin).toFixed(1)}`);
+    } catch (_e) { /* runtime may be absent in tests */ }
     // Use the plugin-declared height envelope so all chunks share the same
     // vertical scale. Unity stores heightmap in [0..1] = value / envelope;
     // rendered relief is still in real meters via terrainData.size.y.
