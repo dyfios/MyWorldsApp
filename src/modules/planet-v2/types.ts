@@ -1,0 +1,198 @@
+// Copyright (c) 2019-2026 Five Squared Interactive. All rights reserved.
+
+/**
+ * Shared types for planet-v2.
+ *
+ * The 4-layer pipeline (far → near):
+ *   ImpostorSphere → TileMesh → TerrainEntity
+ *
+ * Architecture: only the chunk the player is *standing on* uses
+ * TerrainEntity (Unity Terrain — collidable, diggable, can't be rotated).
+ * Neighbor chunks at mid-range use TileMesh (server-baked glTF). Far view
+ * is the impostor sphere. v2 currently ships only TerrainEntity for the
+ * single player-chunk; TileMesh + Impostor are stubbed visibly so the gap
+ * is loud, not silent.
+ */
+
+/* ──────────────────────────── Chunk identity ─────────────────────────── */
+
+export type CubeFace = 0 | 1 | 2 | 3 | 4 | 5;
+
+/** A single terrain chunk's grid identity at some LOD. */
+export interface ChunkKey {
+  face: CubeFace;
+  lod: number;
+  cx: number;
+  cy: number;
+}
+
+export function chunkKeyString(k: ChunkKey): string {
+  return `${k.face}:${k.lod}:${k.cx}:${k.cy}`;
+}
+
+/** Number of cells along one cube-face edge at a given LOD (= 2^lod). */
+export function cellsPerEdgeAtLod(lod: number): number {
+  return 1 << lod;
+}
+
+/* ──────────────────────────── Chunk payload ──────────────────────────── */
+
+/**
+ * Chunk data returned by `wos-plugin-planet`'s chunk-request endpoint.
+ * Heights are in real meters (negatives possible for ocean floor — caller
+ * shifts before passing to TerrainEntity).
+ */
+export interface ChunkData {
+  planetId: string;
+  face: CubeFace;
+  lod: number;
+  cx: number;
+  cy: number;
+  /** World-space side length in meters. */
+  length: number;
+  /** World-space side width in meters. */
+  width: number;
+  /** Vertical envelope in meters (max altitude the plugin guarantees). */
+  height: number;
+  /** Row-major heights matrix in meters. heights[r=V][c=U]. */
+  heights: number[][];
+  revision?: number;
+  planet_config_hash?: string;
+  terrainType?: string;
+}
+
+/* ──────────────────────────── Chunk source ───────────────────────────── */
+
+/** Callback pair for chunk fetches. Promise-free on purpose (JINT). */
+export interface ChunkRequestCallbacks {
+  onSuccess: (chunk: ChunkData) => void;
+  onError?: (err: Error) => void;
+}
+
+/**
+ * Chunk-fetching backend. Callback-driven so JINT's microtask scheduler
+ * doesn't have to resume awaiters across the network boundary. Disposable.
+ */
+export interface IChunkSource {
+  /** Whether the source is ready to accept `requestChunk`. */
+  isConnected(): boolean;
+
+  /** Publish a chunk request. Results delivered via callbacks. */
+  requestChunk(
+    face: CubeFace,
+    lod: number,
+    cx: number,
+    cy: number,
+    callbacks: ChunkRequestCallbacks,
+  ): void;
+
+  dispose(): void;
+}
+
+/* ──────────────────────────── Render phases ──────────────────────────── */
+
+export enum RenderPhase {
+  Impostor = 'impostor',
+  TileMesh = 'tilemesh',
+  TerrainEntity = 'terrainentity',
+  Unloaded = 'unloaded',
+}
+
+/* ──────────────────────────── Streaming budget ───────────────────────── */
+
+export interface StreamingBudget {
+  lruCap: number;
+  loadRadiusMeters: number;
+  unloadRadiusMeters: number;
+}
+
+export const DEFAULT_BUDGET: StreamingBudget = {
+  lruCap: 64,
+  loadRadiusMeters: 8000,
+  unloadRadiusMeters: 12000,
+};
+
+export const WEBGL_BUDGET: StreamingBudget = {
+  lruCap: 32,
+  loadRadiusMeters: 6000,
+  unloadRadiusMeters: 9000,
+};
+
+/* ──────────────────────────── Camera state ───────────────────────────── */
+
+export interface Vec3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface CameraState {
+  /** World position of the camera / player. */
+  position: Vec3;
+  /** Recent velocity (m/s). Zero is acceptable for v1 single-chunk scope. */
+  velocity: Vec3;
+  /** Height above sphere surface in meters — drives `phaseForAltitude`. */
+  altitudeMeters: number;
+}
+
+/* ──────────────────────────── Layer adapter ──────────────────────────── */
+
+/**
+ * Layer adapter interface used by the streamer. Synchronous — actual async
+ * work is callback-driven and fire-and-forget. Returns `boolean` so the
+ * streamer can leave a slot un-tracked when the layer can't accept yet
+ * (e.g., chunk source not connected) and retry next tick.
+ */
+export interface ILayer {
+  /** True if this key is renderable by THIS layer at all (e.g. corners). */
+  canHandle(key: ChunkKey): boolean;
+
+  /**
+   * Kick off loading. Returns true if the load was accepted (layer is now
+   * tracking this slot), false if upstream isn't ready (streamer retries).
+   */
+  load(key: ChunkKey, chunk: ChunkData): boolean;
+
+  /** Free any resources for this key; idempotent. */
+  unload(key: ChunkKey): void;
+
+  /** Free everything; safe to call before initialize completes. */
+  dispose(): void;
+}
+
+/* ──────────────────────────── Planet config ──────────────────────────── */
+
+/** Configuration handed to GlobeRenderer at initialize. */
+export interface PlanetSceneConfig {
+  planetId: string;
+  /** Sphere radius in meters. V1 = 25000m. */
+  radiusMeters: number;
+  /**
+   * Maximum LOD exponent — number of subdivisions per cube face edge is
+   * 2^nExponent. V1 = 5 → 32 cells per edge.
+   */
+  nExponent: number;
+  /** URL of the baked biome map (for Impostor). May be empty in V1. */
+  biomeMapUrl: string;
+  /**
+   * HTTP-style base URL for chunk-mesh assets. May be empty in V1. Reserved
+   * for the Story 5.7 mesh-delivery work.
+   */
+  chunkServiceBaseUrl: string;
+  /** Optional: chunk used as world-origin reference for tile placement. */
+  originChunk?: { face: CubeFace; cx: number; cy: number };
+}
+
+/* ──────────────────────────── Phase selection ────────────────────────── */
+
+/**
+ * Render phase from altitude. Thresholds match v1 / architecture:
+ *   altitude > 15km   → Impostor
+ *   altitude > 1.5km  → TileMesh
+ *   else              → TerrainEntity (close range)
+ */
+export function phaseForAltitude(altitudeMeters: number): RenderPhase {
+  if (altitudeMeters > 15_000) return RenderPhase.Impostor;
+  if (altitudeMeters > 1_500) return RenderPhase.TileMesh;
+  return RenderPhase.TerrainEntity;
+}

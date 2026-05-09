@@ -16,6 +16,7 @@ import { PlanetMvpLoader } from './modules/planet/PlanetMvpLoader';
 import { MqttChunkSource } from './modules/planet/MqttChunkSource';
 import type { PlanetSceneConfig } from './modules/planet/types';
 import type { WorldConfig } from './types/config';
+import * as PlanetV2 from './modules/planet-v2';
 import { EntityTypeSmokeTest } from './testing/EntityTypeSmokeTest';
 import { DEFAULT_FIXTURES } from './testing/fixtures';
 
@@ -178,6 +179,13 @@ export class MyWorld {
         Logging.Log('🌌 World Type: galaxy - Initializing for galactic-scale world rendering');
         // TODO: Add galaxy specific initialization here
         break;
+      case 'planet-v2': {
+        // Clean-slate Epic 6 client. Coexists with `planet` (v1). See
+        // src/modules/planet-v2/README.md for design + lessons applied.
+        Logging.Log('🌐 World Type: planet-v2 — clean-slate Epic 6 client');
+        this.setupPlanetV2();
+        break;
+      }
       case 'planet-mvp': {
         // Phase 2 follow-up — minimum viable end-to-end planet test.
         // Connects MQTT to a wos2 plugin-planet, requests one chunk,
@@ -537,6 +545,127 @@ export class MyWorld {
       mqttTransport: transportRaw,
       requestTimeoutMs: chunkTimeoutMs,
     });
+  }
+
+  /**
+   * Set up the planet-v2 (clean Epic 6) renderer.
+   *
+   * Synchronous orchestration. Builds a v2 MqttChunkSource and a v2
+   * GlobeRenderer; connect is fire-and-forget. The world boots in
+   * milliseconds regardless of broker state — once the source connects,
+   * subsequent ticks succeed. Tick interval pumps GlobeRenderer.tick at
+   * 0.5s mirroring v1's cadence.
+   *
+   * URL params:
+   *   planetId      (required)
+   *   mqttHost      (required for connect — without it scaffold mode)
+   *   mqttPort      (default 9001)
+   *   mqttTransport (default 'websockets')
+   *   face / lod / cx / cy (default 0/5/15/15 — single chunk centered on origin)
+   *   chunkTimeoutMs (default 60000)
+   */
+  private setupPlanetV2(): void {
+    try {
+      Logging.Log('🌐 planet-v2: setupPlanetV2 starting');
+      const planetId = this.queryParams.get('planetId') as string | undefined;
+      if (!planetId) {
+        Logging.LogError('❌ planet-v2: missing planetId query param');
+        return;
+      }
+      const mqttHost = this.queryParams.get('mqttHost') as string | undefined;
+      const mqttPortRaw = this.queryParams.get('mqttPort') as string | undefined;
+      const mqttPort = mqttPortRaw ? Number(mqttPortRaw) : 9001;
+      const mqttTransportRaw = (this.queryParams.get('mqttTransport') as string | undefined) ?? 'websockets';
+      const mqttTransport = (mqttTransportRaw === 'tcp' ? 'tcp' : 'websockets') as 'tcp' | 'websockets';
+      const chunkTimeoutRaw = this.queryParams.get('chunkTimeoutMs') as string | undefined;
+      const chunkTimeoutMs = chunkTimeoutRaw ? Number(chunkTimeoutRaw) : 60_000;
+
+      const face = (Math.max(0, Math.min(5, Math.trunc(Number(this.queryParams.get('face') ?? 0)))) as 0|1|2|3|4|5);
+      const lod = Number(this.queryParams.get('lod') ?? 5);
+      const cx = Number(this.queryParams.get('cx') ?? 15);
+      const cy = Number(this.queryParams.get('cy') ?? 15);
+      const playerKey: PlanetV2.ChunkKey = { face, lod, cx, cy };
+
+      const cfg: PlanetV2.PlanetSceneConfig = {
+        planetId,
+        radiusMeters: Number(this.queryParams.get('radiusMeters') ?? 25_000),
+        nExponent: Number(this.queryParams.get('nExponent') ?? 5),
+        biomeMapUrl: '',
+        chunkServiceBaseUrl: '',
+        originChunk: { face, cx, cy },
+      };
+
+      // Build the chunk source if MQTT info is present. Connect is
+      // fire-and-forget — world boots regardless of broker state.
+      let chunkSource: PlanetV2.MqttChunkSource | undefined;
+      if (mqttHost) {
+        chunkSource = new PlanetV2.MqttChunkSource({
+          planetId,
+          mqttHost,
+          mqttPort,
+          mqttTransport,
+          requestTimeoutMs: chunkTimeoutMs,
+        });
+        chunkSource.connect(
+          () => Logging.Log('🌐 planet-v2: MqttChunkSource connected — chunks will start fetching'),
+          (err: Error) => Logging.LogError('❌ planet-v2: MqttChunkSource connect failed: ' + err.message),
+        );
+        Logging.Log('🌐 planet-v2: MqttChunkSource constructed (' + mqttTransport + ' ' + mqttHost + ':' + mqttPort + ')');
+      } else {
+        Logging.Log('🌐 planet-v2: no mqttHost — running in scaffold mode (no chunks will load)');
+      }
+
+      const renderer = new PlanetV2.GlobeRenderer();
+      renderer.initialize(cfg, {
+        isWebGL: false,
+        chunkSource,
+        candidateProvider: () => [playerKey],
+        playerChunkProvider: () => playerKey,
+      });
+
+      // Stash on the global so the tick driver below can find it without
+      // capturing `renderer` in a closure that survives world transitions.
+      (globalThis as Record<string, unknown>).__planetV2Renderer = renderer;
+
+      // Tick driver. Mirrors v1's pattern: Time.SetInterval at 0.5s, the
+      // global function name is bound here and read by the runtime each
+      // tick. Camera state for v1 is hardcoded altitudeMeters=100 (close
+      // range) — proper altitude derivation is Story 6.6's follow-on.
+      const fnName = 'planet_v2_tick';
+      (globalThis as Record<string, unknown>)[fnName] = (): void => {
+        try {
+          const r = (globalThis as Record<string, unknown>).__planetV2Renderer as
+            | PlanetV2.GlobeRenderer
+            | undefined;
+          if (!r) return;
+          const pc = (globalThis as Record<string, unknown>).playerController as
+            | { internalCharacterEntity?: { GetPosition?: (rel: boolean) => { x: number; y: number; z: number } } }
+            | undefined;
+          let position = { x: 0, y: 0, z: 0 };
+          if (pc?.internalCharacterEntity?.GetPosition) {
+            try { position = pc.internalCharacterEntity.GetPosition(false); } catch (_e) { /* best-effort */ }
+          }
+          r.tick({
+            position,
+            velocity: { x: 0, y: 0, z: 0 },
+            altitudeMeters: 100,
+          });
+        } catch (e) {
+          Logging.LogError('❌ planet-v2 tick error: ' + (e instanceof Error ? e.message : String(e)));
+        }
+      };
+      try {
+        Time.SetInterval(`${fnName}();`, 0.5);
+        Logging.Log('🌐 planet-v2: tick interval started (0.5s)');
+      } catch (e) {
+        Logging.LogWarning('🌐 planet-v2: could not start tick interval: ' +
+          (e instanceof Error ? e.message : String(e)));
+      }
+
+      Logging.Log('✓ planet-v2 setup complete (player chunk face=' + face + ' lod=' + lod + ' cx=' + cx + ' cy=' + cy + ')');
+    } catch (e) {
+      Logging.LogError('❌ planet-v2: setupPlanetV2 threw: ' + (e instanceof Error ? e.message : String(e)));
+    }
   }
 
   /**
