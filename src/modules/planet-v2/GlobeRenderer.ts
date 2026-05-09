@@ -80,7 +80,13 @@ export class GlobeRenderer {
     const budget = isWebGL ? WEBGL_BUDGET : DEFAULT_BUDGET;
 
     this.terrainEntity = new TerrainEntityLayer(cfg, isWebGL);
-    this.tileMesh = new TileMeshLayer(cfg);
+    // TileMeshLayer needs the chunkSource to fetch baked meshes (Story 6.5).
+    // When no source is configured (scaffold mode), pass a no-op stub so
+    // construction doesn't throw — the dispatcher will still skip the layer
+    // when it can't render anything useful.
+    this.tileMesh = new TileMeshLayer(cfg, {
+      chunkSource: deps.chunkSource ?? makeNullChunkSource(),
+    });
     this.impostor = new ImpostorSphere(cfg);
     // ImpostorSphere.initialize() is currently a throwing stub — only call
     // it once Story 6.4 is live. v2 first pass leaves the impostor inactive.
@@ -138,21 +144,18 @@ export class GlobeRenderer {
       playerKey.cx === key.cx &&
       playerKey.cy === key.cy;
 
-    // v2 single-chunk first pass: only the player chunk uses TerrainEntity.
-    // Mid-range candidates SHOULD use TileMesh — but that's stubbed and
-    // throws. Until Stories 5.6/5.7/6.5 are real, candidates that aren't
-    // the player chunk return null (no slot tracked, no render).
+    // Player's chunk → TerrainEntity (collidable + diggable). Other chunks
+    // and explicit mid-range candidates → TileMesh (visual-only). Impostor
+    // is still stubbed (Story 6.4); routes there return null so no slot is
+    // tracked.
     if (phase === RenderPhase.TerrainEntity && isPlayerChunk) {
       return this.adaptTerrainEntity(this.terrainEntity);
     }
     if (phase === RenderPhase.TileMesh || (phase === RenderPhase.TerrainEntity && !isPlayerChunk)) {
-      // Stub layer — return null instead of an endpoint that throws on load,
-      // so the streamer simply doesn't track the slot. Logged once at debug.
-      // Once TileMeshLayer is real, swap this to `this.adaptTileMesh(...)`.
-      return null;
+      return this.adaptTileMesh(this.tileMesh);
     }
     if (phase === RenderPhase.Impostor) {
-      return null; // ImpostorSphere stubbed; same reasoning.
+      return null; // ImpostorSphere stubbed (Story 6.4)
     }
     return null;
   }
@@ -180,6 +183,43 @@ export class GlobeRenderer {
         // Cache miss — kick off fetch (idempotent on inflight set).
         this.kickChunkFetch(key);
         return false;
+      },
+      unload: (key) => layer.unload(key),
+    };
+  }
+
+  /**
+   * Adapt the TileMeshLayer to the streamer's `ILayerEndpoint` contract.
+   * Unlike TerrainEntity (which needs the heights matrix on load),
+   * TileMesh fetches its own glTF mesh from the chunk source via
+   * `requestChunkMesh` — so we don't need a chunk-data cache here. The
+   * load just hands the layer a placeholder ChunkData with `length`/
+   * `width` derived from the chunk geometry; the layer uses those for
+   * world-space positioning, ignores `heights`.
+   */
+  private adaptTileMesh(layer: TileMeshLayer): ILayerEndpoint {
+    return {
+      id: 'tile-mesh',
+      load: (key, _camera): boolean => {
+        if (!this.cfg) return false;
+        // length/width from the same formula plugin-planet uses
+        // (computeChunkMeters with V1 radius). The chunk's geometry is
+        // baked server-side; the client just needs to position the
+        // resulting MeshEntity at the right world-space anchor.
+        const sideMeters =
+          (Math.PI * this.cfg.radiusMeters) / (2 * (1 << key.lod));
+        const placeholder: ChunkData = {
+          planetId: this.cfg.planetId,
+          face: key.face,
+          lod: key.lod,
+          cx: key.cx,
+          cy: key.cy,
+          length: sideMeters,
+          width: sideMeters,
+          height: 1500, // matches MeshBaker's envelope; heights matrix unused
+          heights: [], // unused by TileMeshLayer.load
+        };
+        return layer.load(key, placeholder);
       },
       unload: (key) => layer.unload(key),
     };
@@ -239,4 +279,21 @@ function detectWebGL(): boolean {
   } catch (_e) {
     return false;
   }
+}
+
+/**
+ * No-op chunk source for scaffold mode. Returns isConnected=false so
+ * TileMeshLayer never accepts a slot, requestChunk* fire onError if
+ * called anyway. Lets the renderer construct cleanly when the caller
+ * didn't supply a real source.
+ */
+function makeNullChunkSource(): IChunkSource {
+  return {
+    isConnected: () => false,
+    requestChunk: (_f, _l, _x, _y, cb) =>
+      cb.onError?.(new Error('GlobeRenderer: no chunkSource configured (scaffold mode)')),
+    requestChunkMesh: (_f, _l, _x, _y, cb) =>
+      cb.onError?.(new Error('GlobeRenderer: no chunkSource configured (scaffold mode)')),
+    dispose: () => {},
+  };
 }

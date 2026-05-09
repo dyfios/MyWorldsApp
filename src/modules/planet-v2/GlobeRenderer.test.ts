@@ -90,6 +90,7 @@ describe('GlobeRenderer.tick', () => {
       requestChunk: (face, lod, cx, cy, _cb) => {
         requests.push([face, lod, cx, cy]);
       },
+      requestChunkMesh: () => {},
       dispose: () => {},
     };
     const r = new GlobeRenderer();
@@ -109,6 +110,7 @@ describe('GlobeRenderer.tick', () => {
     const fakeSource: IChunkSource = {
       isConnected: () => false,
       requestChunk: () => { called++; },
+      requestChunkMesh: () => {},
       dispose: () => {},
     };
     const r = new GlobeRenderer();
@@ -132,6 +134,7 @@ describe('GlobeRenderer.tick', () => {
       requestChunk: (face, lod, cx, cy) => {
         requests.push({ face, lod, cx, cy } as ChunkKey);
       },
+      requestChunkMesh: () => {},
       dispose: () => {},
     };
     const r = new GlobeRenderer();
@@ -173,17 +176,23 @@ describe('GlobeRenderer.dispose', () => {
   });
 });
 
-describe('Stub layers throw with explicit story references', () => {
-  it('TileMeshLayer.load throws with Story 5.6 / 5.7 / 6.5', async () => {
+describe('Stub layers — visible failure modes', () => {
+  it('TileMeshLayer.load returns false (defers) when chunkSource is not connected', async () => {
     const { TileMeshLayer } = await import('./TileMeshLayer.js');
-    const layer = new TileMeshLayer(minimalConfig);
+    const layer = new TileMeshLayer(minimalConfig, {
+      chunkSource: {
+        isConnected: () => false,
+        requestChunk: () => {},
+        requestChunkMesh: () => {},
+        dispose: () => {},
+      },
+    });
     const stub: ChunkData = {
       planetId: 'p', face: 0, lod: 5, cx: 0, cy: 0,
       length: 1, width: 1, height: 1, heights: [[0]],
     };
-    expect(() => layer.load({ face: 0, lod: 5, cx: 0, cy: 0 }, stub)).toThrow(
-      /not implemented.*Story 5\.6.*5\.7.*6\.5/s,
-    );
+    expect(layer.load({ face: 0, lod: 5, cx: 0, cy: 0 }, stub)).toBe(false);
+    expect(layer.size()).toBe(0);
   });
 
   it('ImpostorSphere.initialize throws with Story 6.4', async () => {

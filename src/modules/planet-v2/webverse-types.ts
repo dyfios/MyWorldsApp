@@ -205,6 +205,52 @@ export interface TerrainEntityInstance {
   Delete?(): boolean;
 }
 
+/* ──────────────────────────── MeshEntity ──────────────────────────────── */
+
+/**
+ * MeshEntity — verified against
+ *   Assets/Runtime/Handlers/JavascriptHandler/APIs/Entity/Scripts/MeshEntity.cs
+ *
+ * Quirks:
+ * - Loads from a URL string (`meshObject`). Supports `https://` and
+ *   `data:application/gltf-binary;base64,...` URLs (the latter validated
+ *   by SPIKE1's round-trip).
+ * - `meshResources` is for additional asset URLs (textures, etc.) that
+ *   aren't embedded. For our baked meshes (textures embedded in the glb)
+ *   pass an empty array.
+ * - `id` must be a System.Guid string — use `UUID.NewUUID().ToString()`.
+ * - Loaded entities are HIDDEN by default (same as TerrainEntity). Caller's
+ *   `onLoaded` callback must `SetVisibility(true)` and pick an interaction
+ *   state.
+ */
+export interface MeshEntityApi {
+  Create(
+    parent: unknown | null,
+    meshObject: string,
+    meshResources: string[],
+    position: Vector3Like,
+    rotation: QuaternionLike,
+    id?: string,
+    onLoaded?: string,
+    checkForUpdateIfCached?: boolean,
+  ): unknown;
+}
+
+/** Runtime mesh-entity instance returned to the onLoaded callback. */
+export interface MeshEntityInstance {
+  /** Show/hide the rendered mesh. */
+  SetVisibility?(visible: boolean): boolean;
+  /**
+   * Interaction state — same enum as TerrainEntity:
+   *   1 = Static (visible, no collider)
+   *   2 = Physical (visible + collider)
+   * Mid-range tile meshes are visual-only; player walks on the
+   * close-range TerrainEntity. Use `1` (Static).
+   */
+  SetInteractionState?(state: 0 | 1 | 2 | 3): boolean;
+  Delete?(): boolean;
+}
+
 /* ──────────────────────────── Globals access helper ──────────────────── */
 
 /** Shape of `globalThis` from planet-v2's perspective. */
@@ -217,6 +263,7 @@ export interface WebVerseGlobals {
   Color?: ColorCtor;
   MQTTClient?: MQTTClientCtor;
   TerrainEntity?: TerrainEntityApi;
+  MeshEntity?: MeshEntityApi;
 }
 
 /** Typed accessor for the WebVerse globals. */

@@ -25,9 +25,12 @@ import { webverse } from './webverse-types.js';
 import type { MQTTClientInstance } from './webverse-types.js';
 import type {
   ChunkData,
+  ChunkMeshData,
+  ChunkMeshRequestCallbacks,
   ChunkRequestCallbacks,
   CubeFace,
   IChunkSource,
+  MeshQuality,
 } from './types.js';
 
 export interface MqttChunkSourceOptions {
@@ -47,16 +50,34 @@ export interface MqttChunkSourceOptions {
   connectTimeoutMs?: number;
 }
 
-interface PendingRequest {
+/**
+ * Discriminator for the pending map. The MQTT response topic is shared
+ * across both request kinds; the source matches each response back to its
+ * pending entry by correlation-id and dispatches by `kind`.
+ */
+
+interface PendingChunk {
+  kind: 'chunk';
   callbacks: ChunkRequestCallbacks;
   timerId: number | null;
 }
+
+interface PendingChunkMesh {
+  kind: 'chunkMesh';
+  callbacks: ChunkMeshRequestCallbacks;
+  timerId: number | null;
+}
+
+type PendingRequest = PendingChunk | PendingChunkMesh;
 
 interface ChunkResponseEnvelope {
   'correlation-id'?: string;
   success?: boolean;
   error?: { code?: string; message?: string };
+  /** Present on chunk-heights responses. */
   chunk?: ChunkData;
+  /** Present on chunk-mesh responses. */
+  chunk_mesh?: ChunkMeshData;
 }
 
 /**
@@ -167,6 +188,45 @@ export class MqttChunkSource implements IChunkSource {
     cy: number,
     callbacks: ChunkRequestCallbacks,
   ): void {
+    this.publishRequest(
+      `wos/planet/${this.opts.planetId}/chunk/request`,
+      { face, lod, cx, cy },
+      { kind: 'chunk', callbacks, timerId: null },
+      callbacks,
+      `face=${face} lod=${lod} cx=${cx} cy=${cy}`,
+    );
+  }
+
+  requestChunkMesh(
+    face: CubeFace,
+    lod: number,
+    cx: number,
+    cy: number,
+    callbacks: ChunkMeshRequestCallbacks,
+    quality?: MeshQuality,
+  ): void {
+    this.publishRequest(
+      `wos/planet/${this.opts.planetId}/chunk/mesh/request`,
+      { face, lod, cx, cy, ...(quality !== undefined ? { quality } : {}) },
+      { kind: 'chunkMesh', callbacks, timerId: null },
+      callbacks,
+      `face=${face} lod=${lod} cx=${cx} cy=${cy} mesh`,
+    );
+  }
+
+  /**
+   * Shared publish path for both request kinds. Sets up the pending entry,
+   * arms the timeout, builds the payload, publishes, and rolls back on
+   * synchronous publish failure. Pre-flight rejection (disposed / not
+   * connected) fires the supplied callback's onError immediately.
+   */
+  private publishRequest(
+    requestTopic: string,
+    extraFields: Record<string, unknown>,
+    pending: PendingRequest,
+    callbacks: ChunkRequestCallbacks | ChunkMeshRequestCallbacks,
+    timeoutDescription: string,
+  ): void {
     if (this.disposed) {
       callbacks.onError?.(new Error(`${this.tag}: disposed`));
       return;
@@ -177,28 +237,22 @@ export class MqttChunkSource implements IChunkSource {
     }
 
     const w = webverse();
-    const correlationId = w.UUID?.NewUUID?.()?.ToString() ?? `ad-hoc-${Date.now()}-${Math.random()}`;
+    const correlationId =
+      w.UUID?.NewUUID?.()?.ToString() ?? `ad-hoc-${Date.now()}-${Math.random()}`;
     const timeoutMs = this.opts.requestTimeoutMs ?? 60_000;
 
-    const pending: PendingRequest = { callbacks, timerId: null };
     pending.timerId = setTimeout(() => {
       this.pending.delete(correlationId);
       callbacks.onError?.(
-        new Error(
-          `${this.tag}: request timeout for face=${face} lod=${lod} cx=${cx} cy=${cy}`,
-        ),
+        new Error(`${this.tag}: request timeout for ${timeoutDescription}`),
       );
     }, timeoutMs) as unknown as number;
     this.pending.set(correlationId, pending);
 
-    const requestTopic = `wos/planet/${this.opts.planetId}/chunk/request`;
     const payload = JSON.stringify({
       'correlation-id': correlationId,
       'response-topic': this.responseTopic,
-      face,
-      lod,
-      cx,
-      cy,
+      ...extraFields,
     });
     try {
       this.client.Publish(requestTopic, payload);
@@ -329,20 +383,45 @@ export class MqttChunkSource implements IChunkSource {
     this.pending.delete(corrId);
     if (pending.timerId !== null) clearTimeout(pending.timerId);
 
-    if (parsed.success !== true || !parsed.chunk) {
+    // Error envelope handling is identical regardless of request kind.
+    if (parsed.success !== true) {
       const code = parsed.error?.code ?? 'UNKNOWN';
-      const message = parsed.error?.message ?? 'no chunk in response';
+      const message = parsed.error?.message ?? 'no payload in response';
       pending.callbacks.onError?.(
-        new Error(`${this.tag}: chunk request failed (${code}): ${message}`),
+        new Error(`${this.tag}: request failed (${code}): ${message}`),
+      );
+      return;
+    }
+
+    // Dispatch the success body by request kind. Chunk-heights responses
+    // carry `chunk`; mesh responses carry `chunk_mesh`. A mismatched
+    // response (e.g., heights-shaped reply for a mesh request) fires
+    // onError so the caller can retry / log meaningfully.
+    if (pending.kind === 'chunk') {
+      if (!parsed.chunk) {
+        pending.callbacks.onError?.(
+          new Error(`${this.tag}: chunk response missing 'chunk' field`),
+        );
+        return;
+      }
+      try {
+        pending.callbacks.onSuccess(parsed.chunk);
+      } catch (e) {
+        logWarn(`${this.tag}: chunk onSuccess threw: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return;
+    }
+    // pending.kind === 'chunkMesh'
+    if (!parsed.chunk_mesh) {
+      pending.callbacks.onError?.(
+        new Error(`${this.tag}: mesh response missing 'chunk_mesh' field`),
       );
       return;
     }
     try {
-      pending.callbacks.onSuccess(parsed.chunk);
+      pending.callbacks.onSuccess(parsed.chunk_mesh);
     } catch (e) {
-      logWarn(
-        `${this.tag}: onSuccess callback threw: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      logWarn(`${this.tag}: chunk_mesh onSuccess threw: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 

@@ -63,27 +63,80 @@ export interface ChunkData {
 
 /* ──────────────────────────── Chunk source ───────────────────────────── */
 
-/** Callback pair for chunk fetches. Promise-free on purpose (JINT). */
+/** Callback pair for chunk-heights fetches. Promise-free on purpose (JINT). */
 export interface ChunkRequestCallbacks {
   onSuccess: (chunk: ChunkData) => void;
   onError?: (err: Error) => void;
 }
 
 /**
+ * Quality hint for chunk-mesh requests. 'mid-range' → 65² mesh (~10 KB
+ * Draco-compressed), 'far' → 17² mesh (~3 KB). Defaults server-side to
+ * 'mid-range' when omitted.
+ */
+export type MeshQuality = 'mid-range' | 'far';
+
+/**
+ * Mesh-shaped chunk response from `wos/planet/{id}/chunk/mesh/request`.
+ * `mesh_url` is a `data:application/gltf-binary;base64,...` URL that the
+ * client passes directly to `MeshEntity.Create` — self-contained, no HTTP.
+ */
+export interface ChunkMeshData {
+  planetId: string;
+  face: CubeFace;
+  lod: number;
+  cx: number;
+  cy: number;
+  /** Always 'gltf-binary' for V1. */
+  format: 'gltf-binary';
+  /** Pre-base64 byte size. */
+  byte_size: number;
+  /** Vertices per side in the baked mesh (17 or 65 in V1). */
+  target_resolution: number;
+  /** data: URL ready for MeshEntity.Create. */
+  mesh_url: string;
+  revision?: number;
+  planet_config_hash?: string;
+  expires_at?: string | null;
+}
+
+export interface ChunkMeshRequestCallbacks {
+  onSuccess: (mesh: ChunkMeshData) => void;
+  onError?: (err: Error) => void;
+}
+
+/**
  * Chunk-fetching backend. Callback-driven so JINT's microtask scheduler
  * doesn't have to resume awaiters across the network boundary. Disposable.
+ *
+ * Two surfaces:
+ *   - `requestChunk` returns the heights matrix for `TerrainEntityLayer`.
+ *   - `requestChunkMesh` returns a baked glTF mesh for `TileMeshLayer`.
+ *
+ * Both go through the same MQTT connection / response topic — the source
+ * dispatches by correlation-id internally.
  */
 export interface IChunkSource {
-  /** Whether the source is ready to accept `requestChunk`. */
+  /** Whether the source is ready to accept requests. */
   isConnected(): boolean;
 
-  /** Publish a chunk request. Results delivered via callbacks. */
+  /** Publish a chunk-heights request. Results delivered via callbacks. */
   requestChunk(
     face: CubeFace,
     lod: number,
     cx: number,
     cy: number,
     callbacks: ChunkRequestCallbacks,
+  ): void;
+
+  /** Publish a chunk-mesh request. Results delivered via callbacks. */
+  requestChunkMesh(
+    face: CubeFace,
+    lod: number,
+    cx: number,
+    cy: number,
+    callbacks: ChunkMeshRequestCallbacks,
+    quality?: MeshQuality,
   ): void;
 
   dispose(): void;
