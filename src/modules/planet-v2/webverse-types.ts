@@ -212,9 +212,15 @@ export interface TerrainEntityInstance {
  *   Assets/Runtime/Handlers/JavascriptHandler/APIs/Entity/Scripts/MeshEntity.cs
  *
  * Quirks:
- * - Loads from a URL string (`meshObject`). Supports `https://` and
- *   `data:application/gltf-binary;base64,...` URLs (the latter validated
- *   by SPIKE1's round-trip).
+ * - Loads from a URL string (`meshObject`). Supports `http://` and
+ *   `https://` URLs ONLY — fetched via libcurl.
+ * - **`data:application/gltf-binary;base64,...` URLs do NOT work.** libcurl
+ *   rejects them with "URL rejected: Port number was not a decimal number
+ *   between 0 and 65535". Confirmed empirically 2026-05-09. SPIKE1's
+ *   round-trip used HTTP delivery (`serve.mjs` on :8080), not data URLs —
+ *   the earlier comment claiming data-URL support here was speculative.
+ *   plugin-planet's `MeshHttpServer` is the production HTTP delivery path
+ *   for baked chunk meshes.
  * - `meshResources` is for additional asset URLs (textures, etc.) that
  *   aren't embedded. For our baked meshes (textures embedded in the glb)
  *   pass an empty array.

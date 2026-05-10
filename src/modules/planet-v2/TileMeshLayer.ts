@@ -40,11 +40,21 @@ import {
 } from './types.js';
 
 /**
- * Same SEA_LEVEL_OFFSET as TerrainEntityLayer — keeps mid-range mesh tiles
- * vertically aligned with the close-range terrain when the player walks
- * across a chunk boundary (promote/demote, Story 6.6).
+ * Vertical placement note (planet-v2 boundary alignment, fixed 2026-05-09):
+ *
+ * MeshEntity tiles and TerrainEntity tiles share the same final world Y for
+ * a given (face, lod, cx, cy, u, v) sample, but reach it differently:
+ *
+ *   TerrainEntity:  heights += 300  (Unity Terrain clamps Y < 0 to 0),
+ *                   placed at world Y = -300. Net vertex Y = raw_height.
+ *
+ *   MeshEntity:     glb bakes raw heights as Y (no clamping needed for a
+ *                   mesh), placed at world Y = 0. Net vertex Y = raw_height.
+ *
+ * So the tile is anchored at Y=0 and we DO NOT subtract a sea-level offset
+ * here. Earlier code did, which floated the player chunk's TerrainEntity
+ * 300m above the mesh tiles at the boundary.
  */
-const SEA_LEVEL_OFFSET_METERS = 300;
 
 interface LoadedTile {
   key: ChunkKey;
@@ -240,18 +250,24 @@ export class TileMeshLayer implements ILayer {
     try {
       w.MeshEntity.Create(
         null,                            // parent
-        mesh.mesh_url,                   // glTF data: URL
+        mesh.mesh_url,                   // glTF HTTP URL
         [],                              // meshResources — embedded
-        new w.Vector3(worldX, -SEA_LEVEL_OFFSET_METERS, worldZ),
+        new w.Vector3(worldX, 0, worldZ),
         w.Quaternion.identity,
         entityId,
         `${this.cbPrefix}${cbSuffix}`,   // bare global function name
-        false,                           // checkForUpdateIfCached
+        // checkForUpdateIfCached=true. Reason: WebVerse's gltfHandler
+        // caches loaded prefabs by URL across MyWorldsApp page refreshes
+        // (the C# process persists). After wos restarts produce a new
+        // bake (e.g., during dev iteration), `false` would keep showing
+        // the previous bake. `true` makes WebVerse re-fetch and rebuild
+        // the prefab from the fresh URL bytes.
+        true,                            // checkForUpdateIfCached
       );
       logInfo(
         `planet-v2 mesh ${id}: MeshEntity.Create dispatched ` +
           `bytes=${mesh.byte_size} resolution=${mesh.target_resolution} ` +
-          `pos=(${worldX}, ${-SEA_LEVEL_OFFSET_METERS}, ${worldZ})`,
+          `pos=(${worldX}, 0, ${worldZ})`,
       );
     } catch (e) {
       // Roll back: drop slot + free the global so we don't leak.

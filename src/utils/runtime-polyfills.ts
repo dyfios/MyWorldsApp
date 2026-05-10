@@ -39,6 +39,13 @@ if (typeof g.setTimeout !== 'function') {
     const logging = g.Logging as { LogWarning?: (m: string) => void } | undefined;
     logging?.LogWarning?.('runtime-polyfills: neither setTimeout nor Time.SetTimeout is available');
   } else {
+    // Session nonce — random per JS-context-load so stale Time.SetTimeout
+    // payloads from a previous MyWorldsApp session can't collide with new
+    // globals after a page refresh. WebVerse's Time queue persists timer
+    // strings across page reloads; without a nonce, an old timer firing
+    // `__mw_setTimeout_2()` would either error (no global yet) or — worse
+    // — invoke a freshly-allocated id=2 callback meant for unrelated work.
+    const sessionNonce = Math.floor(Math.random() * 0x7fffffff).toString(36);
     let nextId = 1;
     const cancellations = new Map<number, { cancelled: boolean }>();
 
@@ -46,7 +53,7 @@ if (typeof g.setTimeout !== 'function') {
       const id = nextId++;
       const slot = { cancelled: false };
       cancellations.set(id, slot);
-      const cbName = `__mw_setTimeout_${id}`;
+      const cbName = `__mw_setTimeout_${sessionNonce}_${id}`;
       g[cbName] = (): void => {
         delete g[cbName];
         if (slot.cancelled) return;

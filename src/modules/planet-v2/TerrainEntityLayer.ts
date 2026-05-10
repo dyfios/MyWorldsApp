@@ -46,6 +46,29 @@ import { shouldUseTerrainEntity } from './CubeCornerPolicy.js';
  */
 const SEA_LEVEL_OFFSET_METERS = 300;
 
+/**
+ * Compensates for a WebVerse-Runtime bug in `TerrainEntity.SetHeights`
+ * (StraightFour/Entity/Terrain/Scripts/TerrainEntity.cs:333). The
+ * resample formula reads `xInterpolation + yInterpolation / 2` — the
+ * comment claims "Average two axes" but the parentheses are missing, so
+ * for any flat region the output is `c + c/2 = 1.5c`. Every input height
+ * gets multiplied by ~1.5 before normalization.
+ *
+ * v1 only ever rendered TerrainEntity tiles, so they all 1.5x'd
+ * uniformly and looked self-consistent. v2 also renders MeshEntity
+ * tiles (TileMeshLayer) which use raw heights — without this
+ * compensation the player chunk floats above its neighbors with a gap
+ * that grows with elevation.
+ *
+ * Pre-dividing by this factor cancels the bug: `(raw+300)/1.5 → 1.5x →
+ * (raw+300) → normalized → world_y = raw`. Matches what TileMeshLayer
+ * places its meshes at.
+ *
+ * Filed for upstream fix; remove this when WebVerse-Runtime ships the
+ * corrected formula.
+ */
+const WEBVERSE_TERRAIN_RESAMPLE_BUG_FACTOR = 1.5;
+
 interface LoadedTile {
   key: ChunkKey;
   /** Entity returned to the onLoaded callback; null until callback fires. */
@@ -92,12 +115,14 @@ export class TerrainEntityLayer implements ILayer {
       return false;
     }
 
-    // Shift heights in-place by SEA_LEVEL_OFFSET so all values are ≥0.
-    // Mutates the matrix; caller does not retain it.
+    // Shift heights in-place by SEA_LEVEL_OFFSET so all values are ≥0,
+    // then divide by the WebVerse resample-bug factor so the buggy ×1.5
+    // inside the C# SetHeights cancels out. Mutates the matrix; caller
+    // does not retain it. See WEBVERSE_TERRAIN_RESAMPLE_BUG_FACTOR above.
     for (let r = 0; r < chunk.heights.length; r++) {
       const row = chunk.heights[r]!;
       for (let i = 0; i < row.length; i++) {
-        row[i]! += SEA_LEVEL_OFFSET_METERS;
+        row[i]! = (row[i]! + SEA_LEVEL_OFFSET_METERS) / WEBVERSE_TERRAIN_RESAMPLE_BUG_FACTOR;
       }
     }
     const envelope = chunk.height;

@@ -103,8 +103,16 @@ the lessons.
 
 ## How to run
 
-URL: `?worldType=planet-v2&planetId=<id>&mqttHost=<host>&mqttPort=9001&mqttTransport=websockets[&face=0&lod=5&cx=15&cy=15]`
+URL: `?worldType=planet-v2&planetId=<id>&mqttHost=<host>&mqttPort=9001&mqttTransport=websockets[&face=0&lod=5&cx=15&cy=15][&tileMeshDebug=cardinal]`
 
 Defaults: `mqttPort=9001`, `mqttTransport=websockets`, single chunk at
 face=0/lod=5/cx=15/cy=15. The chunk position is centered on world origin so
 the player's spawn lands on it.
+
+`tileMeshDebug` (optional, debug) — emit same-face neighbors as candidates
+so the dispatcher routes them to TileMeshLayer (the player chunk still
+goes to TerrainEntity). `cardinal` or `1` → 4 neighbors (N/E/S/W); `ring`
+→ 8 neighbors (adds diagonals). Off-face neighbors are dropped (Story 6.7
+handles cube-corner crossings). Lets you exercise the full chunk-mesh
+fetch + MeshEntity.Create path before Story 6.6 multi-chunk lights up
+properly.

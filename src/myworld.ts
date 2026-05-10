@@ -563,6 +563,8 @@ export class MyWorld {
    *   mqttTransport (default 'websockets')
    *   face / lod / cx / cy (default 0/5/15/15 — single chunk centered on origin)
    *   chunkTimeoutMs (default 60000)
+   *   tileMeshDebug ('cardinal' | '1' → 4-way neighbors via TileMesh;
+   *                  'ring' → 8-way; off → single chunk)
    */
   private setupPlanetV2(): void {
     try {
@@ -615,11 +617,34 @@ export class MyWorld {
         Logging.Log('🌐 planet-v2: no mqttHost — running in scaffold mode (no chunks will load)');
       }
 
+      // Debug TileMesh exercise: when ?tileMeshDebug is set, the candidate
+      // provider yields the player chunk PLUS same-face neighbors so the
+      // dispatcher routes neighbors to TileMeshLayer (player chunk still
+      // goes to TerrainEntity). 'tileMeshDebug=1' or 'cardinal' → 4-way
+      // (N/E/S/W); 'ring' → 8-way (adds diagonals). Off-face neighbors are
+      // dropped — Story 6.7 (cube-corner policy) handles edge crossings.
+      const tileMeshDebug = this.queryParams.get('tileMeshDebug') as string | undefined;
+      const debugMode: 'off' | 'cardinal' | 'ring' =
+        !tileMeshDebug ? 'off'
+          : tileMeshDebug === 'ring' ? 'ring'
+          : 'cardinal';
+      const candidates: PlanetV2.ChunkKey[] =
+        debugMode === 'off'
+          ? [playerKey]
+          : sameFaceNeighbors(playerKey, debugMode === 'ring');
+      if (debugMode !== 'off') {
+        Logging.Log(
+          '🌐 planet-v2: tileMeshDebug=' + debugMode +
+          ' — emitting ' + candidates.length + ' candidates (player + ' +
+          (candidates.length - 1) + ' TileMesh neighbors)',
+        );
+      }
+
       const renderer = new PlanetV2.GlobeRenderer();
       renderer.initialize(cfg, {
         isWebGL: false,
         chunkSource,
-        candidateProvider: () => [playerKey],
+        candidateProvider: () => candidates,
         playerChunkProvider: () => playerKey,
       });
 
@@ -787,5 +812,28 @@ export class MyWorld {
       Logging.LogError('❌ Failed to create MyWorld instance: ' + errorMessage);
     }
     //(window as any).myworld = myworld;
+
+/**
+ * Same-face neighbors of a chunk (debug TileMesh exerciser).
+ * Returns [center, ...neighbors]. Skips neighbors that would cross a face
+ * edge — Story 6.7 (cube-corner policy) handles those properly.
+ */
+function sameFaceNeighbors(
+  center: PlanetV2.ChunkKey,
+  includeDiagonals: boolean,
+): PlanetV2.ChunkKey[] {
+  const perEdge = 1 << center.lod;
+  const offsets: Array<[number, number]> = includeDiagonals
+    ? [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]]
+    : [[0,-1],[-1,0],[1,0],[0,1]];
+  const out: PlanetV2.ChunkKey[] = [center];
+  for (const [dx, dy] of offsets) {
+    const cx = center.cx + dx;
+    const cy = center.cy + dy;
+    if (cx < 0 || cy < 0 || cx >= perEdge || cy >= perEdge) continue;
+    out.push({ face: center.face, lod: center.lod, cx, cy });
+  }
+  return out;
+}
 
 export default MyWorld;

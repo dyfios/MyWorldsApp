@@ -65,6 +65,10 @@ export function installSetTimeoutPolyfill(): void {
     return;
   }
 
+  // Session nonce — see runtime-polyfills.ts for rationale (stale
+  // Time.SetTimeout strings persist across MyWorldsApp page reloads and
+  // would otherwise collide with fresh globals).
+  const sessionNonce = Math.floor(Math.random() * 0x7fffffff).toString(36);
   let nextId = 1;
   const cancellations = new Map<number, { cancelled: boolean }>();
 
@@ -72,7 +76,7 @@ export function installSetTimeoutPolyfill(): void {
     const id = nextId++;
     const slot = { cancelled: false };
     cancellations.set(id, slot);
-    const cbName = `__pv2_setTimeout_${id}`;
+    const cbName = `__pv2_setTimeout_${sessionNonce}_${id}`;
     g[cbName] = (): void => {
       delete g[cbName];
       if (slot.cancelled) return;
