@@ -26,6 +26,7 @@ import {
 import { ImpostorSphere } from './ImpostorSphere.js';
 import { TileMeshLayer } from './TileMeshLayer.js';
 import { TerrainEntityLayer } from './TerrainEntityLayer.js';
+import { shouldUseTerrainEntity } from './CubeCornerPolicy.js';
 import {
   DEFAULT_BUDGET,
   WEBGL_BUDGET,
@@ -59,6 +60,8 @@ export interface GlobeRendererDeps {
 export class GlobeRenderer {
   private cfg: PlanetSceneConfig | null = null;
   private deps: GlobeRendererDeps = {};
+  /** Resolved at initialize — `deps.isWebGL` falls back to `detectWebGL()` */
+  private isWebGL = false;
   private streamer: ChunkStreamer | null = null;
   private impostor: ImpostorSphere | null = null;
   private tileMesh: TileMeshLayer | null = null;
@@ -106,6 +109,7 @@ export class GlobeRenderer {
     this.cfg = cfg;
     this.deps = deps;
     const isWebGL = deps.isWebGL ?? detectWebGL();
+    this.isWebGL = isWebGL;
     const budget = isWebGL ? WEBGL_BUDGET : DEFAULT_BUDGET;
 
     this.terrainEntity = new TerrainEntityLayer(cfg, isWebGL);
@@ -419,14 +423,23 @@ export class GlobeRenderer {
       playerKey.cx === key.cx &&
       playerKey.cy === key.cy;
 
-    // Player's chunk → TerrainEntity (collidable + diggable). Other chunks
-    // and explicit mid-range candidates → TileMesh (visual-only). Impostor
-    // is still stubbed (Story 6.4); routes there return null so no slot is
-    // tracked.
-    if (phase === RenderPhase.TerrainEntity && isPlayerChunk) {
+    // Player's chunk → TerrainEntity (collidable + diggable) EXCEPT at the
+    // 24 cube-corner chunks (Story 6.7): a corner chunk's grid doesn't
+    // tile as a rectangular Unity Terrain, so it falls back to TileMesh
+    // even though the player is standing on it. They lose collidable
+    // dig-the-ground at the singular corner — acceptable tradeoff, and
+    // the corner is geometrically a point anyway. Also catches WebGL
+    // (no TerrainEntity at all per FR17). Other chunks and explicit
+    // mid-range candidates → TileMesh (visual-only). Impostor is still
+    // stubbed (Story 6.4).
+    const teEligible = shouldUseTerrainEntity(key, this.isWebGL);
+    if (phase === RenderPhase.TerrainEntity && isPlayerChunk && teEligible) {
       return this.adaptTerrainEntity(this.terrainEntity);
     }
-    if (phase === RenderPhase.TileMesh || (phase === RenderPhase.TerrainEntity && !isPlayerChunk)) {
+    if (
+      phase === RenderPhase.TileMesh ||
+      (phase === RenderPhase.TerrainEntity && (!isPlayerChunk || !teEligible))
+    ) {
       return this.adaptTileMesh(this.tileMesh);
     }
     if (phase === RenderPhase.Impostor) {

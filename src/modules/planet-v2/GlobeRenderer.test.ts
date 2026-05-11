@@ -163,6 +163,52 @@ describe('GlobeRenderer.tick', () => {
     r.dispose();
   });
 
+  it('routes player chunks at cube corners through TileMesh, not TerrainEntity', () => {
+    // Story 6.7 (Phase 1): cube-corner chunks (cx ∈ {0, last} AND cy ∈
+    // {0, last}) can't render as Unity Terrains — their grid doesn't
+    // tile cleanly. The dispatcher must downgrade them to TileMesh
+    // even when the player is standing on them. We observe this by
+    // watching for a mesh fetch (TileMesh path) rather than a heights
+    // fetch (TE path). At nExp=5 the last index is 31, so (0, 0) is a
+    // corner chunk; we set the origin to (0, 0) and place the player
+    // there. WebVerse globals are stubbed so TileMeshLayer.load reaches
+    // requestChunkMesh.
+    const g = globalThis as Record<string, unknown>;
+    g.MeshEntity = { Create: () => {} };
+    g.Vector3 = function Vector3(this: unknown) { /* stub */ } as unknown as object;
+    g.Quaternion = { identity: {} };
+    g.UUID = { NewUUID: () => ({ ToString: () => 'test-uuid' }) };
+    try {
+      const meshFetches: ChunkKey[] = [];
+      const fakeSource: IChunkSource = {
+        isConnected: () => true,
+        requestChunk: () => {},
+        requestChunkMesh: (face, lod, cx, cy) => {
+          meshFetches.push({ face, lod, cx, cy } as ChunkKey);
+        },
+        dispose: () => {},
+      };
+      const r = new GlobeRenderer();
+      r.initialize(
+        { ...minimalConfig, originChunk: { face: 0, cx: 0, cy: 0 } },
+        {
+          isWebGL: false,
+          chunkSource: fakeSource,
+          candidateProvider: () => [{ face: 0, lod: 5, cx: 0, cy: 0 }],
+          playerChunkProvider: () => ({ face: 0, lod: 5, cx: 0, cy: 0 }),
+        },
+      );
+      r.tick(cam);
+      expect(meshFetches).toContainEqual({ face: 0, lod: 5, cx: 0, cy: 0 });
+      r.dispose();
+    } finally {
+      delete g.MeshEntity;
+      delete g.Vector3;
+      delete g.Quaternion;
+      delete g.UUID;
+    }
+  });
+
   it('pre-fetches the -X neighbor when the player is within 50m of the chunk boundary', () => {
     const requests: ChunkKey[] = [];
     const fakeSource: IChunkSource = {
