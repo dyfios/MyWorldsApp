@@ -54,8 +54,25 @@ export interface ChunkData {
   width: number;
   /** Vertical envelope in meters (max altitude the plugin guarantees). */
   height: number;
-  /** Row-major heights matrix in meters. heights[r=V][c=U]. */
-  heights: number[][];
+  /**
+   * Row-major heights matrix in meters. heights[r=V][c=U]. Optional in
+   * V2 because the chunk handler now ships heights as a pre-formatted
+   * JSON string (`heights_json`) for the async TerrainEntity.Create
+   * code path. Kept here as `number[][]` for callers (e.g. v1 client,
+   * tests) that need a parsed matrix.
+   */
+  heights?: number[][];
+  /**
+   * Heights matrix encoded as a raw JSON string, **with WebVerse-Runtime
+   * SetHeights bug compensation already applied** ((raw + 300) / 1.5 per
+   * cell). The TerrainEntityLayer embeds this string verbatim into the
+   * envelope passed to `TerrainEntity.Create(jsonString, …)`. Embedding
+   * as a raw segment means JS never parses or stringifies the 1M-element
+   * heights matrix — the heavy deserialization runs on a C# background
+   * thread inside JSONEntityHandler. Optional for backward compat with
+   * older server responses; v2 server always populates it.
+   */
+  heights_json?: string;
   revision?: number;
   planet_config_hash?: string;
   terrainType?: string;

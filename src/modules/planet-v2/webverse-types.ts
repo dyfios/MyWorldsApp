@@ -187,6 +187,20 @@ export interface TerrainEntityApi {
     onLoaded?: string,
     stitchTerrains?: boolean,
   ): unknown;
+  /**
+   * Async path via `JSONEntityHandler.LoadTerrainEntityFromJSONAsync`
+   * (verified against TerrainEntity.cs:136 + JSONEntityHandler.cs:2682).
+   * The handler parses + normalizes the JSON on a background thread;
+   * only the final Unity terrain build runs on the main thread, so the
+   * 1M-element heights deserialization no longer freezes the render
+   * loop. See `reference_webverse_terrain_json` memo for the canonical
+   * shape (terrainType, length/width/height, heights, layers, etc.).
+   *
+   * `onLoaded` is a bare global function name; called with the loaded
+   * TerrainEntity instance once Unity finishes the synchronous
+   * SetHeights/build phase.
+   */
+  Create(jsonEntity: string, parent?: unknown | null, onLoaded?: string): void;
 }
 
 /** Runtime entity instance returned to the onLoaded callback. */

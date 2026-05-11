@@ -130,6 +130,16 @@ export class ChunkStreamer {
     return this.entries.size;
   }
 
+  /** Snapshot of current slots, for diagnostic dumps. Returns an array
+   *  (not a generator) — JINT 5.x doesn't support generators. */
+  snapshot(): Array<{ key: ChunkKey; layerId: string }> {
+    const out: Array<{ key: ChunkKey; layerId: string }> = [];
+    for (const entry of this.entries.values()) {
+      out.push({ key: entry.key, layerId: entry.layerId });
+    }
+    return out;
+  }
+
   /** Unload everything; idempotent. */
   disposeAll(): void {
     for (const [, entry] of this.entries) {

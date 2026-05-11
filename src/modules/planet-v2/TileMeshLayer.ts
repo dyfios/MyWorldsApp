@@ -70,6 +70,16 @@ interface LoadedTile {
    *   - 'unloaded'      — disposed (slot stays in map briefly until callback fires)
    */
   stage: 'fetching' | 'creating' | 'ready' | 'unloaded';
+  /**
+   * Whether this tile should currently be visible. The player chunk
+   * keeps a hidden TileMesh (active=false) so that when the player
+   * crosses away the mesh appears instantly — no fresh fetch. When
+   * the player walks back, the visible tile becomes hidden again.
+   *
+   * Visibility is applied from the onLoaded callback (initial state)
+   * and from `setActive`/`setHidden` (later flips).
+   */
+  active: boolean;
 }
 
 export interface TileMeshLayerDeps {
@@ -106,9 +116,25 @@ export class TileMeshLayer implements ILayer {
     return true;
   }
 
-  load(key: ChunkKey, chunk: ChunkData): boolean {
+  load(
+    key: ChunkKey,
+    chunk: ChunkData,
+    options: { startActive?: boolean } = {},
+  ): boolean {
     const id = chunkKeyString(key);
-    if (this.tiles.has(id)) return true; // idempotent
+    const startActive = options.startActive !== false; // default: visible
+    const existing = this.tiles.get(id);
+    if (existing) {
+      // Idempotent — but if a hidden tile is being re-loaded with
+      // startActive=true, that's a "player just crossed away from this
+      // chunk" transition: flip it visible. The streamer's phase-change
+      // path calls load() with the default options (active), so this is
+      // how the previously-hidden mesh becomes the visible neighbor.
+      if (startActive && !existing.active) {
+        this.setActive(key);
+      }
+      return true;
+    }
 
     if (!this.deps.chunkSource.isConnected()) {
       // Streamer retries next tick once the source is ready.
@@ -133,6 +159,7 @@ export class TileMeshLayer implements ILayer {
       entity: null,
       onLoadedSuffix: null,
       stage: 'fetching',
+      active: startActive,
     };
     this.tiles.set(id, tile);
 
@@ -150,6 +177,46 @@ export class TileMeshLayer implements ILayer {
     );
 
     return true;
+  }
+
+  /**
+   * Make a hidden tile visible. If the tile's entity hasn't loaded yet
+   * (still fetching or creating), the activation is queued — onLoaded
+   * reads `tile.active` and applies the correct state.
+   * Idempotent — calling on an already-active tile is a no-op.
+   */
+  setActive(key: ChunkKey): void {
+    const tile = this.tiles.get(chunkKeyString(key));
+    if (!tile || tile.active) return;
+    tile.active = true;
+    if (tile.entity) {
+      try {
+        tile.entity.SetInteractionState?.(1); // Static (visible, no collider)
+        tile.entity.SetVisibility?.(true);
+      } catch (_e) {
+        /* best-effort */
+      }
+    }
+  }
+
+  /**
+   * Hide an active tile without disposing it. Used by the GlobeRenderer
+   * adapter when the streamer phase-changes a chunk from TileMesh → TE
+   * because the player is entering it — keeping the mesh ready means
+   * when the player eventually crosses away, the mesh appears instantly.
+   */
+  setHidden(key: ChunkKey): void {
+    const tile = this.tiles.get(chunkKeyString(key));
+    if (!tile || !tile.active) return;
+    tile.active = false;
+    if (tile.entity) {
+      try {
+        tile.entity.SetVisibility?.(false);
+        tile.entity.SetInteractionState?.(0); // Hidden — gameObject inactive
+      } catch (_e) {
+        /* best-effort */
+      }
+    }
   }
 
   unload(key: ChunkKey): void {
@@ -186,6 +253,25 @@ export class TileMeshLayer implements ILayer {
   /** Test/debug helper. */
   size(): number {
     return this.tiles.size;
+  }
+
+  /**
+   * Whether the layer is currently tracking a slot for this key — fetching,
+   * creating, or fully loaded. Used by the GlobeRenderer to skip re-loading
+   * the pre-loaded player-chunk mesh on every tick.
+   */
+  hasTile(key: ChunkKey): boolean {
+    return this.tiles.has(chunkKeyString(key));
+  }
+
+  /** Diagnostic dump: every tile's key + current stage + active flag.
+   *  Returns an array (JINT doesn't support generators). */
+  snapshot(): Array<{ key: ChunkKey; stage: string; active: boolean }> {
+    const out: Array<{ key: ChunkKey; stage: string; active: boolean }> = [];
+    for (const tile of this.tiles.values()) {
+      out.push({ key: tile.key, stage: tile.stage, active: tile.active });
+    }
+    return out;
   }
 
   /* ──────────────────── Internal callbacks ───────────────────────────── */
@@ -232,14 +318,26 @@ export class TileMeshLayer implements ILayer {
       tile.entity = entity;
       tile.stage = 'ready';
       try {
+        // Apply the slot's current `active` state. A hidden tile (the
+        // player chunk's pre-loaded mesh) lands invisible+inert so it's
+        // ready to flip the instant the player crosses away — no fetch,
+        // no MeshEntity.Create latency at the boundary. Active tiles get
         // Static (=1): visible + collider DISABLED. Mid-range tile meshes
         // are visual-only; the player walks on the close-range
-        // TerrainEntity (which uses Physical=2). Keeping mid-range as
-        // Static avoids accidental collisions when the promote/demote
-        // boundary fires.
-        entity.SetInteractionState?.(1);
-        entity.SetVisibility?.(true);
-        logInfo(`planet-v2 mesh ${id}: ready (visible, static)`);
+        // TerrainEntity (which uses Physical=2).
+        if (tile.active) {
+          entity.SetInteractionState?.(1);
+          entity.SetVisibility?.(true);
+        } else {
+          entity.SetVisibility?.(false);
+          entity.SetInteractionState?.(0); // Hidden
+        }
+        const dx = this.originCx !== null ? tile.key.cx - this.originCx : 0;
+        const dz = this.originCy !== null ? tile.key.cy - this.originCy : 0;
+        logInfo(
+          `planet-v2 mesh ${id} [dir=${formatDir(dx, dz)}]: ready (` +
+            `${tile.active ? 'visible, static' : 'hidden, pre-loaded'})`,
+        );
       } catch (e) {
         logError(
           `planet-v2 mesh ${id}: enable failed: ${e instanceof Error ? e.message : String(e)}`,
@@ -264,10 +362,12 @@ export class TileMeshLayer implements ILayer {
         // the prefab from the fresh URL bytes.
         true,                            // checkForUpdateIfCached
       );
+      const dxFromOrigin = this.originCx !== null ? tile.key.cx - this.originCx : 0;
+      const dzFromOrigin = this.originCy !== null ? tile.key.cy - this.originCy : 0;
       logInfo(
-        `planet-v2 mesh ${id}: MeshEntity.Create dispatched ` +
-          `bytes=${mesh.byte_size} resolution=${mesh.target_resolution} ` +
-          `pos=(${worldX}, 0, ${worldZ})`,
+        `planet-v2 mesh ${id} [dir=${formatDir(dxFromOrigin, dzFromOrigin)}]: ` +
+          `MeshEntity.Create dispatched bytes=${mesh.byte_size} ` +
+          `resolution=${mesh.target_resolution} pos=(${worldX}, 0, ${worldZ})`,
       );
     } catch (e) {
       // Roll back: drop slot + free the global so we don't leak.
@@ -281,7 +381,22 @@ export class TileMeshLayer implements ILayer {
 
   private onFetchError(id: string, err: Error): void {
     // Drop the placeholder so the streamer retries on the next tick.
+    const tile = this.tiles.get(id);
+    const dx = tile && this.originCx !== null ? tile.key.cx - this.originCx : 0;
+    const dz = tile && this.originCy !== null ? tile.key.cy - this.originCy : 0;
     this.tiles.delete(id);
-    logError(`planet-v2 mesh ${id}: fetch failed: ${err.message}`);
+    logError(`planet-v2 mesh ${id} [dir=${formatDir(dx, dz)}]: fetch failed: ${err.message}`);
   }
+}
+
+/**
+ * Compact "+1,-2"-style direction tag relative to the layer's origin
+ * chunk, so log lines say "the chunk one east + two north of spawn"
+ * instead of forcing the reader to memorize face/lod/cx/cy quadruplets.
+ * Origin renders as `0,0`.
+ */
+function formatDir(dx: number, dz: number): string {
+  const fx = dx === 0 ? '0' : dx > 0 ? `+${dx}` : `${dx}`;
+  const fz = dz === 0 ? '0' : dz > 0 ? `+${dz}` : `${dz}`;
+  return `${fx},${fz}`;
 }

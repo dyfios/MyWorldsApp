@@ -67,6 +67,24 @@ export class GlobeRenderer {
   private readonly chunkCache = new Map<string, ChunkData>();
   /** Keys for which a chunk fetch is in flight (prevents dup requests). */
   private readonly inflight = new Set<string>();
+  /**
+   * Story 6.6 (option 2): keys for which we've pre-loaded a hidden
+   * TerrainEntity in approach-zone reconciliation. The streamer doesn't
+   * own these slots — they're out-of-band, managed by tick()'s
+   * reconcile pass. Promoted out (via setActive) when the player
+   * crosses; disposed when the player walks out of the approach zone.
+   */
+  private readonly preCreated = new Set<string>();
+  /**
+   * Story 6.6 (option 2, mesh side): the chunk the player is currently
+   * standing on, as of the last tick(). Kept so the TileMesh adapter's
+   * unload (fired by the streamer when this chunk promotes to
+   * TerrainEntity) can switch the mesh to hidden-but-resident instead
+   * of disposing it. When the player crosses out, the hidden mesh
+   * flips visible instantly — no fetch, no MeshEntity.Create cost at
+   * the boundary.
+   */
+  private currentPlayerKey: ChunkKey | null = null;
   private disposed = false;
 
   /** Synchronous initialize. */
@@ -106,13 +124,232 @@ export class GlobeRenderer {
     );
   }
 
+  private debugLogTick = 0;
+
   /** Single tick. Sync. Called by the world-type's interval driver. */
   tick(camera: CameraState): void {
     if (!this.streamer || !this.cfg) return;
     const candidates = this.deps.candidateProvider
       ? this.deps.candidateProvider(camera)
       : [];
+
+    // Story 6.6 — pre-fetch heights ONLY for the player chunk and its
+    // immediate cardinal neighbors (the chunks that might soon need a
+    // hidden TerrainEntity for cross-the-boundary smoothing). Heights
+    // payloads are ~6 MB each on the wire; pre-fetching the whole 25-
+    // chunk candidate ring would push 150+ MB through MQTT at world
+    // startup and stall the broker. Mesh fetches (handled by
+    // TileMeshLayer.load when the streamer pushes a candidate into
+    // TileMesh phase) are tiny by comparison (~15 KB each) and load
+    // for the full outer ring without trouble.
+    //
+    // kickChunkFetch is idempotent on the inflight set — repeat calls
+    // no-op once the request is in flight or cached.
+    const playerKey = this.deps.playerChunkProvider?.(camera) ?? null;
+    // Stash before streamer.update so the TileMesh adapter's unload
+    // (which fires when this chunk's slot phase-changes to TerrainEntity)
+    // can read it and decide hide-vs-delete.
+    this.currentPlayerKey = playerKey;
+    if (playerKey) this.kickChunkFetch(playerKey);
+    const approaches = playerKey ? this.computeApproaches(camera, playerKey) : [];
+    for (const k of approaches) this.kickChunkFetch(k);
+
     this.streamer.update(camera, candidates);
+
+    // Story 6.6 (option 2): reconcile pre-loaded hidden TerrainEntities
+    // against the current approach set. Pre-create for new approaches
+    // (where heights have arrived); dispose for keys that fell out of
+    // the approach set without being promoted to active. Runs after
+    // streamer.update so the active player chunk is already known by
+    // the layer and won't be touched here.
+    if (playerKey && this.terrainEntity) {
+      this.reconcileApproachTerrains(approaches, playerKey);
+    }
+
+    // Story 6.6 (option 2, mesh side): the streamer just routed the
+    // player chunk to TerrainEntity, so it never asks TileMesh to keep
+    // a slot there. If we want a hidden mesh waiting for the inevitable
+    // boundary crossing, we have to fire that load ourselves — out of
+    // band, the same way reconcileApproachTerrains works for the TE
+    // side. Idempotent: if a slot already exists, the layer no-ops.
+    if (playerKey && this.tileMesh) {
+      this.reconcilePlayerMesh(playerKey);
+    }
+
+    // Periodic debug dump — every ~10 ticks (~5s at 0.5s tick interval).
+    // Prints the state of the streamer slots + each layer's tracked
+    // tiles relative to the origin chunk. Helps correlate "no mesh
+    // here" observations with which slot/layer thinks it owns that
+    // chunk. Off by default; toggle via ?planetDebug=1.
+    this.debugLogTick++;
+    if (this.debugLogTick % 10 === 0) {
+      const debugFlag = (globalThis as Record<string, unknown>).__pv2DebugDump;
+      if (debugFlag) this.dumpDebugState(playerKey);
+    }
+  }
+
+  private dumpDebugState(playerKey: ChunkKey | null): void {
+    if (!this.cfg?.originChunk || !this.streamer) return;
+    const ox = this.cfg.originChunk.cx;
+    const oy = this.cfg.originChunk.cy;
+    const dir = (cx: number, cy: number): string => {
+      const dx = cx - ox;
+      const dz = cy - oy;
+      const fx = dx === 0 ? '0' : dx > 0 ? `+${dx}` : `${dx}`;
+      const fz = dz === 0 ? '0' : dz > 0 ? `+${dz}` : `${dz}`;
+      return `${fx},${fz}`;
+    };
+    const playerTag = playerKey ? dir(playerKey.cx, playerKey.cy) : '?';
+
+    const streamerSlots: string[] = [];
+    for (const { key, layerId } of this.streamer.snapshot()) {
+      streamerSlots.push(`${dir(key.cx, key.cy)}=${layerId === 'terrain-entity' ? 'TE' : 'TM'}`);
+    }
+    streamerSlots.sort();
+
+    const meshTiles: string[] = [];
+    if (this.tileMesh) {
+      for (const { key, stage, active } of this.tileMesh.snapshot()) {
+        // letter = stage (f/c/r/u); uppercase if active, lowercase if hidden.
+        // Lets us see at a glance whether the player chunk's pre-loaded mesh
+        // is sitting around hidden (e.g. `0,0=r` lowercase = ready+hidden).
+        const stageLetter = stage[0] ?? '?';
+        const marker = active ? stageLetter.toUpperCase() : stageLetter.toLowerCase();
+        meshTiles.push(`${dir(key.cx, key.cy)}=${marker}`);
+      }
+      meshTiles.sort();
+    }
+    const terrainTiles: string[] = [];
+    if (this.terrainEntity) {
+      for (const { key, active, ready } of this.terrainEntity.snapshot()) {
+        terrainTiles.push(`${dir(key.cx, key.cy)}=${active ? 'A' : 'H'}${ready ? 'R' : 'L'}`);
+      }
+      terrainTiles.sort();
+    }
+
+    logInfo(
+      `planet-v2 debug player=${playerTag} | ` +
+      `streamer{${streamerSlots.join(' ')}} | ` +
+      `mesh{${meshTiles.join(' ')}} | ` +
+      `terrain{${terrainTiles.join(' ')}}`,
+    );
+  }
+
+  /**
+   * Reconcile the approach set with the layer's pre-loaded hidden
+   * TerrainEntities. For each approach key with cached heights and no
+   * existing tile: pre-load hidden. For each previously-pre-loaded key
+   * not in the approach set (and not the active player chunk): dispose
+   * via layer.unload — frees its Unity terrain memory.
+   */
+  private reconcileApproachTerrains(approaches: ChunkKey[], playerKey: ChunkKey): void {
+    if (!this.terrainEntity) return;
+    const approachIds = new Set(approaches.map((k) => chunkKeyId(k)));
+    const playerId = chunkKeyId(playerKey);
+
+    // Pre-create where missing.
+    for (const k of approaches) {
+      const id = chunkKeyId(k);
+      if (id === playerId) continue;
+      if (this.terrainEntity.hasTile(k)) continue;
+      const cached = this.chunkCache.get(id);
+      if (!cached) continue;
+      // Heights arrive — pre-load hidden. Future tick: if the player
+      // crosses, the adapter's load() finds hasTile and just calls
+      // setActive() — instant.
+      this.terrainEntity.load(k, cached, { startActive: false });
+      this.preCreated.add(id);
+    }
+
+    // Dispose pre-loaded tiles that left the approach set without being
+    // promoted. The streamer never tracked them, so their cleanup is
+    // our responsibility.
+    for (const id of Array.from(this.preCreated)) {
+      if (id === playerId) {
+        // Got promoted to player chunk via the adapter; preCreated entry
+        // already removed there, but defensive.
+        this.preCreated.delete(id);
+        continue;
+      }
+      if (approachIds.has(id)) continue; // still approaching — keep
+      // Player walked out of approach zone without crossing; reclaim memory.
+      const tile = parseChunkKeyId(id);
+      if (tile) {
+        this.terrainEntity.unload(tile);
+      }
+      this.preCreated.delete(id);
+    }
+  }
+
+  /**
+   * Ensure the player's current chunk has a hidden TileMesh ready. The
+   * streamer routes the player chunk to TerrainEntity, so it never asks
+   * TileMesh to keep a slot there — but the moment the player crosses
+   * out, the streamer will phase-change the chunk back to TileMesh and
+   * expect the mesh to materialize instantly. Pre-loading hidden makes
+   * the crossing a `setActive` flip instead of a fresh fetch.
+   *
+   * The hidden tile is disposed naturally: when the player crosses
+   * away, the adapter's load() finds the slot and calls setActive; if
+   * the player teleports out of range, the streamer's sweep on the
+   * normal mesh-side path will unload it. (When the player IS standing
+   * on it, the adapter's unload() flips to setHidden instead of
+   * deleting — see adaptTileMesh below.)
+   */
+  private reconcilePlayerMesh(playerKey: ChunkKey): void {
+    if (!this.tileMesh || !this.cfg) return;
+    if (this.tileMesh.hasTile(playerKey)) return; // already tracked
+
+    const sideMeters =
+      (Math.PI * this.cfg.radiusMeters) / (2 * (1 << playerKey.lod));
+    const placeholder: ChunkData = {
+      planetId: this.cfg.planetId,
+      face: playerKey.face,
+      lod: playerKey.lod,
+      cx: playerKey.cx,
+      cy: playerKey.cy,
+      length: sideMeters,
+      width: sideMeters,
+      height: 1500,
+      heights: [],
+    };
+    this.tileMesh.load(playerKey, placeholder, { startActive: false });
+  }
+
+  /**
+   * Identify chunks the player is currently approaching: any neighbor
+   * whose shared boundary with the player chunk is within
+   * `APPROACH_METERS` of the player's local-XZ position. Off-face
+   * neighbors are dropped — Story 6.7 handles face crossings.
+   *
+   * Returns 0–4 keys. Used by tick() for two purposes: kick heights
+   * pre-fetches (so the data is cached when needed) and then reconcile
+   * pre-loaded hidden TerrainEntities (so the swap on cross is instant).
+   */
+  private computeApproaches(camera: CameraState, playerKey: ChunkKey): ChunkKey[] {
+    if (!this.cfg?.originChunk) return [];
+    const APPROACH_METERS = 50;
+    const sideMeters = (Math.PI * this.cfg.radiusMeters) / (2 * (1 << playerKey.lod));
+    const playerWorldX = (playerKey.cx - this.cfg.originChunk.cx) * sideMeters;
+    const playerWorldZ = (playerKey.cy - this.cfg.originChunk.cy) * sideMeters;
+    const localX = camera.position.x - playerWorldX;
+    const localZ = camera.position.z - playerWorldZ;
+    const perEdge = 1 << playerKey.lod;
+    const out: ChunkKey[] = [];
+
+    if (localX < APPROACH_METERS && playerKey.cx > 0) {
+      out.push({ ...playerKey, cx: playerKey.cx - 1 });
+    }
+    if (localX > sideMeters - APPROACH_METERS && playerKey.cx < perEdge - 1) {
+      out.push({ ...playerKey, cx: playerKey.cx + 1 });
+    }
+    if (localZ < APPROACH_METERS && playerKey.cy > 0) {
+      out.push({ ...playerKey, cy: playerKey.cy - 1 });
+    }
+    if (localZ > sideMeters - APPROACH_METERS && playerKey.cy < perEdge - 1) {
+      out.push({ ...playerKey, cy: playerKey.cy + 1 });
+    }
+    return out;
   }
 
   dispose(): void {
@@ -128,6 +365,8 @@ export class GlobeRenderer {
     this.terrainEntity = null;
     this.chunkCache.clear();
     this.inflight.clear();
+    this.preCreated.clear();
+    this.currentPlayerKey = null;
     logInfo('planet-v2 GlobeRenderer disposed');
   }
 
@@ -173,18 +412,31 @@ export class GlobeRenderer {
     return {
       id: 'terrain-entity',
       load: (key, _camera): boolean => {
+        // Story 6.6 (option 2): if the layer already has a tile for this
+        // key, it was pre-loaded hidden during approach. Just activate
+        // it — instant flip from hidden to visible+collidable, no Unity
+        // terrain init wait. If onLoaded hasn't fired yet, setActive
+        // queues the activation for when it does.
+        if (layer.hasTile(key)) {
+          layer.setActive(key);
+          this.preCreated.delete(chunkKeyId(key)); // promoted out of pre-loaded set
+          return true;
+        }
         const id = chunkKeyId(key);
         const cached = this.chunkCache.get(id);
         if (cached) {
-          // One-shot: drop from cache so a future re-load fetches fresh.
-          this.chunkCache.delete(id);
           return layer.load(key, cached);
         }
         // Cache miss — kick off fetch (idempotent on inflight set).
         this.kickChunkFetch(key);
         return false;
       },
-      unload: (key) => layer.unload(key),
+      unload: (key) => {
+        // Streamer's eviction or phase-change demote. Drop from any
+        // out-of-band tracking too.
+        this.preCreated.delete(chunkKeyId(key));
+        layer.unload(key);
+      },
     };
   }
 
@@ -219,9 +471,25 @@ export class GlobeRenderer {
           height: 1500, // matches MeshBaker's envelope; heights matrix unused
           heights: [], // unused by TileMeshLayer.load
         };
+        // The layer's load is idempotent — for the player chunk the slot
+        // already exists (pre-loaded hidden in reconcilePlayerMesh), and
+        // the layer flips it active. For neighbors this is a fresh load.
         return layer.load(key, placeholder);
       },
-      unload: (key) => layer.unload(key),
+      unload: (key) => {
+        // Story 6.6 (option 2, mesh side): if the streamer is unloading
+        // the chunk the player is now standing on (because that chunk
+        // just promoted to TerrainEntity), keep the mesh resident but
+        // hidden. When the player crosses back out, the adapter's load
+        // path turns it visible again — no fetch, no Create cost. For
+        // every other key (neighbor that fell out of range, eviction,
+        // etc.), this is a normal dispose.
+        if (this.currentPlayerKey && chunkKeysEqual(key, this.currentPlayerKey)) {
+          layer.setHidden(key);
+          return;
+        }
+        layer.unload(key);
+      },
     };
   }
 
@@ -267,8 +535,20 @@ export class GlobeRenderer {
   }
 }
 
+function parseChunkKeyId(id: string): ChunkKey | null {
+  const parts = id.split(':');
+  if (parts.length !== 4) return null;
+  const [face, lod, cx, cy] = parts.map((p) => Number(p));
+  if (![face, lod, cx, cy].every((n) => Number.isFinite(n))) return null;
+  return { face: face as ChunkKey['face'], lod: lod!, cx: cx!, cy: cy! };
+}
+
 function chunkKeyId(k: ChunkKey): string {
   return `${k.face}:${k.lod}:${k.cx}:${k.cy}`;
+}
+
+function chunkKeysEqual(a: ChunkKey, b: ChunkKey): boolean {
+  return a.face === b.face && a.lod === b.lod && a.cx === b.cx && a.cy === b.cy;
 }
 
 function detectWebGL(): boolean {

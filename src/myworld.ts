@@ -580,13 +580,22 @@ export class MyWorld {
       const mqttTransportRaw = (this.queryParams.get('mqttTransport') as string | undefined) ?? 'websockets';
       const mqttTransport = (mqttTransportRaw === 'tcp' ? 'tcp' : 'websockets') as 'tcp' | 'websockets';
       const chunkTimeoutRaw = this.queryParams.get('chunkTimeoutMs') as string | undefined;
-      const chunkTimeoutMs = chunkTimeoutRaw ? Number(chunkTimeoutRaw) : 60_000;
+      // Default 180s. Cold-start with the 5×5 candidate ring (24 mesh
+      // bakes + a couple heights generations) keeps the wos plugin's
+      // single Node event loop saturated for tens of seconds; some
+      // requests get queued behind earlier ones and miss the older 60s
+      // ceiling, leaving the player with mismatched visible/loaded
+      // chunks. Override via &chunkTimeoutMs= if needed.
+      const chunkTimeoutMs = chunkTimeoutRaw ? Number(chunkTimeoutRaw) : 180_000;
 
       const face = (Math.max(0, Math.min(5, Math.trunc(Number(this.queryParams.get('face') ?? 0)))) as 0|1|2|3|4|5);
       const lod = Number(this.queryParams.get('lod') ?? 5);
       const cx = Number(this.queryParams.get('cx') ?? 15);
       const cy = Number(this.queryParams.get('cy') ?? 15);
-      const playerKey: PlanetV2.ChunkKey = { face, lod, cx, cy };
+      // The URL face/cx/cy is the *origin* chunk (anchor for the
+      // local-XZ chunk grid). The actual player chunk is computed each
+      // tick from world position via computePlayerChunk; on first tick
+      // it equals origin since the avatar spawns at world (0, 0, 0).
 
       const cfg: PlanetV2.PlanetSceneConfig = {
         planetId,
@@ -617,35 +626,64 @@ export class MyWorld {
         Logging.Log('🌐 planet-v2: no mqttHost — running in scaffold mode (no chunks will load)');
       }
 
-      // Debug TileMesh exercise: when ?tileMeshDebug is set, the candidate
-      // provider yields the player chunk PLUS same-face neighbors so the
-      // dispatcher routes neighbors to TileMeshLayer (player chunk still
-      // goes to TerrainEntity). 'tileMeshDebug=1' or 'cardinal' → 4-way
-      // (N/E/S/W); 'ring' → 8-way (adds diagonals). Off-face neighbors are
-      // dropped — Story 6.7 (cube-corner policy) handles edge crossings.
-      const tileMeshDebug = this.queryParams.get('tileMeshDebug') as string | undefined;
-      const debugMode: 'off' | 'cardinal' | 'ring' =
-        !tileMeshDebug ? 'off'
-          : tileMeshDebug === 'ring' ? 'ring'
-          : 'cardinal';
-      const candidates: PlanetV2.ChunkKey[] =
-        debugMode === 'off'
-          ? [playerKey]
-          : sameFaceNeighbors(playerKey, debugMode === 'ring');
-      if (debugMode !== 'off') {
-        Logging.Log(
-          '🌐 planet-v2: tileMeshDebug=' + debugMode +
-          ' — emitting ' + candidates.length + ' candidates (player + ' +
-          (candidates.length - 1) + ' TileMesh neighbors)',
-        );
+      // Story 6.6: dynamic player-chunk + 3×3 ring of candidates. Each
+      // tick computes the chunk under the player from world XZ; the
+      // candidate provider emits that chunk + 8 same-face neighbors so
+      // the streamer keeps the surrounding ring rendered as TileMesh
+      // while the dispatcher routes whatever's currently the player
+      // chunk to TerrainEntity (collidable). Crossing a chunk boundary
+      // changes which key returns TerrainEntity vs TileMesh, and the
+      // streamer's phase-change path runs the promote+demote in one tick
+      // (≤1 active TerrainEntity per the architecture spec). Off-face
+      // neighbors are dropped — Story 6.7 (cube-corner policy) handles
+      // face crossings.
+      const sideMeters =
+        (Math.PI * cfg.radiusMeters) / (2 * (1 << lod));
+      const playerChunkProvider = (camera: PlanetV2.CameraState): PlanetV2.ChunkKey => {
+        return computePlayerChunk(camera.position, cfg.originChunk!, lod, sideMeters);
+      };
+      // Candidate ring radius. Default 1 → 3×3 (9 chunks); set
+      // ?ringRadius=2 to widen to 5×5 (25 chunks) for "preload outer
+      // band" behavior that smooths boundary crossings — has more cold-
+      // start MQTT pressure though, so leave the default conservative
+      // until server-side concurrency is cleaner.
+      const ringRadius = Math.max(
+        1, Math.min(3, Math.trunc(Number(this.queryParams.get('ringRadius') ?? 1))),
+      );
+      Logging.Log('🌐 planet-v2: candidate ring radius=' + ringRadius +
+        ' → ' + ((2*ringRadius + 1) ** 2) + ' chunks');
+
+      // Set a global flag the GlobeRenderer's tick reads to gate the
+      // periodic debug-state dump (streamer slots + each layer's tracked
+      // tiles, relative to origin chunk). Useful for correlating "no
+      // mesh here" observations with what the streamer/layer think is
+      // loaded. Enable via ?planetDebug=1.
+      const planetDebug = this.queryParams.get('planetDebug');
+      if (planetDebug) {
+        (globalThis as Record<string, unknown>).__pv2DebugDump = true;
+        Logging.Log('🌐 planet-v2: debug dump ENABLED (every ~5s)');
       }
+      const candidateProvider = (camera: PlanetV2.CameraState): PlanetV2.ChunkKey[] => {
+        const player = playerChunkProvider(camera);
+        const ring = sameFaceRing(player, ringRadius);
+        // Stable sort by Chebyshev distance so the streamer fires loads
+        // inner-first — visible 3×3 chunks get into MQTT before any
+        // outer band's bake requests pile up on the server.
+        return ring
+          .map((k) => ({
+            k,
+            d: Math.max(Math.abs(k.cx - player.cx), Math.abs(k.cy - player.cy)),
+          }))
+          .sort((a, b) => a.d - b.d)
+          .map((e) => e.k);
+      };
 
       const renderer = new PlanetV2.GlobeRenderer();
       renderer.initialize(cfg, {
         isWebGL: false,
         chunkSource,
-        candidateProvider: () => candidates,
-        playerChunkProvider: () => playerKey,
+        candidateProvider,
+        playerChunkProvider,
       });
 
       // Stash on the global so the tick driver below can find it without
@@ -814,24 +852,56 @@ export class MyWorld {
     //(window as any).myworld = myworld;
 
 /**
- * Same-face neighbors of a chunk (debug TileMesh exerciser).
- * Returns [center, ...neighbors]. Skips neighbors that would cross a face
- * edge — Story 6.7 (cube-corner policy) handles those properly.
+ * Map the player's world XZ position to a chunk key on the same face as
+ * the renderer's origin chunk. Story 6.6 dispatcher uses this to decide
+ * which chunk should currently be the TerrainEntity.
+ *
+ * Origin chunk is anchored at world (0, 0): its (-X, -Z) corner is at
+ * world origin, extending +X/+Z by `sideMeters`. cx/cy increase along
+ * +X/+Z respectively. Off-face indices are clamped (face-edge crossing
+ * is Story 6.7); when clamping fires, the player has run off the face
+ * and the world will look misaligned at the edge.
  */
-function sameFaceNeighbors(
+function computePlayerChunk(
+  position: { x: number; y: number; z: number },
+  origin: { face: 0 | 1 | 2 | 3 | 4 | 5; cx: number; cy: number },
+  lod: number,
+  sideMeters: number,
+): PlanetV2.ChunkKey {
+  const cxOffset = Math.floor(position.x / sideMeters);
+  const cyOffset = Math.floor(position.z / sideMeters);
+  const perEdge = 1 << lod;
+  const clamp = (n: number, lo: number, hi: number): number =>
+    n < lo ? lo : n > hi ? hi : n;
+  return {
+    face: origin.face,
+    lod,
+    cx: clamp(origin.cx + cxOffset, 0, perEdge - 1),
+    cy: clamp(origin.cy + cyOffset, 0, perEdge - 1),
+  };
+}
+
+/**
+ * Same-face square ring of chunks around `center`, with Chebyshev radius
+ * `radius`. radius=1 → 3×3 (9 chunks), radius=2 → 5×5 (25 chunks). The
+ * extra outer band exists so meshes for "the chunks that will be inner
+ * neighbors after the player's next cross" are already loaded — no
+ * fresh-slot mesh fetch races at boundary crossing time. Skips off-face
+ * indices (Story 6.7 handles face crossings).
+ */
+function sameFaceRing(
   center: PlanetV2.ChunkKey,
-  includeDiagonals: boolean,
+  radius: number,
 ): PlanetV2.ChunkKey[] {
   const perEdge = 1 << center.lod;
-  const offsets: Array<[number, number]> = includeDiagonals
-    ? [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]]
-    : [[0,-1],[-1,0],[1,0],[0,1]];
-  const out: PlanetV2.ChunkKey[] = [center];
-  for (const [dx, dy] of offsets) {
-    const cx = center.cx + dx;
-    const cy = center.cy + dy;
-    if (cx < 0 || cy < 0 || cx >= perEdge || cy >= perEdge) continue;
-    out.push({ face: center.face, lod: center.lod, cx, cy });
+  const out: PlanetV2.ChunkKey[] = [];
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const cx = center.cx + dx;
+      const cy = center.cy + dy;
+      if (cx < 0 || cy < 0 || cx >= perEdge || cy >= perEdge) continue;
+      out.push({ face: center.face, lod: center.lod, cx, cy });
+    }
   }
   return out;
 }
