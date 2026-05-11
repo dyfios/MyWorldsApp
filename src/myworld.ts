@@ -665,15 +665,21 @@ export class MyWorld {
       }
       const candidateProvider = (camera: PlanetV2.CameraState): PlanetV2.ChunkKey[] => {
         const player = playerChunkProvider(camera);
-        const ring = sameFaceRing(player, ringRadius);
+        const ring = crossFaceRing(player, ringRadius);
         // Stable sort by Chebyshev distance so the streamer fires loads
         // inner-first — visible 3×3 chunks get into MQTT before any
-        // outer band's bake requests pile up on the server.
+        // outer band's bake requests pile up on the server. For cross-
+        // face entries we re-derive the offset via chunkOffset so the
+        // distance reflects flat-XZ proximity rather than naive cx-diff
+        // (which is wrong across face boundaries).
         return ring
-          .map((k) => ({
-            k,
-            d: Math.max(Math.abs(k.cx - player.cx), Math.abs(k.cy - player.cy)),
-          }))
+          .map((k) => {
+            const off = PlanetV2.chunkOffset(k, player);
+            const d = off
+              ? Math.max(Math.abs(off.dx), Math.abs(off.dz))
+              : ringRadius + 1; // unreachable in flat XZ — sort last
+            return { k, d };
+          })
           .sort((a, b) => a.d - b.d)
           .map((e) => e.k);
       };
@@ -852,15 +858,18 @@ export class MyWorld {
     //(window as any).myworld = myworld;
 
 /**
- * Map the player's world XZ position to a chunk key on the same face as
- * the renderer's origin chunk. Story 6.6 dispatcher uses this to decide
- * which chunk should currently be the TerrainEntity.
+ * Map the player's world XZ position to a chunk key, using cross-face
+ * (equator) traversal so the player can walk off the east/west edge of
+ * an equator face onto its neighbor without clamping. Off-equator N/S
+ * crossings still clamp (Phase 2b territory — see FaceTraversal.ts).
  *
  * Origin chunk is anchored at world (0, 0): its (-X, -Z) corner is at
  * world origin, extending +X/+Z by `sideMeters`. cx/cy increase along
- * +X/+Z respectively. Off-face indices are clamped (face-edge crossing
- * is Story 6.7); when clamping fires, the player has run off the face
- * and the world will look misaligned at the edge.
+ * +X/+Z respectively. When the player walks east past the east edge of
+ * the origin face, `chunkAtOffset` returns the cross-face neighbor;
+ * when they walk far enough north/south to hit a rotated face edge,
+ * it returns null and we clamp to the current face's edge so the world
+ * still renders something.
  */
 function computePlayerChunk(
   position: { x: number; y: number; z: number },
@@ -870,6 +879,17 @@ function computePlayerChunk(
 ): PlanetV2.ChunkKey {
   const cxOffset = Math.floor(position.x / sideMeters);
   const cyOffset = Math.floor(position.z / sideMeters);
+  const originKey: PlanetV2.ChunkKey = {
+    face: origin.face,
+    lod,
+    cx: origin.cx,
+    cy: origin.cy,
+  };
+  const crossed = PlanetV2.chunkAtOffset(originKey, cxOffset, cyOffset);
+  if (crossed) return crossed;
+  // Fallback: rotated edge — clamp to the current face's nearest valid
+  // chunk so we still render something instead of blanking. Phase 2b
+  // will handle the rotation properly.
   const perEdge = 1 << lod;
   const clamp = (n: number, lo: number, hi: number): number =>
     n < lo ? lo : n > hi ? hi : n;
@@ -882,25 +902,24 @@ function computePlayerChunk(
 }
 
 /**
- * Same-face square ring of chunks around `center`, with Chebyshev radius
- * `radius`. radius=1 → 3×3 (9 chunks), radius=2 → 5×5 (25 chunks). The
- * extra outer band exists so meshes for "the chunks that will be inner
- * neighbors after the player's next cross" are already loaded — no
- * fresh-slot mesh fetch races at boundary crossing time. Skips off-face
- * indices (Story 6.7 handles face crossings).
+ * Square ring of chunks around `center`, Chebyshev radius `radius`,
+ * with equator-aware face crossings: when `(dx,dy)` puts us off the
+ * face, `chunkAtOffset` follows the rotation=0 east/west adjacency to
+ * the neighboring equator face. Diagonal moves that combine a cross-
+ * face and an N/S hop still work (e.g., east+north from the corner of
+ * face 0 lands on NEG_Z 0,16). Entries that need a rotated transition
+ * (N/S off the equator) are silently dropped — Phase 2b territory.
+ * radius=1 → up to 9 chunks, radius=2 → up to 25.
  */
-function sameFaceRing(
+function crossFaceRing(
   center: PlanetV2.ChunkKey,
   radius: number,
 ): PlanetV2.ChunkKey[] {
-  const perEdge = 1 << center.lod;
   const out: PlanetV2.ChunkKey[] = [];
   for (let dy = -radius; dy <= radius; dy++) {
     for (let dx = -radius; dx <= radius; dx++) {
-      const cx = center.cx + dx;
-      const cy = center.cy + dy;
-      if (cx < 0 || cy < 0 || cx >= perEdge || cy >= perEdge) continue;
-      out.push({ face: center.face, lod: center.lod, cx, cy });
+      const k = PlanetV2.chunkAtOffset(center, dx, dy);
+      if (k) out.push(k);
     }
   }
   return out;

@@ -28,10 +28,12 @@ import {
   chunkKeyString,
   type ChunkData,
   type ChunkKey,
+  type CubeFace,
   type ILayer,
   type PlanetSceneConfig,
 } from './types.js';
 import { shouldUseTerrainEntity } from './CubeCornerPolicy.js';
+import { chunkOffset } from './FaceTraversal.js';
 
 /**
  * Planet-wide sea-level offset. Heights from V1's noise stack range roughly
@@ -82,8 +84,12 @@ export class TerrainEntityLayer implements ILayer {
    * Lazy-pinned origin chunk. If `cfg.originChunk` is set we pin from it;
    * otherwise we pin from the first chunk loaded. All other chunks render
    * relative to this origin so the player's nominal landing spot is at
-   * world (0, *, 0).
+   * world (0, *, 0). Story 6.7 Phase 2a: the face is tracked too, so
+   * equator-adjacent chunks on a neighbouring face land at the right
+   * world-X via `chunkOffset` rather than being mis-placed by 0 (the
+   * naive `key.cx - originCx` math).
    */
+  private originFace: CubeFace | null = null;
   private originCx: number | null = null;
   private originCy: number | null = null;
 
@@ -91,6 +97,7 @@ export class TerrainEntityLayer implements ILayer {
     this.isWebGL = isWebGL;
     this.cbPrefix = callbackPrefix(`terrain_${cfg.planetId}`);
     if (cfg.originChunk) {
+      this.originFace = cfg.originChunk.face;
       this.originCx = cfg.originChunk.cx;
       this.originCy = cfg.originChunk.cy;
     }
@@ -124,15 +131,31 @@ export class TerrainEntityLayer implements ILayer {
       return false;
     }
 
-    if (this.originCx === null || this.originCy === null) {
+    if (this.originCx === null || this.originCy === null || this.originFace === null) {
+      this.originFace = chunk.face;
       this.originCx = chunk.cx;
       this.originCy = chunk.cy;
     }
-    const worldX = (chunk.cx - this.originCx) * chunk.length;
-    const worldZ = (chunk.cy - this.originCy) * chunk.width;
+    const origin: ChunkKey = {
+      face: this.originFace,
+      lod: key.lod,
+      cx: this.originCx,
+      cy: this.originCy,
+    };
+    const offset = chunkOffset(key, origin);
+    if (!offset) {
+      logError(
+        `planet-v2 terrain ${chunkKeyString(key)}: not representable from origin face=${origin.face} ` +
+          `cx=${origin.cx} cy=${origin.cy} — Phase 2b territory (rotated edge or off-equator)`,
+      );
+      return false;
+    }
+    const worldX = offset.dx * chunk.length;
+    const worldZ = offset.dz * chunk.width;
     const envelope = chunk.height;
     const entityId = w.UUID.NewUUID().ToString();
     const cbSuffix = `loaded_${id.replace(/:/g, '_')}_${entityId.replace(/-/g, '')}`;
+    const dirTag = formatTerrainDir(offset.dx, offset.dz);
     const tile: LoadedTile = {
       key,
       entity: null,
@@ -154,9 +177,6 @@ export class TerrainEntityLayer implements ILayer {
       }
       if (!entity) return;
       tile.entity = entity;
-      const dx = this.originCx !== null ? key.cx - this.originCx : 0;
-      const dz = this.originCy !== null ? key.cy - this.originCy : 0;
-      const dirTag = formatTerrainDir(dx, dz);
       try {
         if (tile.active) {
           // Physical (=2): renderer enabled AND collider enabled.
@@ -205,10 +225,8 @@ export class TerrainEntityLayer implements ILayer {
         heightsJson: chunk.heights_json,
       });
       w.TerrainEntity.Create(jsonBody, null, tile.onLoadedCallbackName);
-      const dxFromOrigin = this.originCx !== null ? key.cx - this.originCx : 0;
-      const dzFromOrigin = this.originCy !== null ? key.cy - this.originCy : 0;
       logInfo(
-        `planet-v2 terrain ${id} [dir=${formatTerrainDir(dxFromOrigin, dzFromOrigin)}]: ` +
+        `planet-v2 terrain ${id} [dir=${dirTag}]: ` +
           `TerrainEntity.Create (json-async) dispatched ` +
           `length=${chunk.length} envelope=${envelope} ` +
           `pos=(${worldX}, ${-SEA_LEVEL_OFFSET_METERS}, ${worldZ})`,

@@ -27,6 +27,7 @@ import { ImpostorSphere } from './ImpostorSphere.js';
 import { TileMeshLayer } from './TileMeshLayer.js';
 import { TerrainEntityLayer } from './TerrainEntityLayer.js';
 import { shouldUseTerrainEntity } from './CubeCornerPolicy.js';
+import { chunkAtOffset, chunkOffset } from './FaceTraversal.js';
 import {
   DEFAULT_BUDGET,
   WEBGL_BUDGET,
@@ -369,25 +370,34 @@ export class GlobeRenderer {
     if (!this.cfg?.originChunk) return [];
     const APPROACH_METERS = 50;
     const sideMeters = (Math.PI * this.cfg.radiusMeters) / (2 * (1 << playerKey.lod));
-    const playerWorldX = (playerKey.cx - this.cfg.originChunk.cx) * sideMeters;
-    const playerWorldZ = (playerKey.cy - this.cfg.originChunk.cy) * sideMeters;
+    // Use chunkOffset so the player's world position is computed relative
+    // to the renderer's origin chunk even when they've crossed onto an
+    // equator-neighbor face. Falling back to 0 means we treat the player
+    // as on the origin chunk for offset purposes — only triggers when
+    // they're somewhere FaceTraversal can't represent (off-equator N/S).
+    const origin: ChunkKey = {
+      face: this.cfg.originChunk.face,
+      lod: playerKey.lod,
+      cx: this.cfg.originChunk.cx,
+      cy: this.cfg.originChunk.cy,
+    };
+    const off = chunkOffset(playerKey, origin) ?? { dx: 0, dz: 0 };
+    const playerWorldX = off.dx * sideMeters;
+    const playerWorldZ = off.dz * sideMeters;
     const localX = camera.position.x - playerWorldX;
     const localZ = camera.position.z - playerWorldZ;
-    const perEdge = 1 << playerKey.lod;
     const out: ChunkKey[] = [];
 
-    if (localX < APPROACH_METERS && playerKey.cx > 0) {
-      out.push({ ...playerKey, cx: playerKey.cx - 1 });
-    }
-    if (localX > sideMeters - APPROACH_METERS && playerKey.cx < perEdge - 1) {
-      out.push({ ...playerKey, cx: playerKey.cx + 1 });
-    }
-    if (localZ < APPROACH_METERS && playerKey.cy > 0) {
-      out.push({ ...playerKey, cy: playerKey.cy - 1 });
-    }
-    if (localZ > sideMeters - APPROACH_METERS && playerKey.cy < perEdge - 1) {
-      out.push({ ...playerKey, cy: playerKey.cy + 1 });
-    }
+    // Use chunkAtOffset so neighbours follow the equator wrap; null when
+    // a ±1 hop would cross a rotated edge (Phase 2b) — silently dropped.
+    const push = (dx: number, dz: number): void => {
+      const k = chunkAtOffset(playerKey, dx, dz);
+      if (k) out.push(k);
+    };
+    if (localX < APPROACH_METERS) push(-1, 0);
+    if (localX > sideMeters - APPROACH_METERS) push(1, 0);
+    if (localZ < APPROACH_METERS) push(0, -1);
+    if (localZ > sideMeters - APPROACH_METERS) push(0, 1);
     return out;
   }
 

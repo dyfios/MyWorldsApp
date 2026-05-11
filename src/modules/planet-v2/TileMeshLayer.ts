@@ -33,11 +33,13 @@ import {
   type ChunkData,
   type ChunkKey,
   type ChunkMeshData,
+  type CubeFace,
   type IChunkSource,
   type ILayer,
   type MeshQuality,
   type PlanetSceneConfig,
 } from './types.js';
+import { chunkOffset } from './FaceTraversal.js';
 
 /**
  * Vertical placement note (planet-v2 boundary alignment, fixed 2026-05-09):
@@ -93,6 +95,9 @@ export class TileMeshLayer implements ILayer {
   private readonly tiles = new Map<string, LoadedTile>();
   private readonly cbPrefix: string;
   private readonly deps: TileMeshLayerDeps;
+  // Story 6.7 Phase 2a: track origin face too so chunkOffset() can place
+  // equator-adjacent chunks on a neighbouring face at the right world-X.
+  private originFace: CubeFace | null = null;
   private originCx: number | null = null;
   private originCy: number | null = null;
 
@@ -100,6 +105,7 @@ export class TileMeshLayer implements ILayer {
     this.deps = deps;
     this.cbPrefix = callbackPrefix(`tilemesh_${cfg.planetId}`);
     if (cfg.originChunk) {
+      this.originFace = cfg.originChunk.face;
       this.originCx = cfg.originChunk.cx;
       this.originCy = cfg.originChunk.cy;
     }
@@ -147,12 +153,27 @@ export class TileMeshLayer implements ILayer {
       return false;
     }
 
-    if (this.originCx === null || this.originCy === null) {
+    if (this.originCx === null || this.originCy === null || this.originFace === null) {
+      this.originFace = chunk.face;
       this.originCx = chunk.cx;
       this.originCy = chunk.cy;
     }
-    const worldX = (chunk.cx - this.originCx) * chunk.length;
-    const worldZ = (chunk.cy - this.originCy) * chunk.width;
+    const origin: ChunkKey = {
+      face: this.originFace,
+      lod: key.lod,
+      cx: this.originCx,
+      cy: this.originCy,
+    };
+    const offset = chunkOffset(key, origin);
+    if (!offset) {
+      logError(
+        `planet-v2 mesh ${id}: not representable from origin face=${origin.face} ` +
+          `cx=${origin.cx} cy=${origin.cy} — Phase 2b territory (rotated edge)`,
+      );
+      return false;
+    }
+    const worldX = offset.dx * chunk.length;
+    const worldZ = offset.dz * chunk.width;
 
     const tile: LoadedTile = {
       key,
@@ -274,6 +295,26 @@ export class TileMeshLayer implements ILayer {
     return out;
   }
 
+  /**
+   * Helper: formatted "+1,-2"-style direction tag relative to the origin
+   * chunk, using chunkOffset so cross-equator-face chunks render with the
+   * correct delta (not naive cx-diff).
+   */
+  private dirTagFor(key: ChunkKey): string {
+    if (this.originFace === null || this.originCx === null || this.originCy === null) {
+      return '?,?';
+    }
+    const origin: ChunkKey = {
+      face: this.originFace,
+      lod: key.lod,
+      cx: this.originCx,
+      cy: this.originCy,
+    };
+    const off = chunkOffset(key, origin);
+    if (!off) return '?,?';
+    return formatDir(off.dx, off.dz);
+  }
+
   /* ──────────────────── Internal callbacks ───────────────────────────── */
 
   private onMeshReceived(
@@ -332,10 +373,8 @@ export class TileMeshLayer implements ILayer {
           entity.SetVisibility?.(false);
           entity.SetInteractionState?.(0); // Hidden
         }
-        const dx = this.originCx !== null ? tile.key.cx - this.originCx : 0;
-        const dz = this.originCy !== null ? tile.key.cy - this.originCy : 0;
         logInfo(
-          `planet-v2 mesh ${id} [dir=${formatDir(dx, dz)}]: ready (` +
+          `planet-v2 mesh ${id} [dir=${this.dirTagFor(tile.key)}]: ready (` +
             `${tile.active ? 'visible, static' : 'hidden, pre-loaded'})`,
         );
       } catch (e) {
@@ -362,10 +401,8 @@ export class TileMeshLayer implements ILayer {
         // the prefab from the fresh URL bytes.
         true,                            // checkForUpdateIfCached
       );
-      const dxFromOrigin = this.originCx !== null ? tile.key.cx - this.originCx : 0;
-      const dzFromOrigin = this.originCy !== null ? tile.key.cy - this.originCy : 0;
       logInfo(
-        `planet-v2 mesh ${id} [dir=${formatDir(dxFromOrigin, dzFromOrigin)}]: ` +
+        `planet-v2 mesh ${id} [dir=${this.dirTagFor(tile.key)}]: ` +
           `MeshEntity.Create dispatched bytes=${mesh.byte_size} ` +
           `resolution=${mesh.target_resolution} pos=(${worldX}, 0, ${worldZ})`,
       );
@@ -382,10 +419,9 @@ export class TileMeshLayer implements ILayer {
   private onFetchError(id: string, err: Error): void {
     // Drop the placeholder so the streamer retries on the next tick.
     const tile = this.tiles.get(id);
-    const dx = tile && this.originCx !== null ? tile.key.cx - this.originCx : 0;
-    const dz = tile && this.originCy !== null ? tile.key.cy - this.originCy : 0;
+    const dirTag = tile ? this.dirTagFor(tile.key) : '?,?';
     this.tiles.delete(id);
-    logError(`planet-v2 mesh ${id} [dir=${formatDir(dx, dz)}]: fetch failed: ${err.message}`);
+    logError(`planet-v2 mesh ${id} [dir=${dirTag}]: fetch failed: ${err.message}`);
   }
 }
 

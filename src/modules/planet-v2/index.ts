@@ -20,6 +20,13 @@ export {
   shouldUseTerrainEntity,
 } from './CubeCornerPolicy.js';
 export {
+  chunkAtOffset,
+  chunkOffset,
+  equatorChunkFromX,
+  equatorChunkX,
+  isEquatorFace,
+} from './FaceTraversal.js';
+export {
   cellsPerEdgeAtLod,
   chunkKeyString,
   phaseForAltitude,

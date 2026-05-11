@@ -209,6 +209,40 @@ describe('GlobeRenderer.tick', () => {
     }
   });
 
+  it('pre-fetches the cross-face neighbor when player is approaching the east edge of the face', () => {
+    // Story 6.7 Phase 2a: equator traversal. From face 0 (POS_X) the
+    // east neighbor of the rightmost column (cx=31) is face 5 (NEG_Z)
+    // cx=0. When the player is within 50m of that east boundary, the
+    // approach pre-fetch should target NEG_Z, not "off the edge" with
+    // a clamp+drop. sideMeters at lod=5 / r=25000m ≈ 1227m. Origin at
+    // (face=0, cx=15). To place the player on (face=0, cx=31, cy=15)
+    // near its east edge: position.x ≈ 17 * sideMeters - 50.
+    const requests: ChunkKey[] = [];
+    const fakeSource: IChunkSource = {
+      isConnected: () => true,
+      requestChunk: (face, lod, cx, cy) => {
+        requests.push({ face, lod, cx, cy } as ChunkKey);
+      },
+      requestChunkMesh: () => {},
+      dispose: () => {},
+    };
+    const r = new GlobeRenderer();
+    const sideMeters = (Math.PI * 25_000) / (2 * 32);
+    r.initialize(minimalConfig, {
+      isWebGL: false,
+      chunkSource: fakeSource,
+      candidateProvider: () => [{ face: 0, lod: 5, cx: 31, cy: 15 }],
+      playerChunkProvider: () => ({ face: 0, lod: 5, cx: 31, cy: 15 }),
+    });
+    r.tick({
+      position: { x: 17 * sideMeters - 10, y: 0, z: 600 },
+      velocity: { x: 0, y: 0, z: 0 },
+      altitudeMeters: 100,
+    });
+    expect(requests).toContainEqual({ face: 5, lod: 5, cx: 0, cy: 15 });
+    r.dispose();
+  });
+
   it('pre-fetches the -X neighbor when the player is within 50m of the chunk boundary', () => {
     const requests: ChunkKey[] = [];
     const fakeSource: IChunkSource = {
