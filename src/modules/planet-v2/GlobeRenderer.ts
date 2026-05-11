@@ -85,6 +85,17 @@ export class GlobeRenderer {
    * the boundary.
    */
   private currentPlayerKey: ChunkKey | null = null;
+  /**
+   * The chunk the player MOST RECENTLY EXITED (set whenever
+   * currentPlayerKey changes). The approach reconciliation skips this
+   * key so we don't burn a fresh TerrainEntity init for the chunk we
+   * just demoted off — the player is standing right at the boundary
+   * immediately after crossing, so computeApproaches will always re-
+   * propose it. Cleared once it drops out of the approach set (the
+   * player has walked far enough that we no longer "see" it), so the
+   * normal flow resumes if they later double back.
+   */
+  private lastPlayerKey: ChunkKey | null = null;
   private disposed = false;
 
   /** Synchronous initialize. */
@@ -146,6 +157,17 @@ export class GlobeRenderer {
     // kickChunkFetch is idempotent on the inflight set — repeat calls
     // no-op once the request is in flight or cached.
     const playerKey = this.deps.playerChunkProvider?.(camera) ?? null;
+    // Detect crossings: if the player chunk just changed, remember the
+    // one we exited so reconcileApproachTerrains can skip it (we just
+    // demoted its TerrainEntity; rebuilding a hidden replica next tick
+    // would be wasted work).
+    if (
+      this.currentPlayerKey &&
+      playerKey &&
+      !chunkKeysEqual(this.currentPlayerKey, playerKey)
+    ) {
+      this.lastPlayerKey = this.currentPlayerKey;
+    }
     // Stash before streamer.update so the TileMesh adapter's unload
     // (which fires when this chunk's slot phase-changes to TerrainEntity)
     // can read it and decide hide-vs-delete.
@@ -246,11 +268,24 @@ export class GlobeRenderer {
     if (!this.terrainEntity) return;
     const approachIds = new Set(approaches.map((k) => chunkKeyId(k)));
     const playerId = chunkKeyId(playerKey);
+    const lastId = this.lastPlayerKey ? chunkKeyId(this.lastPlayerKey) : null;
 
-    // Pre-create where missing.
+    // Clear lastPlayerKey once the player has walked far enough that the
+    // just-exited chunk is no longer in the approach zone. After that we
+    // want the normal flow back: if the player ever returns, a fresh
+    // hidden TE rebuild is fine because we're no longer paying it
+    // repeatedly per tick along a forward path.
+    if (lastId && !approachIds.has(lastId)) {
+      this.lastPlayerKey = null;
+    }
+
+    // Pre-create where missing. Skip lastPlayerKey — we just demoted its
+    // TerrainEntity on the crossing tick; rebuilding a hidden replica
+    // right behind the player is wasted Unity terrain init.
     for (const k of approaches) {
       const id = chunkKeyId(k);
       if (id === playerId) continue;
+      if (lastId && id === lastId) continue;
       if (this.terrainEntity.hasTile(k)) continue;
       const cached = this.chunkCache.get(id);
       if (!cached) continue;
@@ -367,6 +402,7 @@ export class GlobeRenderer {
     this.inflight.clear();
     this.preCreated.clear();
     this.currentPlayerKey = null;
+    this.lastPlayerKey = null;
     logInfo('planet-v2 GlobeRenderer disposed');
   }
 
