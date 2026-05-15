@@ -245,6 +245,13 @@ export interface PlanetSceneConfig {
   /** URL of the baked biome map (for Impostor). May be empty in V1. */
   biomeMapUrl: string;
   /**
+   * URL of the server-baked impostor glb (UV sphere with biome PNG embedded
+   * as diffuse texture). Story 6.4. When empty the ImpostorSphere falls
+   * back to a flat-coloured primitive sphere so the planet has SOMETHING
+   * visible from altitude.
+   */
+  impostorUrl?: string;
+  /**
    * HTTP-style base URL for chunk-mesh assets. May be empty in V1. Reserved
    * for the Story 5.7 mesh-delivery work.
    */

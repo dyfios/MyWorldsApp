@@ -597,6 +597,20 @@ export class MyWorld {
       // tick from world position via computePlayerChunk; on first tick
       // it equals origin since the avatar spawns at world (0, 0, 0).
 
+      // Story 6.4 ImpostorSphere — URL of the server-baked impostor glb.
+      // Optional. Either provide explicitly via `&impostorUrl=...` OR set
+      // `&meshHttpBase=http://host:port` and we'll construct the standard
+      // `<base>/planet/<id>/impostor.glb` URL. When neither is set, the
+      // ImpostorSphere falls back to a flat-coloured primitive sphere so
+      // the planet still has SOMETHING visible from altitude.
+      const explicitImpostor = this.queryParams.get('impostorUrl') as string | undefined;
+      const meshHttpBase = this.queryParams.get('meshHttpBase') as string | undefined;
+      const impostorUrl =
+        explicitImpostor ??
+        (meshHttpBase
+          ? `${meshHttpBase.replace(/\/+$/, '')}/planet/${encodeURIComponent(planetId)}/impostor.glb`
+          : undefined);
+
       const cfg: PlanetV2.PlanetSceneConfig = {
         planetId,
         radiusMeters: Number(this.queryParams.get('radiusMeters') ?? 25_000),
@@ -604,6 +618,7 @@ export class MyWorld {
         biomeMapUrl: '',
         chunkServiceBaseUrl: '',
         originChunk: { face, cx, cy },
+        impostorUrl,
       };
 
       // Build the chunk source if MQTT info is present. Connect is
