@@ -254,6 +254,20 @@ export interface MeshEntityApi {
     onLoaded?: string,
     checkForUpdateIfCached?: boolean,
   ): unknown;
+  /**
+   * Primitive sphere with a solid color material. Diameter 1.0 by default;
+   * use `SetScale` on the instance to size it. Used for Story 6.4
+   * ImpostorSphere (planet at altitude).
+   * Verified against MeshEntity.cs:242 in WebVerse-Runtime.
+   */
+  CreateSphere?(
+    parent: unknown | null,
+    color: ColorLike,
+    position: Vector3Like,
+    rotation: QuaternionLike,
+    id?: string,
+    onLoaded?: string,
+  ): unknown;
 }
 
 /** Runtime mesh-entity instance returned to the onLoaded callback. */
@@ -268,6 +282,13 @@ export interface MeshEntityInstance {
    * close-range TerrainEntity. Use `1` (Static).
    */
   SetInteractionState?(state: 0 | 1 | 2 | 3): boolean;
+  /**
+   * Scale the entity. Primitive meshes (CreateSphere etc.) start at
+   * Unity primitive default diameter 1.0; the ImpostorSphere scales by
+   * 2·radius to fill the planet's actual size.
+   * Verified against BaseEntity.cs:416 in WebVerse-Runtime.
+   */
+  SetScale?(scale: Vector3Like, synchronizeChange?: boolean): boolean;
   Delete?(): boolean;
 }
 

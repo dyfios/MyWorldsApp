@@ -122,8 +122,12 @@ export class GlobeRenderer {
       chunkSource: deps.chunkSource ?? makeNullChunkSource(),
     });
     this.impostor = new ImpostorSphere(cfg);
-    // ImpostorSphere.initialize() is currently a throwing stub — only call
-    // it once Story 6.4 is live. v2 first pass leaves the impostor inactive.
+    // Story 6.4 live as of 2026-05-15: ImpostorSphere creates a flat-
+    // coloured sphere at the planet centre, scaled to radius. Visible
+    // from altitude when the per-tile meshes don't cover the planet's
+    // silhouette. initialize() is idempotent and tolerates the test
+    // env (no WebVerse globals) — safe to call unconditionally here.
+    this.impostor.initialize();
 
     const dispatcher: ILayerDispatcher = {
       layerFor: (key, camera) => this.layerFor(key, camera),
