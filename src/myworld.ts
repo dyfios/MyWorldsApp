@@ -732,6 +732,19 @@ export class MyWorld {
       }
 
       Logging.Log('✓ planet-v2 setup complete (player chunk face=' + face + ' lod=' + lod + ' cx=' + cx + ' cy=' + cy + ')');
+
+      // Dismiss the toolbar's loading panel — planet-v2 doesn't go through
+      // StaticSurfaceRenderer's player-on-ground/water-ready paths that
+      // normally call this for mini-world. Time.SetTimeout takes
+      // MILLISECONDS (memory: reference_webverse_jint_runtime). Fire a few
+      // retries spaced apart so we cover (a) the toolbar HTML still
+      // loading and (b) the first chunk arriving before the panel hides.
+      try {
+        const cmd = `if (typeof toggleLoadingPanel === 'function') { toggleLoadingPanel(false); }`;
+        Time.SetTimeout(cmd, 3000);
+        Time.SetTimeout(cmd, 6000);
+        Time.SetTimeout(cmd, 10000);
+      } catch (_e) { /* best-effort */ }
     } catch (e) {
       Logging.LogError('❌ planet-v2: setupPlanetV2 threw: ' + (e instanceof Error ? e.message : String(e)));
     }
@@ -877,8 +890,15 @@ function computePlayerChunk(
   lod: number,
   sideMeters: number,
 ): PlanetV2.ChunkKey {
-  const cxOffset = Math.floor(position.x / sideMeters);
-  const cyOffset = Math.floor(position.z / sideMeters);
+  // Spawn chunk's CENTER is at world origin (centre-vs-corner alignment —
+  // see TerrainEntityLayer's `worldX - length/2`). Its world extent runs
+  // from -sideMeters/2 to +sideMeters/2 in X and Z; the +cx neighbour is
+  // in [+sideMeters/2, +3·sideMeters/2]. Shift by +sideMeters/2 before
+  // the floor so the player needs to walk past +sideMeters/2 east of
+  // origin to cross into +cx (not past 0 as the old corner-at-origin
+  // convention assumed).
+  const cxOffset = Math.floor((position.x + sideMeters / 2) / sideMeters);
+  const cyOffset = Math.floor((position.z + sideMeters / 2) / sideMeters);
   const originKey: PlanetV2.ChunkKey = {
     face: origin.face,
     lod,

@@ -172,8 +172,11 @@ export class TileMeshLayer implements ILayer {
       );
       return false;
     }
-    const worldX = offset.dx * chunk.length;
-    const worldZ = offset.dz * chunk.width;
+    // MeshEntity position is the NW CORNER of the tile, matching TerrainEntity's
+    // convention. Shift by half a chunk so the spawn chunk's centre is at the
+    // world origin and adjacent ME/TE tiles share seams cleanly.
+    const worldX = offset.dx * chunk.length - chunk.length / 2;
+    const worldZ = offset.dz * chunk.width - chunk.width / 2;
 
     const tile: LoadedTile = {
       key,

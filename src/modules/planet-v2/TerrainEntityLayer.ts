@@ -150,8 +150,12 @@ export class TerrainEntityLayer implements ILayer {
       );
       return false;
     }
-    const worldX = offset.dx * chunk.length;
-    const worldZ = offset.dz * chunk.width;
+    // TerrainEntity position is the NW CORNER of the heightmap, but the
+    // chunk-grid offsets refer to the CENTER. Shift the corner back by
+    // half a chunk so the spawn chunk's centre lands at the world origin
+    // (where the player avatar spawns) instead of its corner.
+    const worldX = offset.dx * chunk.length - chunk.length / 2;
+    const worldZ = offset.dz * chunk.width - chunk.width / 2;
     const envelope = chunk.height;
     const entityId = w.UUID.NewUUID().ToString();
     const cbSuffix = `loaded_${id.replace(/:/g, '_')}_${entityId.replace(/-/g, '')}`;
