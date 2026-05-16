@@ -62,13 +62,27 @@ export class ImpostorSphere {
   initialize(): void {
     if (this.creating || this.entity) return;
     const w = webverse();
-    if (!w.MeshEntity || !w.Vector3 || !w.Quaternion || !w.UUID) {
+    const missing: string[] = [];
+    if (!w.MeshEntity) missing.push('MeshEntity');
+    if (!w.Vector3) missing.push('Vector3');
+    if (!w.Quaternion) missing.push('Quaternion');
+    if (!w.UUID) missing.push('UUID');
+    if (missing.length > 0) {
+      logInfo(
+        `planet-v2 impostor: skipped — missing WebVerse globals: [${missing.join(', ')}] ` +
+          `(this is normal in the test env; in WebVerse it means the runtime hasn't initialized yet)`,
+      );
       return;
     }
 
     if (this.cfg.impostorUrl && this.cfg.impostorUrl.length > 0) {
+      logInfo(`planet-v2 impostor: initializing from URL ${this.cfg.impostorUrl}`);
       this.initializeFromUrl(this.cfg.impostorUrl);
     } else {
+      logInfo(
+        `planet-v2 impostor: initializing as flat-coloured primitive ` +
+          `(no impostorUrl configured — pass &meshHttpBase=http://host:8090 to use the server-baked textured glb)`,
+      );
       this.initializeFlatPrimitive();
     }
   }
@@ -165,18 +179,32 @@ export class ImpostorSphere {
    */
   private initializeFlatPrimitive(): void {
     const w = webverse();
-    if (
-      !w.MeshEntity ||
-      !w.MeshEntity.CreateSphere ||
-      !w.Vector3 ||
-      !w.Quaternion ||
-      !w.UUID ||
-      !w.Color
-    ) {
+    const missing: string[] = [];
+    if (!w.MeshEntity) missing.push('MeshEntity');
+    if (!w.MeshEntity?.CreateSphere) missing.push('MeshEntity.CreateSphere');
+    if (!w.Vector3) missing.push('Vector3');
+    if (!w.Quaternion) missing.push('Quaternion');
+    if (!w.UUID) missing.push('UUID');
+    if (!w.Color) missing.push('Color');
+    if (missing.length > 0) {
+      logError(
+        `planet-v2 impostor: flat-primitive path UNAVAILABLE — missing: [${missing.join(', ')}]. ` +
+          `If MeshEntity.CreateSphere is the only missing one, this WebVerse build is older than ` +
+          `the API surface (MeshEntity.cs:242). Pass &meshHttpBase=... to use the textured-glb path instead.`,
+      );
       return;
     }
+    // TypeScript narrowing — the missing[] check above already validated
+    // each of these, but TS doesn't follow through the array form.
+    const ME = w.MeshEntity!;
+    const Vec = w.Vector3!;
+    const Quat = w.Quaternion!;
+    const Col = w.Color!;
+    const Uid = w.UUID!;
+    const CreateSphere = ME.CreateSphere!;
+
     this.creating = true;
-    const entityId = w.UUID.NewUUID().ToString();
+    const entityId = Uid.NewUUID().ToString();
     const cbSuffix = `loaded_${entityId.replace(/-/g, '')}`;
 
     registerCallback(
@@ -198,12 +226,12 @@ export class ImpostorSphere {
       }) as (...a: never[]) => void,
     );
 
-    const position = new w.Vector3(0, -this.cfg.radiusMeters, 0);
-    const rotation = w.Quaternion.identity;
-    const color = new w.Color(0.65, 0.55, 0.40, 1);
+    const position = new Vec(0, -this.cfg.radiusMeters, 0);
+    const rotation = Quat.identity;
+    const color = new Col(0.65, 0.55, 0.40, 1);
 
     try {
-      w.MeshEntity.CreateSphere(
+      CreateSphere(
         null, color, position, rotation, entityId,
         `${this.cbPrefix}${cbSuffix}`,
       );
