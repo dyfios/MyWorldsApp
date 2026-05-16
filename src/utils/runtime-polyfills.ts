@@ -69,7 +69,15 @@ if (typeof g.setTimeout !== 'function') {
       // in WebVerse-Runtime/.../JavascriptHandler.cs). The d.ts is unit-agnostic
       // so this was originally divided-by-1000 — that bug fired every timeout
       // ~1000× too early and made MqttChunkSource look unreachable.
-      Time.SetTimeout(`${cbName}();`, ms ?? 0);
+      //
+      // Wrap in try/catch: WebVerse's Time queue persists across page
+      // reloads, so a stale timer scheduled by a previous JS context can
+      // fire during the next page load against a different session nonce.
+      // The session-nonce check above prevents wrong-callback collisions,
+      // but it can't prevent "no callback at all" — without this guard,
+      // the eval throws `__mw_setTimeout_<nonce>_<id> is not defined`
+      // every time you reload mid-timer.
+      Time.SetTimeout(`try { ${cbName}(); } catch (_e) {}`, ms ?? 0);
       return id;
     };
 
