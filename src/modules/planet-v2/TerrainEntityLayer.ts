@@ -378,9 +378,18 @@ function buildTerrainEntityJSON(i: TerrainEntityJSONInput): string {
     : '[{"diffuseTexture":"","normalTexture":"","maskTexture":"",' +
       '"specular":{"r":0.5,"g":0.5,"b":0.5,"a":1},' +
       '"metallic":0,"smoothness":0,"sizeFactor":1}]';
-  const layerMasksJson = hasPalette && i.layerMasks && i.layerMasks.length > 0
-    ? JSON.stringify(i.layerMasks)
-    : '[]';
+  // WebVerse upstream bug 2026-05-16: TerrainEntity.Initialize calls
+  // SetLayerMask before terrainData.alphamapResolution is set (still 0
+  // from `new TerrainData()`), so SetAlphamaps fails with the Unity
+  // assertion `spResult == PixelAccessReturnCode::kOk`. Until WebVerse
+  // sets alphamapResolution before SetLayerMask, we ship empty
+  // layerMasks — Unity Terrain defaults to layer 0 at full strength,
+  // so the terrain renders with the first palette entry's texture.
+  // Multi-layer splat blending unlocks when the upstream bug is fixed.
+  // The server's `chunk.layerMasks` are still produced + sent (they're
+  // the right per-cell weights); we just don't emit them in this JSON.
+  const layerMasksJson = '[]';
+  void i.layerMasks;
   return (
     '{' +
       `"id":${JSON.stringify(i.id)},` +
