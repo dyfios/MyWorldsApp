@@ -76,6 +76,35 @@ export interface ChunkData {
   revision?: number;
   planet_config_hash?: string;
   terrainType?: string;
+  /**
+   * Terrain layer palette for this planet — one entry per layer, in
+   * palette order. Texture URLs are absolute (composed server-side from
+   * `mesh_http_external_url`). Matches WebVerse's `JSONTerrainEntityLayer`.
+   * Empty when no palette is configured.
+   */
+  layers?: TerrainLayerWire[];
+  /**
+   * Per-layer per-cell splat strengths (0..1) — one entry per layer in
+   * `layers`. The `heights` field name is a WebVerse misnomer; these are
+   * layer-strength alphamaps, not Z heights.
+   */
+  layerMasks?: TerrainLayerMaskWire[];
+}
+
+/** WebVerse JSONTerrainEntityLayer wire format. */
+export interface TerrainLayerWire {
+  diffuseTexture: string;
+  normalTexture: string;
+  maskTexture: string;
+  specular: { r: number; g: number; b: number; a: number };
+  metallic: number;
+  smoothness: number;
+  sizeFactor: number;
+}
+
+/** WebVerse JSONTerrainEntityLayerMask wire format. */
+export interface TerrainLayerMaskWire {
+  heights: number[][];
 }
 
 /* ──────────────────────────── Chunk source ───────────────────────────── */

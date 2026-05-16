@@ -31,6 +31,8 @@ import {
   type CubeFace,
   type ILayer,
   type PlanetSceneConfig,
+  type TerrainLayerWire,
+  type TerrainLayerMaskWire,
 } from './types.js';
 import { shouldUseTerrainEntity } from './CubeCornerPolicy.js';
 import { chunkOffset } from './FaceTraversal.js';
@@ -227,6 +229,8 @@ export class TerrainEntityLayer implements ILayer {
         width: chunk.width,
         height: envelope,
         heightsJson: chunk.heights_json,
+        layers: chunk.layers,
+        layerMasks: chunk.layerMasks,
       });
       w.TerrainEntity.Create(jsonBody, null, tile.onLoadedCallbackName);
       logInfo(
@@ -343,22 +347,40 @@ interface TerrainEntityJSONInput {
    *  directly without re-parsing. Server is responsible for any
    *  bug-compensation transform on the values. */
   heightsJson: string;
+  /** Optional layer palette from the chunk response (server-baked). */
+  layers?: TerrainLayerWire[];
+  /** Optional per-layer per-cell splat masks (server-baked). Same
+   *  length + order as `layers`. */
+  layerMasks?: TerrainLayerMaskWire[];
 }
 
 /**
- * Build the JSON envelope `TerrainEntity.Create` expects. Layers carry
- * a single neutral grey stub (a layer is REQUIRED — empty array makes
- * the C# side log "must be initialized with at least one layer" and the
- * heightmap never applies). Specular is a literal in the JSON; the
- * JSONEntityHandler constructs the C# UnityEngine.Color on the main
- * thread once normalization completes.
+ * Build the JSON envelope `TerrainEntity.Create` expects.
  *
- * String concatenation is intentional — embedding `heightsJson` as a
+ * Layers handling:
+ * - When the server ships a palette in `chunk.layers` + `chunk.layerMasks`
+ *   (FR17a path), embed both verbatim. The C# JSONEntityHandler uses
+ *   `layerMasks[i].heights` as the per-cell strength for layer `i`.
+ * - When the server ships nothing (empty arrays / undefined), fall back
+ *   to a single neutral-grey stub layer — an empty `layers` array would
+ *   make the C# side log "must be initialized with at least one layer"
+ *   and the heightmap never applies.
+ *
+ * String concatenation is intentional for `heightsJson` — embedding as a
  * raw JSON segment means the JS thread never parses or stringifies the
- * 1M-element heights matrix. That deserialization happens on the C#
- * background thread inside JSONEntityHandler.
+ * 1M-element heights matrix. The layers + masks are smaller and easier;
+ * we stringify them normally.
  */
 function buildTerrainEntityJSON(i: TerrainEntityJSONInput): string {
+  const hasPalette = i.layers && i.layers.length > 0;
+  const layersJson = hasPalette
+    ? JSON.stringify(i.layers)
+    : '[{"diffuseTexture":"","normalTexture":"","maskTexture":"",' +
+      '"specular":{"r":0.5,"g":0.5,"b":0.5,"a":1},' +
+      '"metallic":0,"smoothness":0,"sizeFactor":1}]';
+  const layerMasksJson = hasPalette && i.layerMasks && i.layerMasks.length > 0
+    ? JSON.stringify(i.layerMasks)
+    : '[]';
   return (
     '{' +
       `"id":${JSON.stringify(i.id)},` +
@@ -370,16 +392,8 @@ function buildTerrainEntityJSON(i: TerrainEntityJSONInput): string {
       `"width":${i.width},` +
       `"height":${i.height},` +
       `"heights":${i.heightsJson},` +
-      '"layers":[{' +
-        '"diffuseTexture":"",' +
-        '"normalTexture":"",' +
-        '"maskTexture":"",' +
-        '"specular":{"r":0.5,"g":0.5,"b":0.5,"a":1},' +
-        '"metallic":0,' +
-        '"smoothness":0,' +
-        '"sizeFactor":1' +
-      '}],' +
-      '"layerMasks":[],' +
+      `"layers":${layersJson},` +
+      `"layerMasks":${layerMasksJson},` +
       '"stitchTerrains":false' +
     '}'
   );
