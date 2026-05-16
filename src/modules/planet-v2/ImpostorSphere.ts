@@ -261,6 +261,17 @@ export class ImpostorSphere {
         `planet-v2 impostor: SetScale threw: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+    // MeshEntity.Create / CreateSphere call SetPosition(pos, local=true)
+    // internally — for entities parented to a non-origin root, that puts
+    // the impostor in the wrong world spot. Re-apply the planet-centre
+    // position with local=false to force absolute world placement.
+    try {
+      this.entity.SetPosition?.(new w.Vector3(0, -this.cfg.radiusMeters, 0), false, false);
+    } catch (e) {
+      logError(
+        `planet-v2 impostor: SetPosition (world) threw: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
   }
 
   private applyVisibility(): void {

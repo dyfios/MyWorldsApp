@@ -289,6 +289,14 @@ export interface MeshEntityInstance {
    * Verified against BaseEntity.cs:416 in WebVerse-Runtime.
    */
   SetScale?(scale: Vector3Like, synchronizeChange?: boolean): boolean;
+  /**
+   * Set the entity position. `local` = true sets localPosition (relative
+   * to parent); false sets world transform.position. Used by
+   * ImpostorSphere to force absolute world placement after Create
+   * because Create always uses local=true internally.
+   * Verified against BaseEntity.cs:309 in WebVerse-Runtime.
+   */
+  SetPosition?(position: Vector3Like, local: boolean, synchronizeChange?: boolean): boolean;
   Delete?(): boolean;
 }
 
