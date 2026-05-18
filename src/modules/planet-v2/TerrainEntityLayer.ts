@@ -9,10 +9,16 @@
  * boundaries is the GlobeRenderer's responsibility (and is not yet wired
  * for v2's first pass — single-chunk only).
  *
- * Calls `TerrainEntity.CreateHeightmap` directly with verified C# field
- * names + Color constructor + position+rotation. Heights are shifted by a
- * fixed `SEA_LEVEL_OFFSET_METERS` so adjacent chunks share a baseline (no
- * per-chunk vertical fitting → no boundary cliffs from rendering choice).
+ * Calls `TerrainEntity.Create(jsonString, …)` with `terrainType: "hybrid"`.
+ * Hybrid (not heightmap) because WebVerse's heightmap code path stores
+ * layer texture URLs as strings but never invokes the image loader — the
+ * hybrid path (EntityAPIHelper.LoadHybridTerrainEntityAsync) does load
+ * each diffuse/normal/mask URL via LoadImageResourceAsTexture2D. Empty
+ * `modifications` is fine — it just logs a warning and behaves like
+ * heightmap (JSONEntityHandler.cs:3576-3578).
+ *
+ * Heights are shifted by `SEA_LEVEL_OFFSET_METERS` so adjacent chunks
+ * share a baseline (no per-chunk vertical fitting → no boundary cliffs).
  */
 
 import {
@@ -378,31 +384,44 @@ function buildTerrainEntityJSON(i: TerrainEntityJSONInput): string {
     : '[{"diffuseTexture":"","normalTexture":"","maskTexture":"",' +
       '"specular":{"r":0.5,"g":0.5,"b":0.5,"a":1},' +
       '"metallic":0,"smoothness":0,"sizeFactor":1}]';
-  // WebVerse upstream bug 2026-05-16: TerrainEntity.Initialize calls
-  // SetLayerMask before terrainData.alphamapResolution is set (still 0
-  // from `new TerrainData()`), so SetAlphamaps fails with the Unity
-  // assertion `spResult == PixelAccessReturnCode::kOk`. Until WebVerse
-  // sets alphamapResolution before SetLayerMask, we ship empty
-  // layerMasks — Unity Terrain defaults to layer 0 at full strength,
+  // Ship empty layerMasks for now — matches v1's pattern. Sending
+  // non-empty `layerMasks` via the JSON path triggered a Unity
+  // alphamap assertion in our 2026-05-16 test; we haven't yet found
+  // the correct WebVerse usage to send per-cell splat weights via
+  // JSON (the JSONEntityHandler tests probably show it — TODO).
+  // Until then Unity Terrain defaults to layer 0 at full strength,
   // so the terrain renders with the first palette entry's texture.
-  // Multi-layer splat blending unlocks when the upstream bug is fixed.
-  // The server's `chunk.layerMasks` are still produced + sent (they're
-  // the right per-cell weights); we just don't emit them in this JSON.
+  // The server still produces + sends per-cell `chunk.layerMasks`;
+  // we just don't emit them in this JSON.
   const layerMasksJson = '[]';
   void i.layerMasks;
+  // WebVerse-Runtime "heightmap" terrainType doesn't load layer
+  // textures — the heightmap code path only sets `diffusePath` (a URL
+  // string) on the StraightFour TerrainEntityLayer but never invokes
+  // the LoadImageResourceAsTexture2D coroutine that turns URLs into
+  // Texture2D instances. Layers render untextured.
+  //
+  // The "hybrid" terrainType goes through
+  // EntityAPIHelper.LoadHybridTerrainEntityAsync which DOES load the
+  // textures (EntityAPIHelper.cs:945-998 — three LoadImageResourceAsTexture2D
+  // calls per layer). Per JSONEntityHandler.cs:3578, hybrid with no
+  // modifications behaves like heightmap + a warning log, so this
+  // costs nothing functional. Also aligns with the architecture
+  // long-term goal (FR23 — digger on the player chunk).
   return (
     '{' +
       `"id":${JSON.stringify(i.id)},` +
       `"tag":${JSON.stringify(i.tag)},` +
       `"position":{"x":${i.position.x},"y":${i.position.y},"z":${i.position.z}},` +
       `"rotation":{"x":0,"y":0,"z":0,"w":1},` +
-      '"terrainType":"heightmap",' +
+      '"terrainType":"hybrid",' +
       `"length":${i.length},` +
       `"width":${i.width},` +
       `"height":${i.height},` +
       `"heights":${i.heightsJson},` +
       `"layers":${layersJson},` +
       `"layerMasks":${layerMasksJson},` +
+      '"modifications":[],' +
       '"stitchTerrains":false' +
     '}'
   );
