@@ -6,6 +6,7 @@ import ChatConsole from './components/ChatConsole';
 import PopupMenu from './components/PopupMenu';
 import LoadingPanel from './components/LoadingPanel';
 import MobileControls from './components/MobileControls';
+import Crosshair from './components/Crosshair';
 import { useUISettings } from './hooks/useUISettings';
 
 /**
@@ -91,6 +92,10 @@ function App() {
 
   const [selectedButtonId, setSelectedButtonId] = useState(null);
   const [isChatActive, setIsChatActive] = useState(false);
+
+  // Crosshair state
+  const [crosshairVisible, setCrosshairVisible] = useState(false);
+  const [crosshairHovering, setCrosshairHovering] = useState(false);
 
   // Mobile detection
   const isMobile = useMobileDetection(768);
@@ -303,9 +308,17 @@ function App() {
       resetSettings: uiSettings.resetSettings
     };
 
+    // Expose Crosshair API globally
+    window.CrosshairAPI = {
+      show: () => setCrosshairVisible(true),
+      hide: () => setCrosshairVisible(false),
+      setHovering: (hovering) => setCrosshairHovering(hovering),
+      isVisible: () => crosshairVisible
+    };
+
     // Expose initializeUISettings directly to window for WebVerse access
     window.initializeUISettings = uiSettings.initializeUISettings;
-  }, [addButton, removeButton, reorderButtons, selectButton, selectPrevious, selectNext, selectByNumber, buttons, selectedButtonId, maxDockButtons, uiSettings]);
+  }, [addButton, removeButton, reorderButtons, selectButton, selectPrevious, selectNext, selectByNumber, buttons, selectedButtonId, maxDockButtons, uiSettings, crosshairVisible, setCrosshairVisible, setCrosshairHovering]);
 
   // Chat event handlers
   const handleChatInputOpen = useCallback(() => {
@@ -757,6 +770,11 @@ function App() {
       />
 
       <LoadingPanel />
+
+      <Crosshair 
+        visible={crosshairVisible} 
+        hovering={crosshairHovering} 
+      />
     </div>
   );
 }

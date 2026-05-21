@@ -29,6 +29,7 @@ export class PlayerController {
   private _maintenanceCount: number = 0;
   private avatarSettings: AvatarSettings | null = null;
   private avatarBaseUrl: string | null = null;
+  private lastHoverState: boolean = false;
 
   constructor(initialPosition: Vector3, characterName: string, characterId: string | undefined) {
     this.setupGlobalCallbacks();
@@ -61,7 +62,7 @@ export class PlayerController {
       // Debug: Log every 100th maintenance call to track activity
       this._maintenanceCount++;
       if (this._maintenanceCount % 100 === 0) {
-        Logging.Log('🔧 PlayerController.maintenance() call #' + this._maintenanceCount);
+        //Logging.Log('🔧 PlayerController.maintenance() call #' + this._maintenanceCount);
       }
       
       // Debug: Monitor gravity state changes
@@ -89,6 +90,11 @@ export class PlayerController {
       if (this.inVehicle && this.activeVehicle != null) {
         // Update player position to match vehicle position
         this.internalCharacterEntity.SetPosition(new Vector3(0, 1, -4), true, false);
+      }
+
+      // Update crosshair hover state in first person mode
+      if (this.cameraMode === 'firstPerson' && !this.inVR) {
+        this.updateCrosshairHoverState();
       }
 
       // Handle mobile control flying (shift=up, space=down) or jump
@@ -454,19 +460,31 @@ export class PlayerController {
     Camera.SetPosition(new Vector3(0, 0.79, 0), true);
     this.internalCharacterEntity.SetVisibility(false, false);
     this.cameraMode = 'firstPerson';
+    
+    // Show crosshair in first person mode (not in VR)
+    if (!this.inVR) {
+      this.showCrosshair();
+    }
   }
 
   setCameraModeThirdPerson(): void {
     Camera.SetPosition(new Vector3(0, 1.5, -2.75), true);
     this.internalCharacterEntity.SetVisibility(true, false);
     this.cameraMode = 'thirdPerson';
+    
+    // Hide crosshair in third person mode
+    this.hideCrosshair();
   }
 
   enterVRMode(): void {
     Input.AddRigFollower((globalThis as any).playerController.internalCharacterEntity);
     this.inVR = true;
+    Input.SetRigOffset(new Vector3(0, 0, 0));
     Input.gravityEnabled = false; // Rig handles gravity in VR
     this.internalCharacterEntity.SetVisibility(false, false);
+    
+    // Hide crosshair in VR mode
+    this.hideCrosshair();
   }
 
   setMotionSpeed(speed: number): void {
@@ -514,6 +532,60 @@ export class PlayerController {
     this.setCameraModeThirdPerson();
     this.inVR = false;
     Logging.Log('🎮 enterNonVRMode() END');
+  }
+
+  /**
+   * Show the crosshair via UI API
+   */
+  showCrosshair(): void {
+    // Send message to UI to show crosshair
+    const mainToolbarId = WorldStorage.GetItem("MYWORLDS.MAINTOOLBAR.ID") as string;
+    if (mainToolbarId) {
+      const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+      if (mainToolbar) {
+        mainToolbar.ExecuteJavaScript('if (window.CrosshairAPI) { window.CrosshairAPI.show(); }', '');
+      }
+    }
+  }
+  
+  /**
+   * Hide the crosshair via UI API
+   */
+  hideCrosshair(): void {
+    // Send message to UI to hide crosshair
+    const mainToolbarId = WorldStorage.GetItem("MYWORLDS.MAINTOOLBAR.ID") as string;
+    if (mainToolbarId) {
+      const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+      if (mainToolbar) {
+        mainToolbar.ExecuteJavaScript('if (window.CrosshairAPI) { window.CrosshairAPI.hide(); }', '');
+      }
+    }
+  }
+  
+  /**
+   * Update crosshair color based on whether we're hovering over an interactable entity
+   */
+  updateCrosshairHoverState(): void {
+    // Perform raycast from camera center
+    const hitInfo = Camera.GetRaycast();
+    const isHoveringInteractable = hitInfo != null && 
+                                    hitInfo.entity != null && 
+                                    hitInfo.entity !== this.internalCharacterEntity;
+    
+    // Only update if state changed to avoid unnecessary messages
+    if (isHoveringInteractable !== this.lastHoverState) {
+      this.lastHoverState = isHoveringInteractable;
+      
+      // Send message to UI to update crosshair hover state
+      const mainToolbarId = WorldStorage.GetItem("MYWORLDS.MAINTOOLBAR.ID") as string;
+      if (mainToolbarId) {
+        const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
+        if (mainToolbar) {
+          const hoverValue = isHoveringInteractable ? 'true' : 'false';
+          mainToolbar.ExecuteJavaScript(`if (window.CrosshairAPI) { window.CrosshairAPI.setHovering(${hoverValue}); }`, '');
+        }
+      }
+    }
   }
 
   jump(amount: number): void {

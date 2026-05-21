@@ -1,0 +1,37 @@
+.crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.crosshair-horizontal,
+.crosshair-vertical {
+  position: absolute;
+  background: white;
+  box-shadow: 0 0 2px black, 0 0 2px black;
+}
+
+.crosshair-horizontal {
+  width: 16px;
+  height: 2px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.crosshair-vertical {
+  width: 2px;
+  height: 16px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Hovering over interactable entity - green color */
+.crosshair-hovering .crosshair-horizontal,
+.crosshair-hovering .crosshair-vertical {
+  background: #00ff00;
+}

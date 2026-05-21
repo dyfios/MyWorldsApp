@@ -543,7 +543,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
 
   /**
    * Get the state service address from world metadata
-   * Used for tiled surface renderer state management
+   * Used for static surface renderer state management
    */
   getStateService(): string | undefined {
     return this.worldMetadata?.stateService;

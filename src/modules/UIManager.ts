@@ -1477,7 +1477,7 @@ export class UIManager {
       // Create canvas entity for the VR toolbar
       const vrToolbarCanvas = CanvasEntity.Create(
         container,
-        new Vector3(0, 1, 0.79),
+        new Vector3(0, 1.39, 0.79),
         new Quaternion(0.3827, 0, 0, 0.9239),
         new Vector3(0.0038, 0.003, 0.004),
         false,
