@@ -237,6 +237,7 @@ export class TerrainEntityLayer implements ILayer {
         heightsJson: chunk.heights_json,
         layers: chunk.layers,
         layerMasks: chunk.layerMasks,
+        compositeDiffuseUrl: chunk.composite_diffuse_url,
       });
       w.TerrainEntity.Create(jsonBody, null, tile.onLoadedCallbackName);
       logInfo(
@@ -358,6 +359,11 @@ interface TerrainEntityJSONInput {
   /** Optional per-layer per-cell splat masks (server-baked). Same
    *  length + order as `layers`. */
   layerMasks?: TerrainLayerMaskWire[];
+  /** Optional URL of a per-chunk composite diffuse PNG (server-baked).
+   *  When present, builder emits a single-layer TerrainEntity pointing
+   *  at this URL — preferred over multi-layer because WebVerse's
+   *  alphamap path has rendering bugs with non-empty layerMasks. */
+  compositeDiffuseUrl?: string;
 }
 
 /**
@@ -378,21 +384,39 @@ interface TerrainEntityJSONInput {
  * we stringify them normally.
  */
 function buildTerrainEntityJSON(i: TerrainEntityJSONInput): string {
-  const hasPalette = i.layers && i.layers.length > 0;
-  const layersJson = hasPalette
-    ? JSON.stringify(i.layers)
-    : '[{"diffuseTexture":"","normalTexture":"","maskTexture":"",' +
-      '"specular":{"r":0.5,"g":0.5,"b":0.5,"a":1},' +
-      '"metallic":0,"smoothness":0,"sizeFactor":1}]';
-  // Ship empty layerMasks for now — matches v1's pattern. Sending
-  // non-empty `layerMasks` via the JSON path triggered a Unity
-  // alphamap assertion in our 2026-05-16 test; we haven't yet found
-  // the correct WebVerse usage to send per-cell splat weights via
-  // JSON (the JSONEntityHandler tests probably show it — TODO).
-  // Until then Unity Terrain defaults to layer 0 at full strength,
-  // so the terrain renders with the first palette entry's texture.
-  // The server still produces + sends per-cell `chunk.layerMasks`;
-  // we just don't emit them in this JSON.
+  // Prefer the server-baked per-chunk composite diffuse (route 'b'
+  // from the 2026-05-17 note below). When present, we ship a SINGLE-
+  // layer TerrainEntity pointing at that PNG — Unity Terrain renders
+  // it at full coverage with no alphamap math, sidestepping the
+  // checkerboard-on-non-empty-masks issue entirely. Player chunk now
+  // visually matches the surrounding mesh tiles (which composite the
+  // same texture client-internally via embedded glTF).
+  //
+  // Fall back to the legacy multi-layer-with-empty-masks path when
+  // the server doesn't ship a composite URL (older servers / mock
+  // fixtures); still grass-everywhere on the close-range chunk, same
+  // as before this change.
+  const compositeUrl = i.compositeDiffuseUrl ?? '';
+  const useComposite = compositeUrl.length > 0;
+  let layersJson: string;
+  if (useComposite) {
+    layersJson =
+      `[{"diffuseTexture":${JSON.stringify(compositeUrl)},` +
+      '"normalTexture":"","maskTexture":"",' +
+      '"specular":{"r":0.2,"g":0.2,"b":0.2,"a":1},' +
+      '"metallic":0,"smoothness":0.3,"sizeFactor":1}]';
+  } else {
+    const hasPalette = i.layers && i.layers.length > 0;
+    layersJson = hasPalette
+      ? JSON.stringify(i.layers)
+      : '[{"diffuseTexture":"","normalTexture":"","maskTexture":"",' +
+        '"specular":{"r":0.5,"g":0.5,"b":0.5,"a":1},' +
+        '"metallic":0,"smoothness":0,"sizeFactor":1}]';
+  }
+  // Always ship empty layerMasks. With single-layer composite, Unity
+  // Terrain doesn't need alphamap data (one layer = 100% coverage).
+  // For the multi-layer fallback path, see the 2026-05-17 note below
+  // about why non-empty masks broke diffuse rendering.
   const layerMasksJson = '[]';
   void i.layerMasks;
   // WebVerse-Runtime "heightmap" terrainType doesn't load layer

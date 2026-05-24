@@ -89,6 +89,17 @@ export interface ChunkData {
    * layer-strength alphamaps, not Z heights.
    */
   layerMasks?: TerrainLayerMaskWire[];
+  /**
+   * Per-chunk composite diffuse URL — pre-baked from palette × layer
+   * weights server-side. When present (non-empty), TerrainEntityLayer
+   * builds a SINGLE-layer TerrainEntity JSON pointing at this URL
+   * instead of using the multi-layer `layers` array. Sidesteps the
+   * WebVerse alphamap interaction that produced checkerboard artifacts
+   * with non-empty `layerMasks`, and brings the player-chunk visual
+   * in line with the neighbour mesh tiles (which composite the same
+   * texture client-internally via embedded glTF).
+   */
+  composite_diffuse_url?: string;
 }
 
 /** WebVerse JSONTerrainEntityLayer wire format. */
