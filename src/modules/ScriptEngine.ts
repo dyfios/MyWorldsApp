@@ -9,6 +9,39 @@ export class ScriptEngine {
   private _1_0IntervalScripts: Map<string, any> = new Map();
   private _2_0IntervalScripts: Map<string, any> = new Map()
 
+  /**
+   * Run a script with `self` bound to the entity that owns the script.
+   * This keeps entity scripts simple and avoids relying on implicit Jint globals.
+   */
+  private runScriptWithSelf(entity: BaseEntity, script: any, context: string, logErrors: boolean = true): void {
+    if (script == null || typeof script !== 'string' || script.trim() === '') {
+      return;
+    }
+
+    const entityId = entity.id.ToString();
+    if (entityId == null || entityId === '') {
+      if (logErrors) {
+        Logging.LogError(`Failed to run ${context} script: invalid entity ID`);
+      }
+      return;
+    }
+
+    const escapedEntityId = entityId.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const wrappedScript = `(function() {\n`
+      + `  var self = Entity.Get("${escapedEntityId}");\n`
+      + `  if (self == null) { return; }\n`
+      + `${script}\n`
+      + `})();`;
+
+    try {
+      Scripting.RunScript(wrappedScript);
+    } catch (error) {
+      if (logErrors) {
+        Logging.LogError(`Error running ${context} script for ${entityId}: ` + error);
+      }
+    }
+  }
+
   constructor() {
     (globalThis as any).scriptEngine = this;
 
@@ -51,11 +84,7 @@ export class ScriptEngine {
     if (this.scripts.has(entity.id.ToString()!)) {
       const scriptEntity = this.scripts.get(entity.id.ToString()!) as [ BaseEntity, any ];
       if (scriptEntity && scriptEntity[1]["on_create"]) {
-        try {
-          Scripting.RunScript(scriptEntity[1]["on_create"]);
-        } catch (error) {
-          Logging.LogError(`Error running onCreate script for ${entity.id.ToString()}:` + error);
-        }
+        this.runScriptWithSelf(entity, scriptEntity[1]["on_create"], 'onCreate');
       }
     }
   }
@@ -66,11 +95,7 @@ export class ScriptEngine {
   runOnDestroyScript(entity: BaseEntity): void {
     const scriptEntity = this.scripts.get(entity.id.ToString()!) as [ BaseEntity, any ];
     if (scriptEntity && scriptEntity[1]["on_destroy"]) {
-      try {
-        Scripting.RunScript(scriptEntity[1]["on_destroy"]);
-      } catch (error) {
-        Logging.LogError(`Error running onDestroy script for ${entity.id.ToString()}:` + error);
-      }
+      this.runScriptWithSelf(entity, scriptEntity[1]["on_destroy"], 'onDestroy');
     }
   }
 
@@ -80,11 +105,7 @@ export class ScriptEngine {
   runOnPickupScript(entity: BaseEntity): void {
     const scriptEntity = this.scripts.get(entity.id.ToString()!) as [ BaseEntity, any ];
     if (scriptEntity && scriptEntity[1]["on_pickup"]) {
-      try {
-        Scripting.RunScript(scriptEntity[1]["on_pickup"]);
-      } catch (error) {
-        Logging.LogError(`Error running onPickup script for ${entity.id.ToString()}:` + error);
-      }
+      this.runScriptWithSelf(entity, scriptEntity[1]["on_pickup"], 'onPickup');
     }
   }
 
@@ -94,11 +115,7 @@ export class ScriptEngine {
   runOnPlaceScript(entity: BaseEntity): void {
     const scriptEntity = this.scripts.get(entity.id.ToString()!) as [ BaseEntity, any ];
     if (scriptEntity && scriptEntity[1]["on_place"]) {
-      try {
-        Scripting.RunScript(scriptEntity[1]["on_place"]);
-      } catch (error) {
-        Logging.LogError(`Error running onPlace script for ${entity.id.ToString()}:` + error);
-      }
+      this.runScriptWithSelf(entity, scriptEntity[1]["on_place"], 'onPlace');
     }
   }
 
@@ -108,11 +125,7 @@ export class ScriptEngine {
   runOnTouchScript(entity: BaseEntity): void {
     const scriptEntity = this.scripts.get(entity.id.ToString()!) as [ BaseEntity, any ];
     if (scriptEntity && scriptEntity[1]["on_touch"]) {
-      try {
-        Scripting.RunScript(scriptEntity[1]["on_touch"]);
-      } catch (error) {
-        Logging.LogError(`Error running onTouch script for ${entity.id.ToString()}:` + error);
-      }
+      this.runScriptWithSelf(entity, scriptEntity[1]["on_touch"], 'onTouch');
     }
   }
 
@@ -122,11 +135,7 @@ export class ScriptEngine {
   runOnUntouchScript(entity: BaseEntity): void {
     const scriptEntity = this.scripts.get(entity.id.ToString()!) as [ BaseEntity, any ];
     if (scriptEntity && scriptEntity[1]["on_untouch"]) {
-      try {
-        Scripting.RunScript(scriptEntity[1]["on_untouch"]);
-      } catch (error) {
-        Logging.LogError(`Error running onUntouch script for ${entity.id.ToString()}:` + error);
-      }
+      this.runScriptWithSelf(entity, scriptEntity[1]["on_untouch"], 'onUntouch');
     }
   }
 
@@ -161,12 +170,8 @@ export class ScriptEngine {
     // Logging.Log('🟢 handle0_25IntervalScripts() START');
     try {
       this._0_25IntervalScripts.forEach((value, _key) => {
-        const [ _entity, script ] = value;
-        try {
-          Scripting.RunScript(script);
-        } catch (error) {
-          Logging.LogError('❌ ScriptEngine 0.25s error: ' + error + ' | Script: ' + (typeof script === 'string' ? script.substring(0, 200) : 'non-string'));
-        }
+        const [ entity, script ] = value;
+        this.runScriptWithSelf(entity, script, '0.25s interval');
       });
     } catch (e) {
       // Silently ignore
@@ -205,12 +210,8 @@ export class ScriptEngine {
     // Logging.Log('🟡 handle0_5IntervalScripts() START');
     try {
       this._0_5IntervalScripts.forEach((value, _key) => {
-        const [ _entity, script ] = value;
-        try {
-          Scripting.RunScript(script);
-        } catch (error) {
-          // Silently ignore script errors
-        }
+        const [ entity, script ] = value;
+        this.runScriptWithSelf(entity, script, '0.5s interval', false);
       });
     } catch (error) {
       // Silently ignore iteration errors
@@ -249,12 +250,8 @@ export class ScriptEngine {
     // Logging.Log('🟠 handle1_0IntervalScripts() START');
     try {
       this._1_0IntervalScripts.forEach((value, _key) => {
-        const [ _entity, script ] = value;
-        try {
-          Scripting.RunScript(script);
-        } catch (error) {
-          // Silently ignore script errors
-        }
+        const [ entity, script ] = value;
+        this.runScriptWithSelf(entity, script, '1.0s interval', false);
       });
     } catch (error) {
       // Silently ignore iteration errors
@@ -293,12 +290,8 @@ export class ScriptEngine {
     // Logging.Log('🔴 handle2_0IntervalScripts() START');
     try {
       this._2_0IntervalScripts.forEach((value, _key) => {
-        const [ _entity, script ] = value;
-        try {
-          Scripting.RunScript(script);
-        } catch (error) {
-          // Silently ignore script errors
-        }
+        const [ entity, script ] = value;
+        this.runScriptWithSelf(entity, script, '2.0s interval', false);
       });
     } catch (error) {
       // Silently ignore iteration errors

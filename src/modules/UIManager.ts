@@ -1335,6 +1335,117 @@ export class UIManager {
     }
   }
 
+  private disconnectOverlayShown: boolean = false;
+
+  /**
+   * Show a full-screen overlay telling the user the sync connection was lost
+   * and they must reload. This is idempotent — calling it twice is safe.
+   */
+  showDisconnectOverlay(): void {
+    if (this.disconnectOverlayShown) return;
+    this.disconnectOverlayShown = true;
+
+    try {
+      // Register the runtime-side handler for the reload button
+      (globalThis as any)._onDisconnectOverlayMessage = (msg: string) => {
+        if (msg === 'RELOAD_WORLD()') {
+          this._reloadCurrentWorld();
+        }
+      };
+
+      const canvasId = UUID.NewUUID().ToString() || 'disconnect-canvas';
+      const htmlId = UUID.NewUUID().ToString() || 'disconnect-html';
+
+      const canvas = CanvasEntity.Create(
+        undefined,
+        new Vector3(0, 0, 0),
+        new Quaternion(0, 0, 0, 1),
+        new Vector3(1, 1, 1),
+        true,
+        canvasId,
+      );
+      canvas.MakeScreenCanvas();
+      canvas.SetInteractionState(InteractionState.Static);
+      canvas.SetVisibility(true);
+
+      const html: HTMLEntity = HTMLEntity.Create(
+        canvas,
+        new Vector2(0, 0),
+        new Vector2(1, 1),
+        htmlId,
+        'DisconnectOverlay',
+        '_onDisconnectOverlayMessage',
+      );
+
+      const overlayHTML = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.85);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #fff;
+  }
+  .panel {
+    text-align: center; padding: 48px; border-radius: 16px;
+    background: rgba(30,30,30,0.95); max-width: 480px;
+  }
+  h1 { font-size: 24px; margin-bottom: 12px; }
+  p  { font-size: 16px; margin-bottom: 24px; color: #bbb; }
+  button {
+    padding: 14px 36px; font-size: 16px; font-weight: 600;
+    border: none; border-radius: 8px; cursor: pointer;
+    background: #3b82f6; color: #fff;
+  }
+  button:hover { background: #2563eb; }
+</style></head>
+<body>
+  <div class="panel">
+    <h1>Connection Lost</h1>
+    <p>The connection to the server was lost and could not be restored. Please reload to reconnect.</p>
+    <button onclick="
+      if (window.vuplex) {
+        window.vuplex.postMessage('RELOAD_WORLD()');
+      } else if (window.postWorldMessage) {
+        window.postWorldMessage('RELOAD_WORLD()');
+      } else {
+        window.location.reload();
+      }
+    ">Reload</button>
+  </div>
+</body>
+</html>`;
+
+      html.LoadHTML(overlayHTML);
+      html.SetVisibility(true);
+
+      Logging.Log('UIManager: disconnect overlay shown');
+    } catch (error: any) {
+      Logging.LogError('UIManager: failed to show disconnect overlay: ' + (error?.message || error));
+    }
+  }
+
+  /**
+   * Reload the current world. Uses World.LoadWorld in the desktop client,
+   * falls back to page reload in the browser.
+   */
+  private _reloadCurrentWorld(): void {
+    try {
+      const worldAddress = World.GetQueryParam('worldAddress');
+      if (worldAddress) {
+        Logging.Log('UIManager: reloading world via World.LoadWorld: ' + worldAddress);
+        World.LoadWorld(worldAddress);
+      } else {
+        Logging.LogWarning('UIManager: no worldAddress found, cannot reload');
+      }
+    } catch (error: any) {
+      Logging.LogError('UIManager: reload failed: ' + (error?.message || error));
+    }
+  }
+
   /**
    * Clean up UI elements
    */

@@ -56,6 +56,11 @@ export class Modules {
       Context.DefineContext('WorldRendererFactory', this.worldRendering);
       Logging.Log('⚙️ Step 3k: Creating Environment Modifier module...');
       this.environmentModifier = new EnvironmentModifier();
+      // Wire sync connection loss to a blocking reload overlay
+      this.sync.onConnectionLost = () => {
+        this.ui.showDisconnectOverlay();
+      };
+
       Logging.Log('⚙️ All modules created successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

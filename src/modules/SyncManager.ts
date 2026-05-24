@@ -14,16 +14,99 @@ export interface SyncDiff {
   timestamp: number;
 }
 
+export interface ConnectionMonitorOptions {
+  /** Seconds between health checks (default: 5) */
+  intervalSeconds?: number;
+  /** Consecutive failures before declaring connection lost (default: 6) */
+  maxRetries?: number;
+}
+
 export class SyncManager {
   public globalSynchronizer: VOSSynchronizer | null = null;
+  public onConnectionLost: (() => void) | null = null;
   private listeners: ((diff: SyncDiff) => void)[] = [];
   private connected: boolean = false;
   private vosSynchronizer?: VOSSynchronizer;
   private syncConfig?: VOSSynchronizerConfig;
+  private monitorIntervalId: any = null;
+  private monitorSessionId: string = '';
+  private monitorFailCount: number = 0;
+  private monitorMaxRetries: number = 6;
+  private monitorFired: boolean = false;
+  private monitorEverConnected: boolean = false;
 
   constructor(syncConfig?: VOSSynchronizerConfig) {
     this.syncConfig = syncConfig;
     (globalThis as any).syncManager = this;
+  }
+
+  /**
+   * Start polling VOSSynchronization.IsSessionEstablished to detect connection loss.
+   * After maxRetries consecutive failures, fires onConnectionLost once.
+   */
+  startConnectionMonitor(sessionId: string, options?: ConnectionMonitorOptions): void {
+    if (!sessionId) return;
+
+    this.monitorSessionId = sessionId;
+    this.monitorMaxRetries = options?.maxRetries ?? 6;
+    this.monitorFailCount = 0;
+    this.monitorFired = false;
+    this.monitorEverConnected = false;
+    const intervalSec = options?.intervalSeconds ?? 5;
+
+    (globalThis as any)._syncMonitorPoll = () => {
+      this._pollConnectionHealth();
+    };
+
+    this.monitorIntervalId = Time.SetInterval(
+      `globalThis._syncMonitorPoll();`,
+      intervalSec,
+    );
+  }
+
+  /**
+   * Stop the connection health monitor.
+   */
+  stopConnectionMonitor(): void {
+    if (this.monitorIntervalId) {
+      Time.StopInterval(this.monitorIntervalId);
+      this.monitorIntervalId = null;
+    }
+    delete (globalThis as any)._syncMonitorPoll;
+  }
+
+  private _pollConnectionHealth(): void {
+    if (this.monitorFired) return;
+
+    try {
+      const established = VOSSynchronization.IsSessionEstablished(this.monitorSessionId);
+      if (established) {
+        this.monitorEverConnected = true;
+        this.monitorFailCount = 0;
+        return;
+      }
+    } catch (_e) {
+      // IsSessionEstablished threw — treat as failure
+    }
+
+    // Don't count failures until the session has connected at least once.
+    // During initial handshake the session isn't established yet.
+    if (!this.monitorEverConnected) return;
+
+    this.monitorFailCount++;
+    Logging.LogWarning(
+      'SyncManager: connection check failed (' +
+        this.monitorFailCount + '/' + this.monitorMaxRetries + ')',
+    );
+
+    if (this.monitorFailCount >= this.monitorMaxRetries) {
+      this.monitorFired = true;
+      this.stopConnectionMonitor();
+      Logging.LogError('SyncManager: connection lost — retries exhausted');
+      if (this.onConnectionLost) {
+        this.onConnectionLost();
+      }
+    }
   }
 
   connectToGlobalSynchronizer(worldConfig: any, onConnect: any, onJoinSession: any): void {
@@ -40,6 +123,9 @@ export class SyncManager {
     try {
       this.globalSynchronizer = new VOSSynchronizer(globalSyncConfig, onConnect, onJoinSession, this.onVSSMessage);
       this.globalSynchronizer.Connect();
+
+      // Start monitoring the session so we can surface a reload prompt on disconnect
+      this.startConnectionMonitor(globalSyncConfig.sessionId);
     } catch (error) {
       Logging.LogError('Failed to create global synchronizer: ' + error);
     }
