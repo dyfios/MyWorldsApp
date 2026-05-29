@@ -57,9 +57,7 @@ export class Modules {
       Logging.Log('⚙️ Step 3k: Creating Environment Modifier module...');
       this.environmentModifier = new EnvironmentModifier();
       // Wire sync connection loss to a blocking reload overlay
-      this.sync.onConnectionLost = () => {
-        this.ui.showDisconnectOverlay();
-      };
+      this.sync.onConnectionLost = this.ui.showDisconnectOverlay.bind(this.ui);
 
       Logging.Log('⚙️ All modules created successfully');
     } catch (error) {

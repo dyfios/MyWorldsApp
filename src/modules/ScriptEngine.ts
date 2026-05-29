@@ -40,7 +40,7 @@ export class ScriptEngine {
       }
     }
 
-    const escapedEntityId = entityId.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const escapedEntityId = entityId.split('\\').join('\\\\').split('"').join('\\"');
     const wrappedScript = `(function() {\n`
       + `  var self = Entity.Get("${escapedEntityId}");\n`
       + `  if (self == null) { return; }\n`
@@ -241,7 +241,7 @@ export class ScriptEngine {
       return;
     }
 
-    const onUsePreview = onUseScript.replace(/\s+/g, ' ').slice(0, 120);
+    const onUsePreview = onUseScript.slice(0, 120);
     Logging.Log('[ScriptEngine] runOnUseScript payload entity=' + entityId
       + ' length=' + onUseScript.length
       + ' preview=' + onUsePreview);
@@ -466,9 +466,11 @@ export class ScriptEngine {
     Logging.Log(`MW_AnimationSmokeTest: tag=${entityTag} animation=${animationName} speed=${speed} started=${started}`);
 
     if (started && stopAfterSeconds > 0) {
+      const escTag = entityTag.split('\\').join('\\\\').split('"').join('\\"');
+      const escAnim = animationName.split('\\').join('\\\\').split('"').join('\\"');
       Time.SetTimeout(`
-        var e = Entity.GetByTag("${entityTag.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}");
-        if (e != null) { e.StopAnimation("${animationName.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"); }
+        var e = Entity.GetByTag("${escTag}");
+        if (e != null) { e.StopAnimation("${escAnim}"); }
       `, stopAfterSeconds);
     }
 
@@ -490,7 +492,7 @@ export class ScriptEngine {
       return false;
     }
 
-    const escapedAnimationName = animationName.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const escapedAnimationName = animationName.split('\\').join('\\\\').split('"').join('\\"');
     const script = `self.SetAnimationSpeed("${escapedAnimationName}", ${speed}); self.PlayAnimation("${escapedAnimationName}");`;
     this.runScriptWithSelf(entity, script, 'animation self smoke test');
     Logging.Log(`MW_AnimationSelfSmoke: tag=${entityTag} animation=${animationName} speed=${speed}`);

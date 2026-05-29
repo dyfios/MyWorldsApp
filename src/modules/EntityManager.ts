@@ -697,7 +697,7 @@ export class EntityManager {
       return undefined;
     }
 
-    const numericOnlyKeys = keys.every((k) => /^\d+$/.test(k));
+    const numericOnlyKeys = keys.every((k) => k.length > 0 && Array.from(k).every((ch) => ch >= '0' && ch <= '9'));
     if (numericOnlyKeys) {
       Logging.LogError('[EntityManager] Invalid scripts payload keys for instanceId=' + instanceId + ': ' + keys.join(',') + ' (numeric-only)');
       return undefined;
