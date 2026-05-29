@@ -4,12 +4,16 @@
 
 import { VOSSynchronizer } from "./VOSSynchronizer";
 import { TiledSurfaceRenderer } from "./WorldRendererFactory";
+import { ScriptEngine } from "./ScriptEngine";
 
 export class EnvironmentModifier {
   private interactionMode: string = "HAND";
+    private lastTouchedEntity: BaseEntity | null = null;
 
   constructor() {
+        (globalThis as any).environmentModifier = this;
     this.setupGlobalCallbacks();
+        this.startTouchHoverTracking();
   }
 
   /**
@@ -46,6 +50,10 @@ export class EnvironmentModifier {
       this.setInteractionMode(mode);
     };
 
+        (globalThis as any).processTouchHover = () => {
+            this.processTouchHover();
+        };
+
     // Define global callback for terrain dig REST response
     (globalThis as any).onTerrainDigRESTResponse = (response: any) => {
         this.onTerrainDigRESTResponse(response);
@@ -61,8 +69,100 @@ export class EnvironmentModifier {
    * Set the current interaction mode
    */
   setInteractionMode(mode: string): void {
+        if (this.interactionMode === "HAND" && mode !== "HAND") {
+            this.clearTouchedEntity();
+        }
     this.interactionMode = mode;
   }
+
+    private startTouchHoverTracking(): void {
+        Time.SetInterval("globalThis.processTouchHover();", 0.1);
+    }
+
+    private getScriptEngine(): ScriptEngine | null {
+        const scriptEngine = (globalThis as any).scriptEngine as ScriptEngine | undefined;
+        if (!scriptEngine) {
+            return null;
+        }
+        return scriptEngine;
+    }
+
+    private isScriptableEntity(entity: BaseEntity | null): entity is BaseEntity {
+        if (entity == null) {
+            return false;
+        }
+        const isMesh = typeof MeshEntity !== 'undefined' && entity instanceof MeshEntity;
+        const isAutomobile = typeof AutomobileEntity !== 'undefined' && entity instanceof AutomobileEntity;
+        const isAirplane = typeof AirplaneEntity !== 'undefined' && entity instanceof AirplaneEntity;
+        return isMesh || isAutomobile || isAirplane;
+    }
+
+    private getInteractionHitInfo(range?: number): RaycastHitInfo | null {
+        const isFullClient = (globalThis as any).uiManager?.clientType === 'full';
+        if (isFullClient) {
+            return range != null ? Input.GetPointerRaycast(Vector3.forward, range) : Input.GetPointerRaycast(Vector3.forward);
+        }
+
+        // Browser/lite mode often needs camera center raycast.
+        return Camera.GetRaycast();
+    }
+
+    private clearTouchedEntity(): void {
+        if (this.lastTouchedEntity == null) {
+            return;
+        }
+
+        const scriptEngine = this.getScriptEngine();
+        if (scriptEngine) {
+            scriptEngine.runOnUntouchScript(this.lastTouchedEntity);
+        }
+        this.lastTouchedEntity = null;
+    }
+
+    processTouchHover(): void {
+        if (this.interactionMode !== "HAND") {
+            this.clearTouchedEntity();
+            return;
+        }
+
+        const scriptEngine = this.getScriptEngine();
+        if (!scriptEngine) {
+            return;
+        }
+
+        const hitInfo = this.getInteractionHitInfo(1);
+        const touchedEntity = this.isScriptableEntity(hitInfo?.entity ?? null) ? hitInfo!.entity : null;
+
+        if (this.lastTouchedEntity?.id?.ToString() === touchedEntity?.id?.ToString()) {
+            return;
+        }
+
+        if (this.lastTouchedEntity != null) {
+            scriptEngine.runOnUntouchScript(this.lastTouchedEntity);
+        }
+
+        this.lastTouchedEntity = touchedEntity;
+        if (this.lastTouchedEntity != null) {
+            scriptEngine.runOnTouchScript(this.lastTouchedEntity);
+        }
+    }
+
+    private tryRunUseScriptOnHitEntity(hitInfo: RaycastHitInfo | null): void {
+        if (this.interactionMode !== "HAND" || !hitInfo || !this.isScriptableEntity(hitInfo.entity)) {
+            return;
+        }
+
+                Logging.Log('[use] HAND: target=' + hitInfo.entity.id
+                    + ' tag=' + ((hitInfo.entity as any)?.tag || '(none)')
+                    + ' type=' + hitInfo.entity.constructor?.name);
+
+        const scriptEngine = this.getScriptEngine();
+        if (scriptEngine) {
+            scriptEngine.runOnUseScript(hitInfo.entity);
+        } else {
+            Logging.LogWarning('[use] HAND: scriptEngine unavailable for ' + hitInfo.entity.id);
+        }
+    }
 
   /**
    * Handle left mouse button press
@@ -87,6 +187,8 @@ export class EnvironmentModifier {
                 else if (hitInfo.entity instanceof AirplaneEntity) {
                     
                 }
+
+                this.tryRunUseScriptOnHitEntity(hitInfo);
             }
         }
     }
@@ -405,6 +507,11 @@ export class EnvironmentModifier {
       Logging.Log('🔒 Cannot delete frozen entity: ' + entityId);
       return;
     }
+
+        if (entityId && typeof entityManager?.removeScriptEntity === 'function') {
+            entityManager.removeScriptEntity(entityId);
+        }
+
     Logging.Log('Deleting entity "' + entity.id + '"');
     entity.Delete(true);
   }
@@ -567,6 +674,8 @@ export class EnvironmentModifier {
                 else if (hitInfo.entity instanceof AirplaneEntity) {
                     
                 }
+
+                this.tryRunUseScriptOnHitEntity(hitInfo);
             }
         }
     }
@@ -744,24 +853,39 @@ export class EnvironmentModifier {
   private handleRightPress(): void {
     const isFullClient = (globalThis as any).uiManager?.clientType === 'full';
     var hitInfo = Input.GetPointerRaycast(Vector3.forward);
+    Logging.Log('[handleRightPress] mode=' + this.interactionMode + ' fullClient=' + isFullClient + ' pointerHit=' + (hitInfo != null ? 'non-null' : 'null'));
     // In browser/lite mode, pointer position isn't reliable (defaults to 0,0);
     // use Camera.GetRaycast() for entity placing instead
     if (!isFullClient && this.interactionMode == "ENTITY-PLACING") {
       hitInfo = Camera.GetRaycast();
+      Logging.Log('[handleRightPress] ENTITY-PLACING camera raycast=' + (hitInfo != null ? 'non-null' : 'null'));
     } else if (hitInfo == null && this.interactionMode == "ENTITY-PLACING") {
       hitInfo = Camera.GetRaycast();
+      Logging.Log('[handleRightPress] ENTITY-PLACING fallback camera raycast=' + (hitInfo != null ? 'non-null' : 'null'));
     }
 
     if (this.interactionMode == "HAND") {
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
+                Logging.Log('[handleRightPress] HAND target=' + hitInfo.entity.id + ' type=' + hitInfo.entity.constructor?.name);
+                this.tryRunUseScriptOnHitEntity(hitInfo);
+
                 if (hitInfo.entity instanceof AutomobileEntity) {
+                    Logging.Log('[handleRightPress] HAND vehicle branch -> automobile');
                     this.placeCharacterInAutomobile(hitInfo.entity);
                 }
                 else if (hitInfo.entity instanceof AirplaneEntity) {
+                    Logging.Log('[handleRightPress] HAND vehicle branch -> airplane');
                     this.placeCharacterInAirplane(hitInfo.entity);
                 }
+                else {
+                    Logging.Log('[handleRightPress] HAND target was not a vehicle; use dispatch only');
+                }
+            } else {
+                Logging.LogWarning('[handleRightPress] HAND hitInfo.entity is null');
             }
+        } else {
+            Logging.LogWarning('[handleRightPress] HAND hitInfo is null');
         }
     }
     else if (this.interactionMode == "SQUARE-SHOVEL-1") {

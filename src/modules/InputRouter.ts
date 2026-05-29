@@ -160,6 +160,7 @@ export class InputRouter {
    * Process right press
    */
   processRightPress(): void {
+    Logging.Log('[InputRouter] processRightPress -> handleRightPress()');
     (globalThis as any).handleRightPress();
   }
 
@@ -426,6 +427,7 @@ export class InputRouter {
    * Process right trigger press events
    */
   processRightTriggerPress(): void {
+    Logging.Log('[InputRouter] processRightTriggerPress -> processTriggerPress()');
     WorldStorage.SetItem("RIGHT-TRIGGER-STATE", "PRESSED");
     (globalThis as any).processTriggerPress();
   }

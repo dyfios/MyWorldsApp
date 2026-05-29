@@ -62,6 +62,29 @@ export class StaticSurfaceRenderer extends WorldRendering {
   private worldMetadata?: WorldMetadata;
   private entityManager: EntityManager;
   private identityModule: Identity;
+  private characterSynchronizer: string | null = null;
+  private syncMaintenanceId: UUID | null = null;
+  private syncInfoRequested: boolean = false;
+  private connectionId: string = UUID.NewUUID().ToString() as string;
+  private sessionJoinParams: {
+    sessionId: string; sessionTag: string;
+    host: string; port: number; tls: boolean; transport: string;
+  } | null = null;
+  private sessionWasEstablished: boolean = false;
+  // Sticky: true once the session has been established at least once. Used to
+  // gate the disconnect overlay so it doesn't fire during initial handshake.
+  private sessionEverEstablished: boolean = false;
+  // Wall-clock millisecond-of-day (from Jint's Date.now property) of the last
+  // tick that observed VOSSynchronization.IsSessionEstablished === true. The
+  // disconnect overlay is fired when (nowMs - lastHealthyMs) exceeds
+  // disconnectTimeoutMs. This is immune to IsSessionEstablished briefly
+  // flickering back to true between rejoin attempts (which would reset a
+  // consecutive-tick counter and never trip the threshold).
+  private lastHealthyMs: number = 0;
+  private disconnectTimeoutMs: number = 15000;
+  private disconnectOverlayFired: boolean = false;
+  // Throttle for diagnostic disconnect logging (1 per second).
+  private lastDisconnectDiagMs: number = 0;
 
   constructor() {
     super();
@@ -126,11 +149,23 @@ export class StaticSurfaceRenderer extends WorldRendering {
     };
 
     // Provide a stub tiledsurfacerenderer object for compatibility
+    // regionSynchronizers is a live object populated when the sync session is joined
     (globalThis as any).tiledsurfacerenderer = {
       getTerrainTileForIndex: (_index: Vector2Int) => null,
       restClient: this.restClient,
-      regionSynchronizers: {},
-      worldId: null as string | null  // Will be set after initialize() parses metadata
+      regionSynchronizers: {} as { [key: string]: string },
+      worldId: null as string | null,  // Will be set after initialize() parses metadata
+      worldOwner: null as string | null,  // userID of world owner (for placement gating)
+      worldPermissions: null as string | null  // 'public' | other (for placement gating)
+    };
+
+    // Sync-related global callbacks
+    (globalThis as any).onStaticWorldSyncInfoReceived = (response: string) => {
+      this.onSyncInfoReceived(response);
+    };
+
+    (globalThis as any).staticsurfacerenderer_syncMaintenance = () => {
+      this.ensureCharacterIsInSession();
     };
 
     // Sky setup callback for when sun entity is created
@@ -311,6 +346,11 @@ export class StaticSurfaceRenderer extends WorldRendering {
       Logging.Log('🌐 StaticSurfaceRenderer: Using world address: ' + worldAddress);
       // Create new REST client with the world address as base URL
       this.restClient = new REST(worldAddress);
+      // Update the global stub so consumers (e.g. EntityManager) use the
+      // world-address client instead of the stale default ('/api' -> localhost).
+      if ((globalThis as any).tiledsurfacerenderer) {
+        (globalThis as any).tiledsurfacerenderer.restClient = this.restClient;
+      }
     } else {
       Logging.Log('🌐 StaticSurfaceRenderer: No world address specified, using default API endpoint');
       // Keep the default REST client
@@ -321,7 +361,11 @@ export class StaticSurfaceRenderer extends WorldRendering {
     // Update the tiledsurfacerenderer stub with worldId from metadata
     if (this.worldMetadata && this.worldMetadata.id && (globalThis as any).tiledsurfacerenderer) {
       (globalThis as any).tiledsurfacerenderer.worldId = this.worldMetadata.id;
+      (globalThis as any).tiledsurfacerenderer.worldOwner = this.worldMetadata.owner || null;
+      (globalThis as any).tiledsurfacerenderer.worldPermissions = this.worldMetadata.permissions || null;
       Logging.Log('🌐 StaticSurfaceRenderer: Set tiledsurfacerenderer.worldId=' + this.worldMetadata.id);
+      Logging.Log('🌐 StaticSurfaceRenderer: Set tiledsurfacerenderer.worldOwner=' + (this.worldMetadata.owner || '(none)')
+        + ' worldPermissions=' + (this.worldMetadata.permissions || '(none)'));
     }
 
     // Store world gravity default for PlayerController to apply after character loads
@@ -559,6 +603,9 @@ export class StaticSurfaceRenderer extends WorldRendering {
     } else {
       Logging.Log('⚠️ No pending entity template request found');
     }
+
+    // After auth, also request sync info for real-time multiplayer
+    this.requestSyncInfo();
   }
 
   /**
@@ -610,6 +657,9 @@ export class StaticSurfaceRenderer extends WorldRendering {
         this.startLoginProcess();
         return;
       }
+
+      // Request sync info now that we're authenticated
+      this.requestSyncInfo();
 
       // Use the globally defined callback function names
       const onComplete = 'onEntityTemplatesComplete';
@@ -731,6 +781,9 @@ export class StaticSurfaceRenderer extends WorldRendering {
         let type = 'mesh';
         let meshObject = "";
         let meshResources: string[] = [];
+        let scripts: any = undefined;
+        let wheels: any = undefined;
+        let mass: number | undefined = undefined;
 
         const templates = Context.GetContext("MW_ENTITY_TEMPLATES");
         if (templates == null) {
@@ -745,10 +798,14 @@ export class StaticSurfaceRenderer extends WorldRendering {
             }
 
             // TODO: identify if not public
+            const assets = JSON.parse(template["assets"]);
             meshObject = this.queryParams.getWorldAddress() + "/public-assets/" +
-              "/" + JSON.parse(template["assets"]).model_path;
+              "/" + assets.model_path;
             meshResources = [meshObject];
             type = template.type;
+            scripts = (template as any).scripts ?? assets.scripts;
+            wheels = assets.wheels;
+            mass = assets.mass;
 
             if (type != 'mesh') {
               Logging.Log("Unsupported entity type: " + type + " for entity " + instanceId);
@@ -758,6 +815,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
         }
 
         Logging.Log(`📍 Entity ${instanceId}: pos(${position.x}, ${position.y}, ${position.z}), rot(${rotation.x}, ${rotation.y}, ${rotation.z}, ${rotation.w}), scale(${scale})`);
+        Logging.Log('🧩 StaticSurfaceRenderer: scripts for ' + instanceId + ' = ' + (scripts ? 'present' : 'missing'));
 
         // Load entity using EntityManager with correct parameters
         const loadedInstanceId = this.entityManager.loadEntity(
@@ -774,10 +832,10 @@ export class StaticSurfaceRenderer extends WorldRendering {
           scale,
           meshObject,
           meshResources,
-          undefined,        // wheels
-          undefined,        // mass
+          wheels,
+          mass,
           undefined,        // autoType
-          undefined,        // scripts
+          scripts,
           false,            // placingEntity
           instance.frozen   // frozen flag
         );
@@ -807,8 +865,8 @@ export class StaticSurfaceRenderer extends WorldRendering {
       Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user ID from context: ' + error);
     }
 
-    // Return empty string if not authenticated (no fallback)
-    return "";
+    // Fall back to connectionId so we never send a null client-id
+    return this.connectionId;
   }
 
   /**
@@ -869,7 +927,293 @@ export class StaticSurfaceRenderer extends WorldRendering {
     }
   }
 
+  // ==================== Sync Support ====================
+
+  /**
+   * Request sync session info from the server.
+   * Called after authentication is complete.
+   */
+  requestSyncInfo(): void {
+    if (this.syncInfoRequested) return;
+    if (!this.worldMetadata?.id) {
+      Logging.LogError('StaticSurfaceRenderer: Cannot request sync info - no world ID');
+      return;
+    }
+    this.syncInfoRequested = true;
+
+    const userId = this.getUserId();
+    const userToken = this.getUserToken();
+
+    Logging.Log('StaticSurfaceRenderer: Requesting sync info for world ' + this.worldMetadata.id);
+    this.restClient.sendGetSyncInfoRequest(
+      this.worldMetadata.id, userId, userToken, 'onStaticWorldSyncInfoReceived');
+  }
+
+  /**
+   * Handle sync info response from server
+   */
+  onSyncInfoReceived(response: string): void {
+    try {
+      const syncInfo = JSON.parse(response);
+      Logging.Log('StaticSurfaceRenderer: Sync info received: ' + response);
+
+      if (!syncInfo.success || !syncInfo.synchronizer_id) {
+        Logging.LogError('StaticSurfaceRenderer: Failed to get sync info: ' + (syncInfo.error || 'unknown error'));
+        return;
+      }
+
+      const vosHost = syncInfo.vos_host || this.getSyncHost();
+      const vosPort = syncInfo.vos_port || this.getSyncPort();
+      const vosTls = syncInfo.vos_tls || false;
+      const vosTransport = syncInfo.vos_transport || 'websocket';
+
+      if (this.worldMetadata) {
+        this.worldMetadata.syncConfig = {
+          synchronizer_id: syncInfo.synchronizer_id,
+          synchronizer_tag: syncInfo.synchronizer_tag,
+          host: vosHost,
+          port: vosPort,
+          tls: vosTls,
+          transport: vosTransport
+        };
+      }
+
+      this.joinWorldSyncSession(
+        syncInfo.synchronizer_id, syncInfo.synchronizer_tag,
+        vosHost, vosPort, vosTls, vosTransport);
+    } catch (error) {
+      Logging.LogError('StaticSurfaceRenderer: Failed to parse sync info response: ' + error);
+    }
+  }
+
+  /**
+   * Join the single world-level sync session and start maintenance loop.
+   */
+  private joinWorldSyncSession(
+    sessionId: string, sessionTag: string,
+    host: string, port: number, tls: boolean, transport: string
+  ): void {
+    this.sessionJoinParams = { sessionId, sessionTag, host, port, tls, transport };
+
+    this.doJoinSession(sessionId, sessionTag, host, port, tls, transport);
+
+    // Populate regionSynchronizers with "0.0" key for compatibility with
+    // EntityManager and EnvironmentModifier gates (which check tsr.regionSynchronizers[xy])
+    const tsr = (globalThis as any).tiledsurfacerenderer;
+    tsr.regionSynchronizers['0.0'] = sessionId;
+
+    Logging.Log('StaticSurfaceRenderer: World sync session joined, regionSynchronizers["0.0"] set');
+
+    // Start the connection health monitor so SyncManager.onConnectionLost
+    // (wired to UIManager.showDisconnectOverlay) fires if the session drops.
+    const syncManager = (globalThis as any).syncManager;
+    if (syncManager && typeof syncManager.startConnectionMonitor === 'function') {
+      syncManager.startConnectionMonitor(sessionId);
+    }
+
+    this.startSyncMaintenance();
+  }
+
+  private doJoinSession(
+    sessionId: string, sessionTag: string,
+    host: string, port: number, tls: boolean, transport: string
+  ): void {
+    const userId = this.getUserId();
+    const userToken = this.getUserToken();
+    const syncClientId = userId + ':' + this.connectionId;
+
+    Logging.Log('StaticSurfaceRenderer: Joining world sync session ' + sessionId + ' at ' + host + ':' + port);
+    Logging.Log('StaticSurfaceRenderer: Join params - syncClientId=' + syncClientId
+      + ' tokenPresent=' + (userToken ? 'yes' : 'no') + ' sessionTag=' + sessionTag);
+
+    const onJoinAction = `
+      Logging.Log('[StaticSurfaceRenderer] Session joined, registering message callback');
+      if (this.syncManager && this.syncManager.onVSSMessage) {
+        VOSSynchronization.RegisterMessageCallback('${sessionId}', 'onVSSMessage');
+      }
+    `;
+
+    const joinResult = VOSSynchronization.JoinSession(
+      host, port, tls,
+      sessionId, sessionTag,
+      Environment.GetWorldOffset(), onJoinAction,
+      transport.toLowerCase() === 'tcp' ? VSSTransport.TCP : VSSTransport.WebSocket,
+      syncClientId, userToken);
+    Logging.Log('StaticSurfaceRenderer: JoinSession returned clientId=' + joinResult);
+  }
+
+  /**
+   * Start the maintenance loop that ensures the character entity is synchronized.
+   */
+  private startSyncMaintenance(): void {
+    if (this.syncMaintenanceId !== null) return;
+    Logging.Log('StaticSurfaceRenderer: Starting sync maintenance');
+    this.syncMaintenanceId = Time.SetInterval('staticsurfacerenderer_syncMaintenance();', 0.5);
+  }
+
+  private stopSyncMaintenance(): void {
+    if (this.syncMaintenanceId !== null) {
+      Time.StopInterval(this.syncMaintenanceId.ToString());
+      this.syncMaintenanceId = null;
+    }
+  }
+
+  /**
+   * Ensure the character entity is being synchronized in the world session.
+   * Static worlds only have a single session (vs planet's per-region sessions).
+   */
+  ensureCharacterIsInSession(): void {
+    const pc = (globalThis as any).playerController;
+    if (!pc?.characterLoaded) {
+      return;
+    }
+    const entity = pc?.internalCharacterEntity;
+    if (entity === null || entity === undefined) {
+      return;
+    }
+
+    const tsr = (globalThis as any).tiledsurfacerenderer;
+    const syncId = tsr?.regionSynchronizers?.['0.0'];
+    if (!syncId) return;
+
+    const established = VOSSynchronization.IsSessionEstablished(syncId);
+
+    if (this.characterSynchronizer === syncId) {
+      // Already synced - check if session is still established
+      if (!established) {
+        Logging.Log('[SyncDebug] Session ' + syncId + ' no longer established! Resetting characterSynchronizer');
+        this.characterSynchronizer = null;
+        this.handleDisconnectObserved(false);
+        if (this.sessionJoinParams && this.sessionWasEstablished) {
+          Logging.Log('[SyncDebug] Attempting to rejoin session after disconnect');
+          this.sessionWasEstablished = false;
+          VOSSynchronization.ExitSession(syncId);
+          const p = this.sessionJoinParams;
+          this.doJoinSession(p.sessionId, p.sessionTag, p.host, p.port, p.tls, p.transport);
+        }
+      } else {
+        this.handleDisconnectObserved(true);
+      }
+      return;
+    }
+
+    if (!established) {
+      // Not yet established (initial handshake or post-rejoin). Only count as
+      // a disconnect tick if we've connected at least once before.
+      if (this.sessionEverEstablished) {
+        this.handleDisconnectObserved(false);
+      }
+      return;
+    }
+
+    this.sessionWasEstablished = true;
+    this.sessionEverEstablished = true;
+    this.handleDisconnectObserved(true);
+
+    const entityId = entity.id;
+    Logging.Log('StaticSurfaceRenderer: Starting entity sync - syncId=' + syncId + ' entityId=' + entityId);
+    const result = VOSSynchronization.StartSynchronizingEntity(syncId, entityId, true);
+    Logging.Log('StaticSurfaceRenderer: StartSynchronizingEntity returned ' + result);
+    this.characterSynchronizer = syncId;
+  }
+
+  /**
+   * Compute wall-clock milliseconds-of-day from Jint's Date.now property.
+   * Note: WebVerse's Jint runtime exposes Date.now as a Date-valued property,
+   * NOT a callable function (see ScriptEngine.runOnUseScript for the same pattern).
+   */
+  private nowMs(): number {
+    const d: any = (Date as any).now;
+    return ((d.hour * 60 + d.minute) * 60 + d.second) * 1000 + d.millisecond;
+  }
+
+  /**
+   * Called from the maintenance loop. If healthy=true, refresh lastHealthyMs.
+   * If healthy=false, check whether the gap since lastHealthyMs exceeds the
+   * disconnect timeout; if so, fire the disconnect overlay.
+   *
+   * Uses wall-clock timing so it's immune to IsSessionEstablished flickering
+   * back to true between rejoin attempts.
+   */
+  private handleDisconnectObserved(healthy: boolean): void {
+    if (this.disconnectOverlayFired) return;
+    const now = this.nowMs();
+
+    if (healthy) {
+      this.lastHealthyMs = now;
+      return;
+    }
+
+    // Unhealthy. Need a baseline to measure against.
+    if (this.lastHealthyMs === 0) {
+      // Never seen healthy yet — start the clock now so we don't immediately
+      // fire on the very first unhealthy tick after sessionEverEstablished flips.
+      this.lastHealthyMs = now;
+      return;
+    }
+
+    let gap = now - this.lastHealthyMs;
+    // Day-rollover guard: ms-of-day wraps at midnight. Treat negative gap as
+    // a fresh baseline instead of "23+ hours disconnected".
+    if (gap < 0) {
+      this.lastHealthyMs = now;
+      return;
+    }
+
+    // Throttled diagnostic log (1/sec) so retests produce clear evidence.
+    if (now - this.lastDisconnectDiagMs >= 1000) {
+      this.lastDisconnectDiagMs = now;
+      Logging.Log('[SyncDiag] unhealthy gap=' + gap + 'ms timeout=' + this.disconnectTimeoutMs
+        + ' everEstablished=' + this.sessionEverEstablished
+        + ' overlayFired=' + this.disconnectOverlayFired);
+    }
+
+    if (gap >= this.disconnectTimeoutMs) {
+      this.disconnectOverlayFired = true;
+      Logging.LogError('StaticSurfaceRenderer: sync session lost for ' + gap
+        + 'ms (>=' + this.disconnectTimeoutMs + 'ms) — firing disconnect overlay');
+      const syncManager = (globalThis as any).syncManager;
+      if (!syncManager) {
+        Logging.LogError('StaticSurfaceRenderer: globalThis.syncManager is missing — cannot show overlay');
+        return;
+      }
+      if (typeof syncManager.onConnectionLost !== 'function') {
+        Logging.LogError('StaticSurfaceRenderer: syncManager.onConnectionLost is not a function (type='
+          + typeof syncManager.onConnectionLost + ')');
+        return;
+      }
+      try {
+        Logging.Log('StaticSurfaceRenderer: invoking syncManager.onConnectionLost()');
+        syncManager.onConnectionLost();
+        Logging.Log('StaticSurfaceRenderer: syncManager.onConnectionLost() returned');
+      } catch (e) {
+        Logging.LogError('StaticSurfaceRenderer: onConnectionLost threw: ' + e);
+      }
+    }
+  }
+
+  /**
+   * Derive sync service host from world address (fallback when server doesn't return one).
+   */
+  private getSyncHost(): string {
+    const worldAddr = this.queryParams.getWorldAddress() || '';
+    try {
+      const url = new URL(worldAddr);
+      return url.hostname;
+    } catch {
+      return 'localhost';
+    }
+  }
+
+  /**
+   * Default sync service port (static worlds use the container bus WebSocket port).
+   */
+  private getSyncPort(): number {
+    return 45526;
+  }
+
   dispose(): void {
+    this.stopSyncMaintenance();
     Logging.Log('StaticSurfaceRenderer disposed');
   }
 }

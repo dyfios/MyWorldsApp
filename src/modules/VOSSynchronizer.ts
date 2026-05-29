@@ -39,6 +39,7 @@ export class VOSSynchronizer {
     public onMessage = null;
     private config: VOSSynchronizerConfig;
     private isConnected: boolean = false;
+    private connectionId: string = UUID.NewUUID().ToString() as string;
     private messageHandlers: Map<string, ((message: VOSMessage) => void)[]> = new Map();
     private sessionMessageHandlers: Map<string, ((message: VOSSessionMessage) => void)[]> = new Map();
     private entitySyncCallbacks: Map<string, (entity: any) => void> = new Map();
@@ -77,7 +78,7 @@ export class VOSSynchronizer {
 
             VOSSynchronization.JoinSession(this.config.host, this.config.port,
                 this.config.tls, this.config.sessionId, this.config.sessionTag,
-                onJoinAction, this.config.transport, userId, userToken);
+                onJoinAction, this.config.transport, userId + ':' + this.connectionId, userToken);
             
             return true;
         } catch (error) {
@@ -336,11 +337,11 @@ export class VOSSynchronizer {
         return contextUser.userID;
       }
     } catch (error) {
-      Logging.LogWarning('🔍 StaticSurfaceRenderer: Could not get user ID from context: ' + error);
+      Logging.LogWarning('VOSSynchronizer: Could not get user ID from context: ' + error);
     }
 
-    // Return empty string if not authenticated (no fallback)
-    return "";
+    // Fall back to connectionId so we never send a null client-id
+    return this.connectionId;
   }
 
   /**

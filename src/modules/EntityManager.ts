@@ -4,6 +4,7 @@
 
 import { Position, Rotation } from '../types/config';
 import { EntityData } from '../types/entity';
+import { EntityScriptMap } from '../types/scripts';
 import { ScriptEngine } from './ScriptEngine';
 import { VOSSynchronizer } from './VOSSynchronizer';
 import { TiledSurfaceRenderer } from './WorldRendererFactory';
@@ -20,7 +21,7 @@ export class EntityPlacement {
   public variantID: string | null = null;
   public instanceID: string | null = null;
   public orientationIndex: number = 0;
-  public scripts: { [key: string]: any } = {};
+  public scripts: EntityScriptMap = {};
   public wheels: any = null;
   public mass: number = 0;
   public modelRotation: Quaternion | null = null;
@@ -51,7 +52,7 @@ export class EntityPlacement {
     (globalThis as any).startPlacing = (entityToPlace: BaseEntity, entityType: string,
       entityIndex: number, variantIndex: number, entityID: string, variantID: string,
       modelPath: string, wheels: any, mass: number,
-      scripts: { [key: string]: any }, instanceId: string) => {
+      scripts: EntityScriptMap, instanceId: string) => {
       this.startPlacing(entityToPlace, entityType, entityIndex, variantIndex, entityID,
         variantID, modelPath, wheels, mass, scripts, instanceId);
     };
@@ -167,14 +168,27 @@ export class EntityPlacement {
     modelPath: string,
     wheels: any,
     mass: number,
-    scripts: { [key: string]: any },
+    scripts: EntityScriptMap,
     instanceID: string,
     offset?: Vector3,
     rotation?: Quaternion,
     placementOffset?: Vector3
   ): void {
     //WorldStorage.SetItem("TERRAIN-EDIT-LAYER", "-1");
-    
+
+    // Pre-placement permission gate: if the world is private and the current
+    // user is not the owner, refuse to enter placement mode. This prevents
+    // visual preview + REST round-trip for placements the server will reject.
+    if (!this.canPlaceEntities()) {
+      Logging.LogWarning('[EntityPlacer] startPlacing denied by permission gate — world is private and current user is not the owner');
+      this.notifyPlacementDenied();
+      // Destroy the spawned preview entity so it doesn't leak into the scene.
+      if (entityToPlace != null) {
+        try { entityToPlace.Delete(); } catch (_e) { /* best-effort */ }
+      }
+      return;
+    }
+
     this.exitDeleteMode();
     
     if (this.placingEntity != null) {
@@ -207,9 +221,23 @@ export class EntityPlacement {
     
     entityToPlace.SetHighlight(true);
     // Switch to Placing interaction state — toggles to preview mesh and (per WebVerse fix)
-+    // disables colliders so the placement raycast passes through the entity to hit world
-+    // geometry instead of being blocked by the entity's own colliders.
-+    entityToPlace.SetInteractionState(InteractionState.Placing);
+    // disables colliders so the placement raycast passes through the entity to hit world
+    // geometry instead of being blocked by the entity's own colliders.
+    entityToPlace.SetInteractionState(InteractionState.Placing);
+
+    const placementScriptKeys = Object.keys(this.scripts || {});
+    const placementPreview = placementScriptKeys.slice(0, 16);
+    Logging.Log('[PlacementRegistration] startPlacing entityInstance=' + (entityToPlace.id?.ToString ? entityToPlace.id.ToString() : entityToPlace.id)
+      + ' entityID=' + entityID
+      + ' variantID=' + variantID
+      + ' keyCount=' + placementScriptKeys.length
+      + ' keysPreview=' + (placementPreview.length > 0 ? placementPreview.join(',') : '(none)'));
+
+    if (this.scripts != null && Object.keys(this.scripts).length > 0) {
+      Logging.Log('[PlacementRegistration] startPlacing addScriptEntity for ' + (entityToPlace.id?.ToString ? entityToPlace.id.ToString() : entityToPlace.id));
+      ((globalThis as any).scriptEngine as ScriptEngine).addScriptEntity(entityToPlace, this.scripts);
+      ((globalThis as any).scriptEngine as ScriptEngine).runOnPickupScript(entityToPlace);
+    }
     // Input.TurnLocomotionMode = Input.VRTurnLocomotionMode.None; // VR-specific, commented out
   }
 
@@ -258,6 +286,18 @@ export class EntityPlacement {
     Logging.Log('[stopPlacing] typeof regionPos.x=' + typeof regionPos.x + ' Number(regionPos.x)=' + Number(regionPos.x));
     Logging.Log('[stopPlacing] REST check: instanceID=' + this.instanceID + ' entityID=' + this.entityID + ' variantID=' + this.variantID);
     if (this.instanceID && this.entityID && this.variantID) {
+      // Safety-net permission gate: even if startPlacing was somehow bypassed,
+      // refuse to send the create-entity-instance REST request when the user
+      // does not have write permission for this world.
+      if (!this.canPlaceEntities()) {
+        Logging.LogWarning('[stopPlacing] denied by permission gate — destroying preview and skipping REST request');
+        this.notifyPlacementDenied();
+        try { this.placingEntity.Delete(); } catch (_e) { /* best-effort */ }
+        this.placingEntity = null;
+        this.entityBeingPlaced = false;
+        this.keepSpawning = false;
+        return;
+      }
       var tsr = (globalThis as any).tiledsurfacerenderer as TiledSurfaceRenderer;
       const userId = this.getUserId();
       const userToken = this.getUserToken();
@@ -267,7 +307,7 @@ export class EntityPlacement {
         Logging.Log('[stopPlacing] Sending REST create-entity-instance request: pos=' + regionPos.x + ',' + regionPos.y + ',' + regionPos.z);
         tsr.restClient.sendPositionEntityRequest(
           worldId, this.entityID, this.variantID,
-          this.instanceID, regionPos, rot, userId, userToken, "onCompleteCallback");
+          this.instanceID, regionPos, rot, userId, userToken, null);
         // VOS sync only available in planet/tiled mode
         var wsync = (globalThis as any).wsync_instance as VOSSynchronizer;
         if (wsync && terrainIndex && tsr.regionSynchronizers
@@ -281,7 +321,11 @@ export class EntityPlacement {
     
     // Handle scripts if present
     if (this.scripts != null && Object.keys(this.scripts).length > 0) {
-      Logging.Log("[EntityPlacer] Adding scripts to placed entity");
+      const placeScriptKeys = Object.keys(this.scripts);
+      const placePreview = placeScriptKeys.slice(0, 16);
+      Logging.Log('[PlacementRegistration] stopPlacing addScriptEntity entity=' + (this.placingEntity.id?.ToString ? this.placingEntity.id.ToString() : this.placingEntity.id)
+        + ' keyCount=' + placeScriptKeys.length
+        + ' keysPreview=' + (placePreview.length > 0 ? placePreview.join(',') : '(none)'));
       ((globalThis as any).scriptEngine as ScriptEngine).addScriptEntity(this.placingEntity, this.scripts);
 
       ((globalThis as any).scriptEngine as ScriptEngine).runOnCreateScript(this.placingEntity);
@@ -301,6 +345,8 @@ export class EntityPlacement {
       if (this.scripts["2_0_update"] != null) {
         ((globalThis as any).scriptEngine as ScriptEngine).add2_0IntervalScript(this.placingEntity, this.scripts["2_0_update"]);
       }
+
+      ((globalThis as any).scriptEngine as ScriptEngine).runOnPlaceScript(this.placingEntity);
     }
 
     // Finalize placement
@@ -456,6 +502,99 @@ export class EntityPlacement {
     // Return empty string if not authenticated (no fallback)
     return "";
   }
+
+  /**
+   * Pre-placement permission gate.
+   *
+   * Returns true if the current user is allowed to place entities in this
+   * world. Rules (matching the server-side model in MyWorldsServer):
+   *   - world is "public"          → anyone may place
+   *   - current user is the owner  → may place
+   *   - otherwise                  → denied
+   *
+   * Fail-open if world metadata or current-user identity is unavailable: we
+   * don't want to block legitimate placements just because metadata hasn't
+   * been wired yet. The server remains the authoritative check.
+   */
+  canPlaceEntities(): boolean {
+    try {
+      const tsr: any = (globalThis as any).tiledsurfacerenderer;
+      if (!tsr) return true;
+
+      const permissionsRaw: any = tsr.worldPermissions;
+      const owner: string | null | undefined = tsr.worldOwner;
+
+      // Normalize permissions to a lowercase string when possible. Server
+      // schemas vary: sometimes a simple string ('public'), sometimes an
+      // object map. We only recognize the simple string form here.
+      let permStr = '';
+      if (typeof permissionsRaw === 'string') {
+        permStr = permissionsRaw.toLowerCase().trim();
+      }
+
+      // Public worlds: anyone may place.
+      if (permStr === 'public') return true;
+
+      // No usable owner info → we can't make an ownership decision.
+      // Fail-open and let the server be the authoritative check, rather
+      // than blocking legitimate placements in worlds whose metadata
+      // doesn't carry an owner field.
+      if (!owner || typeof owner !== 'string') {
+        Logging.Log('[EntityPlacer] permission check: no owner in metadata, failing open'
+          + ' (permissions=' + JSON.stringify(permissionsRaw) + ')');
+        return true;
+      }
+
+      // Pull both userID and userTag from the identity context — different
+      // worlds may store either form as the owner field.
+      let userId = '';
+      let userTag = '';
+      try {
+        const ctx: any = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+        if (ctx) {
+          userId = ctx.userID || '';
+          userTag = ctx.userTag || '';
+        }
+      } catch (_e) { /* ignore */ }
+
+      const ownerNorm = owner.toLowerCase().trim();
+      const userIdNorm = userId.toLowerCase().trim();
+      const userTagNorm = userTag.toLowerCase().trim();
+
+      Logging.Log('[EntityPlacer] permission check: permissions=' + JSON.stringify(permissionsRaw)
+        + ' owner=' + owner + ' userID=' + userId + ' userTag=' + userTag);
+
+      if (ownerNorm === userIdNorm || ownerNorm === userTagNorm) {
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      Logging.LogWarning('[EntityPlacer] canPlaceEntities check threw, failing open: ' + e);
+      return true;
+    }
+  }
+
+  /**
+   * Show a chat-console notification when a placement is denied. Best-effort:
+   * if the chat console isn't available yet, the warning log is still emitted
+   * by the caller.
+   */
+  private notifyPlacementDenied(): void {
+    try {
+      const ui: any = (globalThis as any).uiManager;
+      if (ui && typeof ui.addRemoteConsoleMessage === 'function') {
+        const d: any = (Date as any).now;
+        const pad = function (n: number): string {
+          const s = String(n);
+          return s.length < 2 ? '0' + s : s;
+        };
+        const timestamp = pad(d.hour) + ':' + pad(d.minute) + ':' + pad(d.second);
+        ui.addRemoteConsoleMessage(timestamp, 'System',
+          'You do not have permission to place entities in this world.');
+      }
+    } catch (_e) { /* best-effort */ }
+  }
 }
 
 export class EntityManager {
@@ -471,7 +610,145 @@ export class EntityManager {
   private currentModelPath: string = "";
   private currentWheels: any | undefined = undefined;
   private currentMass: number | undefined = undefined;
-  private currentScripts: string | undefined = undefined;
+  private currentScripts: EntityScriptMap | undefined = undefined;
+
+  private ensureEntityScriptsByInstanceId(): any {
+    if (!(globalThis as any).entityScriptsByInstanceId) {
+      (globalThis as any).entityScriptsByInstanceId = {};
+    }
+    return (globalThis as any).entityScriptsByInstanceId;
+  }
+
+  private normalizeScriptsPayload(rawScripts: any, instanceId: string): EntityScriptMap | undefined {
+    if (rawScripts == null) {
+      Logging.Log('[EntityManager] Scripts payload missing for instanceId=' + instanceId);
+      return undefined;
+    }
+
+    if (typeof rawScripts === 'string') {
+      const trimmed = rawScripts.trim();
+      if (trimmed === '') {
+        Logging.LogWarning('[EntityManager] Empty scripts string for instanceId=' + instanceId);
+        return undefined;
+      }
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        return this.normalizeScriptsPayload(parsed, instanceId);
+      } catch (_error) {
+        // Treat non-JSON script strings as an on_use body.
+        Logging.LogWarning('[EntityManager] Non-JSON scripts string for instanceId=' + instanceId + ' - treating as on_use');
+        return { on_use: trimmed };
+      }
+    }
+
+    if (Array.isArray(rawScripts)) {
+      const arr = rawScripts as any[];
+      const preview = JSON.stringify(arr).slice(0, 400);
+      Logging.LogWarning('[EntityManager] Array scripts payload for instanceId=' + instanceId
+        + ' length=' + arr.length
+        + ' preview=' + preview);
+
+      // Case A: ["on_use", "script body"] or ["0_25_update", "..."]
+      if (arr.length === 2 && typeof arr[0] === 'string' && typeof arr[1] === 'string') {
+        const key = arr[0].trim();
+        const value = arr[1];
+        if (key !== '') {
+          Logging.LogWarning('[EntityManager] Coercing 2-item scripts array to object for instanceId=' + instanceId + ' key=' + key);
+          const coerced: EntityScriptMap = {};
+          (coerced as any)[key] = value;
+          return coerced;
+        }
+      }
+
+      // Case B: [["on_use","..."], ["on_touch","..."]] style entries array
+      if (arr.every((item) => Array.isArray(item) && item.length === 2 && typeof item[0] === 'string' && typeof item[1] === 'string')) {
+        const coerced: EntityScriptMap = {};
+        for (const [key, value] of arr as Array<[string, string]>) {
+          if (key && key.trim() !== '') {
+            (coerced as any)[key] = value;
+          }
+        }
+        const keys = Object.keys(coerced);
+        if (keys.length > 0) {
+          Logging.LogWarning('[EntityManager] Coerced entry-array scripts for instanceId=' + instanceId + ' keys=' + keys.join(','));
+          return coerced;
+        }
+      }
+
+      // Case C: ["script body"] -> treat as on_use for backward compatibility
+      if (arr.length === 1 && typeof arr[0] === 'string' && arr[0].trim() !== '') {
+        Logging.LogWarning('[EntityManager] Coercing single-item scripts array to on_use for instanceId=' + instanceId);
+        return { on_use: arr[0] };
+      }
+
+      Logging.LogError('[EntityManager] Invalid scripts payload (array) for instanceId=' + instanceId + ' - unable to coerce');
+      return undefined;
+    }
+
+    if (typeof rawScripts !== 'object') {
+      Logging.LogError('[EntityManager] Invalid scripts payload type for instanceId=' + instanceId + ': ' + typeof rawScripts);
+      return undefined;
+    }
+
+    const normalized = rawScripts as EntityScriptMap;
+    const keys = Object.keys(normalized);
+    if (keys.length === 0) {
+      return undefined;
+    }
+
+    const numericOnlyKeys = keys.every((k) => /^\d+$/.test(k));
+    if (numericOnlyKeys) {
+      Logging.LogError('[EntityManager] Invalid scripts payload keys for instanceId=' + instanceId + ': ' + keys.join(',') + ' (numeric-only)');
+      return undefined;
+    }
+
+    return normalized;
+  }
+
+  private registerScriptsForInstance(instanceId: string, scripts: EntityScriptMap | undefined): void {
+    if (!instanceId) {
+      return;
+    }
+
+    const registry = this.ensureEntityScriptsByInstanceId();
+    if (scripts && Object.keys(scripts).length > 0) {
+      registry[instanceId] = scripts;
+      Logging.Log('[EntityManager] Registered scripts for instanceId=' + instanceId);
+    } else {
+      delete registry[instanceId];
+      Logging.Log('[EntityManager] Cleared scripts for instanceId=' + instanceId + ' (none)');
+    }
+  }
+
+  private ensurePendingEntityLoads(): any {
+    if (!(globalThis as any).pendingEntityLoads) {
+      (globalThis as any).pendingEntityLoads = {};
+    }
+    return (globalThis as any).pendingEntityLoads;
+  }
+
+  private registerPendingEntityLoad(instanceId: string, scripts: EntityScriptMap | undefined, type: string): void {
+    const pendingEntityLoads = this.ensurePendingEntityLoads();
+    pendingEntityLoads[instanceId] = {
+      scripts,
+      type
+    };
+    const scriptKeys = scripts ? Object.keys(scripts).join(',') : '';
+    Logging.Log('[loadEntity] pendingEntityLoad instanceId=' + instanceId
+      + ' type=' + type
+      + ' scripts=' + (scripts ? 'yes' : 'no')
+      + ' keys=' + (scriptKeys || '(none)'));
+  }
+
+  private consumePendingEntityLoad(instanceId: string): { scripts?: EntityScriptMap; type?: string } | null {
+    const pendingEntityLoads = this.ensurePendingEntityLoads();
+    const pending = pendingEntityLoads[instanceId] || null;
+    if (pending) {
+      delete pendingEntityLoads[instanceId];
+    }
+    return pending;
+  }
 
   constructor() {
     this.entityPlacement = new EntityPlacement();
@@ -522,7 +799,7 @@ export class EntityManager {
       wheels: any | undefined,
       mass: number | undefined,
       autoType: AutomobileType | undefined,
-      scripts: string | undefined,
+      scripts: EntityScriptMap | undefined,
       placingEntity: boolean | undefined,
       frozen: boolean | undefined
     ): string => {
@@ -570,7 +847,7 @@ export class EntityManager {
     wheels: any | undefined = undefined,
     mass: number | undefined = undefined,
     autoType: AutomobileType | undefined = undefined,
-    scripts: string | undefined = undefined,
+    scripts: EntityScriptMap | undefined = undefined,
     placingEntity: boolean = false,
     frozen: boolean = false
   ): string {
@@ -588,7 +865,25 @@ export class EntityManager {
     if (entityId == null || variantId == null || scale == null) {
 
     }
-    Logging.Log('[loadEntity] entityId=' + entityId + ' variantId=' + variantId + ' placingEntity=' + placingEntity);
+    const rawScripts: any = scripts as any;
+    let scriptsShape = 'null';
+    if (rawScripts == null) {
+      scriptsShape = 'null';
+    } else if (Array.isArray(rawScripts)) {
+      scriptsShape = 'array(len=' + rawScripts.length + ')';
+    } else if (typeof rawScripts === 'string') {
+      scriptsShape = 'string(len=' + rawScripts.length + ')';
+    } else if (typeof rawScripts === 'object') {
+      scriptsShape = 'object(keys=' + Object.keys(rawScripts).join(',') + ')';
+    } else {
+      scriptsShape = typeof rawScripts;
+    }
+    Logging.Log('[loadEntity] instanceId=' + instanceId
+      + ' entityId=' + entityId
+      + ' variantId=' + variantId
+      + ' type=' + type
+      + ' placingEntity=' + placingEntity
+      + ' scriptsShape=' + scriptsShape);
     this.currentEntityIndex = entityIndex || "";
     this.currentVariantIndex = variantIndex || "";
     this.currentEntityId = entityId;
@@ -604,7 +899,17 @@ export class EntityManager {
     }
     //this.currentWheels = automobileWheels;
     this.currentMass = mass;
-    this.currentScripts = scripts;
+
+    const normalizedScripts = this.normalizeScriptsPayload(scripts, instanceId);
+    const normalizedKeys = normalizedScripts ? Object.keys(normalizedScripts) : [];
+    const normalizedPreview = normalizedKeys.slice(0, 16);
+    Logging.Log('[loadEntity] normalized scripts for instanceId=' + instanceId
+      + ' normalizedKeyCount=' + normalizedKeys.length
+      + ' normalizedKeysPreview=' + (normalizedPreview.length > 0 ? normalizedPreview.join(',') : '(none)'));
+    this.currentScripts = normalizedScripts;
+    this.registerScriptsForInstance(instanceId, normalizedScripts);
+
+    this.registerPendingEntityLoad(instanceId, normalizedScripts, type);
 
     // Store placement metadata globally keyed by instanceId so async callbacks
     // can retrieve it regardless of which EntityManager instance they fire on
@@ -620,10 +925,11 @@ export class EntityManager {
         modelPath: meshObject,
         wheels: wheels,
         mass: mass,
-        scripts: scripts,
+        scripts: normalizedScripts,
         type: type
       };
-      Logging.Log('[loadEntity] Stored pending placement for instanceId=' + instanceId);
+      Logging.Log('[loadEntity] Stored pending placement for instanceId=' + instanceId
+        + ' normalizedScriptKeyCount=' + normalizedKeys.length);
     }
     if (type == null || type === "") {
       type = "mesh";
@@ -697,8 +1003,18 @@ export class EntityManager {
     Logging.Log(`✓ Mesh entity loaded successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
-    var scripts = this.currentScripts as any;
+    const instanceId = entity.id?.ToString ? (entity.id.ToString() || '') : String(entity.id || '');
+    const pendingLoad = this.consumePendingEntityLoad(instanceId);
+    var scripts = (pendingLoad?.scripts ?? this.currentScripts) as any;
+    this.registerScriptsForInstance(instanceId, scripts);
+    Logging.Log('[onMeshEntityLoadedGeneric] instanceId=' + instanceId
+      + ' scriptsFrom=' + (pendingLoad ? 'pendingEntityLoads' : 'currentScripts')
+      + ' scripts=' + (scripts ? 'yes' : 'no'));
     if (scripts != null) {
+      const scriptKeys = Object.keys(scripts);
+      Logging.Log('[EntityManager] Registering mesh scripts for ' + instanceId
+        + ' keyCount=' + scriptKeys.length
+        + ' keys=' + (scriptKeys.length > 0 ? scriptKeys.join(',') : '(none)'));
       ((globalThis as any).scriptEngine as ScriptEngine).addScriptEntity(entity, scripts);
 
       ((globalThis as any).scriptEngine as ScriptEngine).runOnCreateScript(entity);
@@ -732,7 +1048,13 @@ export class EntityManager {
     const pending = entityIdStr ? (globalThis as any).pendingPlacements?.[entityIdStr] : null;
     const instanceIdStr: string = (entity.id?.ToString ? entity.id.ToString() : String(entity.id || '')) || '';
     if (pending) {
-      Logging.Log('[onMeshEntityLoadedGenericPlacing] Using pending placement data: entityId=' + pending.entityId + ' variantId=' + pending.variantId + ' instanceId=' + instanceIdStr);
+      const pendingScriptKeys = Object.keys((pending.scripts || {}) as any);
+      const pendingPreview = pendingScriptKeys.slice(0, 16);
+      Logging.Log('[PlacementRegistration] pending->startPlacing mesh instanceId=' + instanceIdStr
+        + ' entityId=' + pending.entityId
+        + ' variantId=' + pending.variantId
+        + ' keyCount=' + pendingScriptKeys.length
+        + ' keysPreview=' + (pendingPreview.length > 0 ? pendingPreview.join(',') : '(none)'));
       (globalThis as any).startPlacing(entity, "mesh", pending.entityIndex, pending.variantIndex, pending.entityId,
         pending.variantId, pending.modelPath, pending.wheels, pending.mass, pending.scripts, instanceIdStr);
       delete (globalThis as any).pendingPlacements[entityIdStr];
@@ -751,8 +1073,18 @@ export class EntityManager {
     Logging.Log(`✓ Automobile entity loaded successfully: ${entity.id}`);
     entity.SetInteractionState(InteractionState.Static);
     entity.SetVisibility(true);
-    var scripts = this.currentScripts as any;
+    const instanceId = entity.id?.ToString ? (entity.id.ToString() || '') : String(entity.id || '');
+    const pendingLoad = this.consumePendingEntityLoad(instanceId);
+    var scripts = (pendingLoad?.scripts ?? this.currentScripts) as any;
+    this.registerScriptsForInstance(instanceId, scripts);
+    Logging.Log('[onAutomobileEntityLoadedGeneric] instanceId=' + instanceId
+      + ' scriptsFrom=' + (pendingLoad ? 'pendingEntityLoads' : 'currentScripts')
+      + ' scripts=' + (scripts ? 'yes' : 'no'));
     if (scripts != null) {
+      const scriptKeys = Object.keys(scripts);
+      Logging.Log('[EntityManager] Registering automobile scripts for ' + instanceId
+        + ' keyCount=' + scriptKeys.length
+        + ' keys=' + (scriptKeys.length > 0 ? scriptKeys.join(',') : '(none)'));
       ((globalThis as any).scriptEngine as ScriptEngine).addScriptEntity(entity, scripts);
       ((globalThis as any).scriptEngine as ScriptEngine).runOnCreateScript(entity);
 

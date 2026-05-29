@@ -58,8 +58,8 @@ export class REST {
 
   sendPositionEntityRequest(worldId: string, entityId: string, variantId: string,
     instanceId: string, position: Vector3, rotation: Quaternion, userId: string,
-    userToken: string, onComplete: string): void {
-    this.post(`/world/${worldId}/create-entity-instance`, {
+    userToken: string, onComplete: string | null): void {
+    this.post(`/api/world/${worldId}/create-entity-instance`, {
       'world-id': worldId,
       'entity-data': {
         'entity_id': entityId,
@@ -78,7 +78,7 @@ export class REST {
       },
       'user-id': userId,
       'user-token': userToken
-    }, "application/json", onComplete);
+    }, "application/json", onComplete || "");
   }
 
   async sendDeleteEntityRequest(entityId: string): Promise<void> {
@@ -163,6 +163,14 @@ export class REST {
 
   sendBiomeManifestRequest(onComplete: string): void {
     this.get('/getbiomeinfo', null, onComplete);
+  }
+
+  sendGetSyncInfoRequest(worldId: string, userId: string, userToken: string, onComplete: string): void {
+    this.post(`/api/world/${worldId}/sync-info`, {
+      'world-id': worldId,
+      'user-id': userId,
+      'user-token': userToken
+    }, "application/json", onComplete);
   }
 
   async sendAddEntityInstanceRequest(data: EntityPlacementData): Promise<EntityData> {

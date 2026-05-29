@@ -240,6 +240,7 @@ export class UIManager {
           break;
         case 'RIGHT_PRESS()':
           // Handle right click from web browser mode
+          Logging.Log('🖱️ UIManager: RIGHT_PRESS() received, forwarding to processRightPress()');
           if (typeof (globalThis as any).processRightPress === 'function') {
             (globalThis as any).processRightPress();
           }
@@ -397,9 +398,15 @@ export class UIManager {
                 
                 // Parse the assets JSON to get model path
                 let modelPath = '';
+                let templateScripts: any = undefined;
+                let templateWheels: any = undefined;
+                let templateMass: number | undefined = undefined;
                 try {
                   const assets = JSON.parse(foundTemplate.assets);
                   modelPath = worldAddress + '/public-assets/' + assets.model_path;
+                  templateScripts = (foundTemplate as any).scripts ?? assets.scripts;
+                  templateWheels = assets.wheels;
+                  templateMass = assets.mass;
                 } catch (e) {
                   Logging.LogError('❌ UIManager: Failed to parse template assets: ' + e);
                   return;
@@ -409,6 +416,15 @@ export class UIManager {
                 const entityType = foundTemplate.type || 'mesh';
                 
                 Logging.Log('🏗️ UIManager: Loading entity for placement - model: ' + modelPath);
+                Logging.Log('🏗️ UIManager: Template placement scripts shape=' + (
+                  templateScripts == null
+                    ? 'null'
+                    : Array.isArray(templateScripts)
+                      ? 'array(len=' + templateScripts.length + ')'
+                      : typeof templateScripts === 'object'
+                        ? 'object(keys=' + Object.keys(templateScripts).join(',') + ')'
+                        : typeof templateScripts
+                ));
                 
                 // Cancel any existing placement
                 (globalThis as any).cancelPlacing?.();
@@ -429,10 +445,10 @@ export class UIManager {
                   Vector3.one,                  // scale
                   modelPath,                    // meshObject
                   [modelPath],                  // meshResources
-                  undefined,                    // wheels
-                  undefined,                    // mass
+                  templateWheels,               // wheels
+                  templateMass,                 // mass
                   undefined,                    // autoType
-                  undefined,                    // scripts
+                  templateScripts,              // scripts
                   true                          // placingEntity = true
                 );
               } else {
@@ -1342,6 +1358,7 @@ export class UIManager {
    * and they must reload. This is idempotent — calling it twice is safe.
    */
   showDisconnectOverlay(): void {
+    Logging.Log('UIManager: showDisconnectOverlay() called (alreadyShown=' + this.disconnectOverlayShown + ')');
     if (this.disconnectOverlayShown) return;
     this.disconnectOverlayShown = true;
 
@@ -1394,27 +1411,12 @@ export class UIManager {
     background: rgba(30,30,30,0.95); max-width: 480px;
   }
   h1 { font-size: 24px; margin-bottom: 12px; }
-  p  { font-size: 16px; margin-bottom: 24px; color: #bbb; }
-  button {
-    padding: 14px 36px; font-size: 16px; font-weight: 600;
-    border: none; border-radius: 8px; cursor: pointer;
-    background: #3b82f6; color: #fff;
-  }
-  button:hover { background: #2563eb; }
+  p  { font-size: 16px; color: #bbb; }
 </style></head>
 <body>
   <div class="panel">
     <h1>Connection Lost</h1>
-    <p>The connection to the server was lost and could not be restored. Please reload to reconnect.</p>
-    <button onclick="
-      if (window.vuplex) {
-        window.vuplex.postMessage('RELOAD_WORLD()');
-      } else if (window.postWorldMessage) {
-        window.postWorldMessage('RELOAD_WORLD()');
-      } else {
-        window.location.reload();
-      }
-    ">Reload</button>
+    <p>The connection to the server was lost and could not be restored. Please reload the page to reconnect.</p>
   </div>
 </body>
 </html>`;

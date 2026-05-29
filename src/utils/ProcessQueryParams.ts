@@ -29,6 +29,15 @@ export interface UserPosition {
   z: number;
 }
 
+export interface WorldSyncConfig {
+  synchronizer_id: string;
+  synchronizer_tag: string;
+  host: string;
+  port: number;
+  tls: boolean;
+  transport: string;
+}
+
 export interface WorldMetadata {
   id: string;
   name: string;
@@ -36,6 +45,7 @@ export interface WorldMetadata {
   owner: string;
   permissions: string;
   stateService?: string; // Used for tiled surface renderer
+  syncConfig?: WorldSyncConfig; // Populated at runtime for static worlds
   sky?: SkyConfig;
   spawn?: SpawnConfig;
   /** Whether gravity is enabled by default. Defaults to true if omitted. */
