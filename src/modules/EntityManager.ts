@@ -106,8 +106,9 @@ export class EntityPlacement {
     // Logging.Log('🔵 placementUpdate() A - before raycast');
     const isThirdPerson = (globalThis as any).playerController?.cameraMode === 'thirdPerson';
     const isFullClient = (globalThis as any).uiManager?.clientType === 'full';
+    const isVR = (globalThis as any).playerController?.inVR === true;
     const hitInfo = (isThirdPerson && isFullClient)
-      ? Input.GetPointerRaycast(Vector3.forward)
+      ? Input.GetPointerRaycast(Vector3.forward, isVR ? 1 : 0)
       : Camera.GetRaycast();
     // Logging.Log('🔵 placementUpdate() B - after raycast');
     if (hitInfo != null && hitInfo.entity != null) {
