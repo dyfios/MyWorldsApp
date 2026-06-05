@@ -309,12 +309,18 @@ export class EntityPlacement {
         tsr.restClient.sendPositionEntityRequest(
           worldId, this.entityID, this.variantID,
           this.instanceID, regionPos, rot, userId, userToken, null);
-        // VOS sync only available in planet/tiled mode
+        // VOS sync: tiled mode uses per-region sessions, static mode uses single "0.0" session
         var wsync = (globalThis as any).wsync_instance as VOSSynchronizer;
-        if (wsync && terrainIndex && tsr.regionSynchronizers
-            && tsr.regionSynchronizers[terrainIndex.x + '.' + terrainIndex.y]) {
-          wsync.SendEntityAddUpdate(tsr.regionSynchronizers[terrainIndex.x + '.' + terrainIndex.y],
-            this.instanceID, regionPos, rot);
+        var syncKey = terrainIndex ? (terrainIndex.x + '.' + terrainIndex.y) : '0.0';
+        var sessionId = tsr.regionSynchronizers ? tsr.regionSynchronizers[syncKey] : null;
+        if (wsync && sessionId && terrainIndex) {
+          // Tiled/planet mode: use VOSSynchronizer wrapper
+          wsync.SendEntityAddUpdate(sessionId, this.instanceID, regionPos, rot);
+        } else if (sessionId && this.placingEntity) {
+          // Static mode: use VOSSynchronization directly to sync the placed entity
+          var entityId = this.placingEntity.id?.ToString ? this.placingEntity.id.ToString() : String(this.placingEntity.id);
+          Logging.Log('[stopPlacing] Static world sync: sessionId=' + sessionId + ' entityId=' + entityId + ' modelPath=' + this.modelPath);
+          VOSSynchronization.StartSynchronizingEntity(sessionId as string, entityId as string, false, this.modelPath || undefined, this.modelPath ? [this.modelPath] : undefined);
         }
       }
       Logging.Log(`[EntityPlacer] Placing entity at position: ${pos.x}, ${pos.y}, ${pos.z}`);

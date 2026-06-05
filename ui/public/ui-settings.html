@@ -257,6 +257,36 @@
         </div>
     </div>
 
+    <!-- Building & Placement Section -->
+    <div class="settings-section">
+        <h2>Building &amp; Placement</h2>
+
+        <!-- Placement Mode -->
+        <div class="setting-item">
+            <label class="setting-label">Placement Mode</label>
+            <div class="radio-group">
+                <label class="radio-option">
+                    <input type="radio" name="placementMode" value="grid" checked>
+                    <span>Grid</span>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="placementMode" value="free">
+                    <span>Free</span>
+                </label>
+            </div>
+            <div style="font-size: 12px; color: #888; margin-top: 6px;">Grid snaps objects to a fixed grid. Free places them exactly where you point.</div>
+        </div>
+
+        <!-- Grid Size -->
+        <div class="setting-item" id="gridSizeItem">
+            <label class="setting-label">Grid Size</label>
+            <div class="slider-container">
+                <input type="range" class="slider" id="gridSize" min="0.25" max="5.0" step="0.25" value="1.0">
+                <div class="slider-value" id="gridSizeValue">1.0</div>
+            </div>
+        </div>
+    </div>
+
     <!-- VR Section -->
     <div class="settings-section">
         <h2>VR</h2>
@@ -271,7 +301,9 @@
             cameraMode: 'firstPerson',
             movementSpeed: 1.0,
             lookSpeed: 1.0,
-            flying: false
+            flying: false,
+            placementMode: 'grid',
+            gridSize: 1.0
         };
 
         // Double-tap detection for space key
@@ -341,6 +373,36 @@
             document.getElementById('lookSpeedValue').textContent = speed + 'x';
             saveSettings();
             console.log('Look speed changed to:', speed);
+        }
+
+        // Update placement mode (grid vs free)
+        function updatePlacementMode(mode) {
+            settings.placementMode = mode;
+            updateGridSizeVisibility();
+            saveSettings();
+            console.log('Placement mode changed to:', mode);
+        }
+
+        // Update grid size
+        function updateGridSize(size) {
+            settings.gridSize = parseFloat(size);
+            document.getElementById('gridSizeValue').textContent = parseFloat(size).toFixed(2);
+            saveSettings();
+            console.log('Grid size changed to:', size);
+        }
+
+        // Dim the grid size control when free placement is selected
+        function updateGridSizeVisibility() {
+            const gridSizeItem = document.getElementById('gridSizeItem');
+            if (!gridSizeItem) {
+                return;
+            }
+            const isGrid = settings.placementMode === 'grid';
+            gridSizeItem.style.opacity = isGrid ? '1' : '0.4';
+            const slider = document.getElementById('gridSize');
+            if (slider) {
+                slider.disabled = !isGrid;
+            }
         }
 
         // Toggle flying
@@ -438,6 +500,18 @@
             } else {
                 flyingToggle.classList.remove('active');
             }
+
+            // Placement mode
+            const placementModeInputs = document.querySelectorAll('input[name="placementMode"]');
+            placementModeInputs.forEach(input => {
+                input.checked = input.value === settings.placementMode;
+            });
+
+            // Grid size
+            const gridSizeSlider = document.getElementById('gridSize');
+            gridSizeSlider.value = settings.gridSize;
+            updateGridSize(settings.gridSize);
+            updateGridSizeVisibility();
         }
 
         // Initialize event listeners
@@ -467,6 +541,22 @@
             // Flying toggle
             const flyingToggle = document.getElementById('flyingToggle');
             flyingToggle.addEventListener('click', toggleFlying);
+
+            // Placement mode radio buttons
+            const placementModeInputs = document.querySelectorAll('input[name="placementMode"]');
+            placementModeInputs.forEach(input => {
+                input.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        updatePlacementMode(e.target.value);
+                    }
+                });
+            });
+
+            // Grid size slider
+            const gridSizeSlider = document.getElementById('gridSize');
+            gridSizeSlider.addEventListener('input', (e) => {
+                updateGridSize(e.target.value);
+            });
 
             // Double-tap space key to toggle flying
             document.addEventListener('keydown', handleKeyDown);

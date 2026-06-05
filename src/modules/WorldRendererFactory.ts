@@ -1026,12 +1026,34 @@ export class StaticSurfaceRenderer extends WorldRendering {
     Logging.Log('StaticSurfaceRenderer: Join params - syncClientId=' + syncClientId
       + ' tokenPresent=' + (userToken ? 'yes' : 'no') + ' sessionTag=' + sessionTag);
 
-    const onJoinAction = `
-      Logging.Log('[StaticSurfaceRenderer] Session joined, registering message callback');
-      if (this.syncManager && this.syncManager.onVSSMessage) {
-        VOSSynchronization.RegisterMessageCallback('${sessionId}', 'onVSSMessage');
+    // Register global message handler for custom sync messages (e.g. ENTITY.DELETE)
+    (globalThis as any).onStaticSyncMessage = function(topic: string, sender: string, msg: string) {
+      Logging.Log('[StaticSync] Message received: topic=' + topic + ' sender=' + sender);
+      if (topic === 'ENTITY.DELETE') {
+        try {
+          var parsed = JSON.parse(msg);
+          var deleteId = parsed.id;
+          if (deleteId) {
+            Logging.Log('[StaticSync] Deleting entity ' + deleteId);
+            var entity = BaseEntity.Get(deleteId);
+            if (entity) {
+              entity.Delete(false);
+            } else {
+              Logging.LogWarning('[StaticSync] Entity not found for delete: ' + deleteId);
+            }
+          }
+        } catch (e) {
+          Logging.LogError('[StaticSync] Error handling ENTITY.DELETE: ' + e);
+        }
       }
+    };
+
+    const onJoinAction = `
+      Logging.Log('[StaticSurfaceRenderer] Session joined callback fired');
+      VOSSynchronization.RegisterMessageCallback('${sessionId}', 'onStaticSyncMessage');
     `;
+
+    Logging.Log('[SyncDebug] doJoinSession: syncClientId=' + syncClientId + ' transport=' + transport + ' tls=' + tls);
 
     const joinResult = VOSSynchronization.JoinSession(
       host, port, tls,
@@ -1039,7 +1061,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
       Environment.GetWorldOffset(), onJoinAction,
       transport.toLowerCase() === 'tcp' ? VSSTransport.TCP : VSSTransport.WebSocket,
       syncClientId, userToken);
-    Logging.Log('StaticSurfaceRenderer: JoinSession returned clientId=' + joinResult);
+    Logging.Log('[SyncDebug] JoinSession returned clientId=' + joinResult);
   }
 
   /**
@@ -1081,7 +1103,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
     if (this.characterSynchronizer === syncId) {
       // Already synced - check if session is still established
       if (!established) {
-        Logging.Log('[SyncDebug] Session ' + syncId + ' no longer established! Resetting characterSynchronizer');
+        Logging.Log('[SyncDebug] Session ' + syncId + ' no longer established! Resetting characterSynchronizer. sessionWasEstablished=' + this.sessionWasEstablished);
         this.characterSynchronizer = null;
         this.handleDisconnectObserved(false);
         if (this.sessionJoinParams && this.sessionWasEstablished) {
@@ -1101,6 +1123,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
       // Not yet established (initial handshake or post-rejoin). Only count as
       // a disconnect tick if we've connected at least once before.
       if (this.sessionEverEstablished) {
+        Logging.Log('[SyncDebug] Session not established yet (post-rejoin), waiting. syncId=' + syncId + ' charSync=' + this.characterSynchronizer);
         this.handleDisconnectObserved(false);
       }
       return;
@@ -1111,9 +1134,9 @@ export class StaticSurfaceRenderer extends WorldRendering {
     this.handleDisconnectObserved(true);
 
     const entityId = entity.id;
-    Logging.Log('StaticSurfaceRenderer: Starting entity sync - syncId=' + syncId + ' entityId=' + entityId);
+    Logging.Log('[SyncDebug] Starting entity sync - syncId=' + syncId + ' entityId=' + entityId + ' charSync=' + this.characterSynchronizer);
     const result = VOSSynchronization.StartSynchronizingEntity(syncId, entityId, true);
-    Logging.Log('StaticSurfaceRenderer: StartSynchronizingEntity returned ' + result);
+    Logging.Log('[SyncDebug] StartSynchronizingEntity returned ' + result);
     this.characterSynchronizer = syncId;
   }
 

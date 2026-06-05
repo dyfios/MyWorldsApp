@@ -539,7 +539,7 @@ export class PlayerController {
    */
   showCrosshair(): void {
     // Send message to UI to show crosshair
-    const mainToolbarId = WorldStorage.GetItem("MYWORLDS.MAINTOOLBAR.ID") as string;
+    const mainToolbarId = WorldStorage.GetItem("MAIN-TOOLBAR-ID") as string;
     if (mainToolbarId) {
       const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
       if (mainToolbar) {
@@ -553,7 +553,7 @@ export class PlayerController {
    */
   hideCrosshair(): void {
     // Send message to UI to hide crosshair
-    const mainToolbarId = WorldStorage.GetItem("MYWORLDS.MAINTOOLBAR.ID") as string;
+    const mainToolbarId = WorldStorage.GetItem("MAIN-TOOLBAR-ID") as string;
     if (mainToolbarId) {
       const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
       if (mainToolbar) {
@@ -577,7 +577,7 @@ export class PlayerController {
       this.lastHoverState = isHoveringInteractable;
       
       // Send message to UI to update crosshair hover state
-      const mainToolbarId = WorldStorage.GetItem("MYWORLDS.MAINTOOLBAR.ID") as string;
+      const mainToolbarId = WorldStorage.GetItem("MAIN-TOOLBAR-ID") as string;
       if (mainToolbarId) {
         const mainToolbar = Entity.Get(mainToolbarId) as HTMLEntity;
         if (mainToolbar) {

@@ -97,10 +97,12 @@ export class EnvironmentModifier {
         return isMesh || isAutomobile || isAirplane;
     }
 
-    private getInteractionHitInfo(range?: number): RaycastHitInfo | null {
+    private getInteractionHitInfo(pointerIndex?: number): RaycastHitInfo | null {
         const isFullClient = (globalThis as any).uiManager?.clientType === 'full';
         if (isFullClient) {
-            return range != null ? Input.GetPointerRaycast(Vector3.forward, range) : Input.GetPointerRaycast(Vector3.forward);
+            const isVR = (globalThis as any).playerController?.inVR === true;
+            const idx = (pointerIndex != null && isVR) ? pointerIndex : 0;
+            return Input.GetPointerRaycast(Vector3.forward, idx);
         }
 
         // Browser/lite mode often needs camera center raycast.
@@ -168,15 +170,8 @@ export class EnvironmentModifier {
    * Handle left mouse button press
    */
   private handleLeftPress(): void {
-    const isFullClient = (globalThis as any).uiManager?.clientType === 'full';
-    var hitInfo = Input.GetPointerRaycast(Vector3.forward);
-    // In browser/lite mode, pointer position isn't reliable (defaults to 0,0);
-    // use Camera.GetRaycast() for entity placing instead
-    if (!isFullClient && this.interactionMode == "ENTITY-PLACING") {
-      hitInfo = Camera.GetRaycast();
-    } else if (hitInfo == null && this.interactionMode == "ENTITY-PLACING") {
-      hitInfo = Camera.GetRaycast();
-    }
+    const isFirstPerson = (globalThis as any).playerController?.cameraMode === 'firstPerson';
+    var hitInfo = isFirstPerson ? Camera.GetRaycast() : Input.GetPointerRaycast(Vector3.forward);
 
     if (this.interactionMode == "HAND") {
         if (hitInfo != null) {
@@ -229,6 +224,7 @@ export class EnvironmentModifier {
         }
     }
     else if (this.interactionMode == "SLEDGE-HAMMER") {
+        Logging.Log('[SLEDGE] hitInfo=' + (hitInfo != null) + ' entity=' + (hitInfo?.entity != null) + ' entityType=' + (hitInfo?.entity?.constructor?.name || 'unknown') + ' isMesh=' + (hitInfo?.entity instanceof MeshEntity) + ' isAuto=' + (hitInfo?.entity instanceof AutomobileEntity) + ' isAir=' + (hitInfo?.entity instanceof AirplaneEntity));
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof MeshEntity ||
@@ -513,6 +509,15 @@ export class EnvironmentModifier {
         }
 
     Logging.Log('Deleting entity "' + entity.id + '"');
+
+    // Sync deletion to other clients via custom message
+    var tsr = (globalThis as any).tiledsurfacerenderer;
+    var syncId = tsr?.regionSynchronizers?.['0.0'];
+    if (syncId && entityId) {
+      Logging.Log('[deleteEntity] Sending ENTITY.DELETE sync for ' + entityId);
+      VOSSynchronization.SendMessage(syncId, "ENTITY.DELETE", JSON.stringify({ id: entityId }));
+    }
+
     entity.Delete(true);
   }
 
@@ -716,6 +721,7 @@ export class EnvironmentModifier {
         }
     }
     else if (this.interactionMode == "SLEDGE-HAMMER") {
+        Logging.Log('[SLEDGE] hitInfo=' + (hitInfo != null) + ' entity=' + (hitInfo?.entity != null) + ' entityType=' + (hitInfo?.entity?.constructor?.name || 'unknown') + ' isMesh=' + (hitInfo?.entity instanceof MeshEntity) + ' isAuto=' + (hitInfo?.entity instanceof AutomobileEntity) + ' isAir=' + (hitInfo?.entity instanceof AirplaneEntity));
         if (hitInfo != null) {
             if (hitInfo.entity != null) {
                 if (hitInfo.entity instanceof MeshEntity ||

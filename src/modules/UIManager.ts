@@ -839,6 +839,23 @@ export class UIManager {
         Logging.Log('✈️ UIManager: Flying mode NOT applied - hasOwnProperty: ' + settings.hasOwnProperty('flying') + ', playerController: ' + !!(globalThis as any).playerController);
       }
 
+      // Apply entity placement mode (grid snapping vs free placement)
+      if (settings.placementMode && (globalThis as any).entityPlacementComponent) {
+        const entityPlacement = (globalThis as any).entityPlacementComponent;
+        entityPlacement.gridEnabled = settings.placementMode === 'grid';
+        Logging.Log('🧱 UIManager: Applied placement mode: ' + settings.placementMode + ' (gridEnabled=' + entityPlacement.gridEnabled + ')');
+      }
+
+      // Apply grid size (only affects grid placement mode)
+      if (settings.gridSize != null && (globalThis as any).entityPlacementComponent) {
+        const entityPlacement = (globalThis as any).entityPlacementComponent;
+        const requestedGridSize = Number(settings.gridSize);
+        if (!isNaN(requestedGridSize) && requestedGridSize > 0) {
+          entityPlacement.gridSize = requestedGridSize;
+          Logging.Log('🧱 UIManager: Applied grid size: ' + requestedGridSize);
+        }
+      }
+
       Logging.Log('✅ UIManager: UI Settings applied successfully');
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
