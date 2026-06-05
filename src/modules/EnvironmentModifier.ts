@@ -504,6 +504,12 @@ export class EnvironmentModifier {
       return;
     }
 
+    // Permission gate: reuse the same check as entity placement
+    if (entityManager?.entityPlacement && !entityManager.entityPlacement.canPlaceEntities()) {
+      Logging.LogWarning('[deleteEntity] denied by permission gate');
+      return;
+    }
+
         if (entityId && typeof entityManager?.removeScriptEntity === 'function') {
             entityManager.removeScriptEntity(entityId);
         }
@@ -516,6 +522,18 @@ export class EnvironmentModifier {
     if (syncId && entityId) {
       Logging.Log('[deleteEntity] Sending ENTITY.DELETE sync for ' + entityId);
       VOSSynchronization.SendMessage(syncId, "ENTITY.DELETE", JSON.stringify({ id: entityId }));
+    }
+
+    // REST delete to persist removal
+    if (tsr?.restClient && entityId && tsr.worldId) {
+      var userId = '';
+      var userToken = '';
+      try {
+        var ctx: any = Context.GetContext('MW_TOP_LEVEL_CONTEXT');
+        if (ctx) { userId = ctx.userID || ''; userToken = ctx.token || ''; }
+      } catch (_e) { /* ignore */ }
+      Logging.Log('[deleteEntity] REST delete: worldId=' + tsr.worldId + ' entityId=' + entityId + ' userId=' + userId + ' tokenPresent=' + (userToken ? 'yes' : 'no'));
+      tsr.restClient.sendDeleteEntityInstanceRequest(tsr.worldId, entityId, userId, userToken);
     }
 
     entity.Delete(true);

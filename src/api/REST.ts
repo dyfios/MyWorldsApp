@@ -13,15 +13,6 @@ export class REST {
     this.baseUrl = baseUrl;
   }
 
-  private generateRequestId(): string {
-    const uuid = UUID.NewUUID().ToString();
-    if (uuid === null) {
-      // Fallback using a simple counter
-      return 'fallback_' + Math.random().toString(36).substr(2, 9);
-    }
-    return uuid;
-  }
-
   sendTerrainDigRequest(terrainIndex: Vector2Int, hitPoint: Vector3, digLayer: number, brushSize: number,
     userId: string, userToken: string, onComplete: string): void {
     this.get('/modifyterrain', {
@@ -81,8 +72,13 @@ export class REST {
     }, "application/json", onComplete || "");
   }
 
-  async sendDeleteEntityRequest(entityId: string): Promise<void> {
-    await this.delete(`/entity/${entityId}`);
+  sendDeleteEntityInstanceRequest(worldId: string, instanceId: string,
+    userId: string, userToken: string, onComplete?: string): void {
+    this.post(`/api/world/${worldId}/delete-entity-instance`, {
+      'instance-id': instanceId,
+      'user-id': userId,
+      'user-token': userToken
+    }, "application/json", onComplete || "");
   }
 
   sendBiomeInfoRequest(position: Position, onComplete: string): void {
@@ -202,30 +198,5 @@ export class REST {
     Logging.Log('🌐 REST POST request to: ' + url + ' with data: ' + JSON.stringify(data));
 
     HTTPNetworking.Post(url, JSON.stringify(data), dataType, onComplete);
-  }
-
-  private async delete(endpoint: string): Promise<void> {
-    const url = this.baseUrl + endpoint;
-    
-    return new Promise((resolve, reject) => {
-      const requestId = this.generateRequestId();
-      const onComplete = `onHTTPDeleteComplete_${requestId}`;
-      const onError = `onHTTPDeleteError_${requestId}`;
-
-      HTTPNetworking.Fetch(url, onComplete);
-
-      // Store callbacks globally for HTTPNetworking to call
-      (globalThis as any)[onComplete] = (_response: any) => {
-        delete (globalThis as any)[onComplete];
-        delete (globalThis as any)[onError];
-        resolve();
-      };
-
-      (globalThis as any)[onError] = (error: any) => {
-        delete (globalThis as any)[onComplete];
-        delete (globalThis as any)[onError];
-        reject(new Error(`HTTP error! ${error.message || 'Unknown error'}`));
-      };
-    });
   }
 }

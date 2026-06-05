@@ -71,6 +71,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
     host: string; port: number; tls: boolean; transport: string;
   } | null = null;
   private sessionWasEstablished: boolean = false;
+  private messageCallbackRegistered: boolean = false;
   // Sticky: true once the session has been established at least once. Used to
   // gate the disconnect overlay so it doesn't fire during initial handshake.
   private sessionEverEstablished: boolean = false;
@@ -1026,8 +1027,14 @@ export class StaticSurfaceRenderer extends WorldRendering {
     Logging.Log('StaticSurfaceRenderer: Join params - syncClientId=' + syncClientId
       + ' tokenPresent=' + (userToken ? 'yes' : 'no') + ' sessionTag=' + sessionTag);
 
+    const onJoinAction = `
+      Logging.Log('[StaticSurfaceRenderer] Session joined callback fired');
+      VOSSynchronization.RegisterMessageCallback('${sessionId}', 'onStaticSyncMessage');
+    `;
+
     // Register global message handler for custom sync messages (e.g. ENTITY.DELETE)
-    (globalThis as any).onStaticSyncMessage = function(topic: string, sender: string, msg: string) {
+    // Must be a bare function declaration so JINT can resolve it by name
+    (globalThis as any).onStaticSyncMessage = (topic: string, sender: string, msg: string) => {
       Logging.Log('[StaticSync] Message received: topic=' + topic + ' sender=' + sender);
       if (topic === 'ENTITY.DELETE') {
         try {
@@ -1035,7 +1042,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
           var deleteId = parsed.id;
           if (deleteId) {
             Logging.Log('[StaticSync] Deleting entity ' + deleteId);
-            var entity = BaseEntity.Get(deleteId);
+            var entity = Entity.Get(deleteId);
             if (entity) {
               entity.Delete(false);
             } else {
@@ -1047,11 +1054,6 @@ export class StaticSurfaceRenderer extends WorldRendering {
         }
       }
     };
-
-    const onJoinAction = `
-      Logging.Log('[StaticSurfaceRenderer] Session joined callback fired');
-      VOSSynchronization.RegisterMessageCallback('${sessionId}', 'onStaticSyncMessage');
-    `;
 
     Logging.Log('[SyncDebug] doJoinSession: syncClientId=' + syncClientId + ' transport=' + transport + ' tls=' + tls);
 
@@ -1132,6 +1134,13 @@ export class StaticSurfaceRenderer extends WorldRendering {
     this.sessionWasEstablished = true;
     this.sessionEverEstablished = true;
     this.handleDisconnectObserved(true);
+
+    // Register message callback once when session is first established
+    if (!this.messageCallbackRegistered) {
+      Logging.Log('[StaticSync] Registering message callback for session ' + syncId);
+      VOSSynchronization.RegisterMessageCallback(syncId, 'onStaticSyncMessage');
+      this.messageCallbackRegistered = true;
+    }
 
     const entityId = entity.id;
     Logging.Log('[SyncDebug] Starting entity sync - syncId=' + syncId + ' entityId=' + entityId + ' charSync=' + this.characterSynchronizer);
