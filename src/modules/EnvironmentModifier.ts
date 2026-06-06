@@ -504,9 +504,9 @@ export class EnvironmentModifier {
       return;
     }
 
-    // Permission gate: reuse the same check as entity placement
-    if (entityManager?.entityPlacement && !entityManager.entityPlacement.canPlaceEntities()) {
-      Logging.LogWarning('[deleteEntity] denied by permission gate');
+    // Permission gate: check if user has take permission on this entity
+    if (entityId && entityManager && !entityManager.canTakeEntity(entityId)) {
+      Logging.LogWarning('[deleteEntity] denied — no take permission for ' + entityId);
       return;
     }
 

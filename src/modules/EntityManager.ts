@@ -609,6 +609,7 @@ export class EntityManager {
   private entities: Map<string, EntityData> = new Map();
   private worldStorage: Map<string, any> = new Map();
   private frozenEntities: Set<string> = new Set();
+  private entityCanTake: Map<string, boolean> = new Map();
 
   private currentEntityIndex: string = "";
   private currentVariantIndex: string = "";
@@ -808,7 +809,8 @@ export class EntityManager {
       autoType: AutomobileType | undefined,
       scripts: EntityScriptMap | undefined,
       placingEntity: boolean | undefined,
-      frozen: boolean | undefined
+      frozen: boolean | undefined,
+      canTake: boolean | undefined
     ): string => {
       return this.loadEntity(
         entityIndex,
@@ -829,7 +831,8 @@ export class EntityManager {
         autoType,
         scripts,
         placingEntity,
-        frozen
+        frozen,
+        canTake !== undefined ? canTake : true
       );
     };
   }
@@ -856,7 +859,8 @@ export class EntityManager {
     autoType: AutomobileType | undefined = undefined,
     scripts: EntityScriptMap | undefined = undefined,
     placingEntity: boolean = false,
-    frozen: boolean = false
+    frozen: boolean = false,
+    canTake: boolean = true
   ): string {
     // Store frozen status for this entity
     Logging.Log('🔒 loadEntity: instanceId=' + instanceId + ', frozen param=' + frozen);
@@ -864,6 +868,9 @@ export class EntityManager {
       this.frozenEntities.add(instanceId);
       Logging.Log('🔒 Entity ' + instanceId + ' added to frozenEntities set. Set size now: ' + this.frozenEntities.size);
     }
+
+    // Store take permission for this entity
+    this.entityCanTake.set(instanceId, canTake);
 
     let parentEntity = null;
     if (entityParent != null && entityParent != undefined && entityParent !== "" && entityParent != "null") {
@@ -1205,6 +1212,22 @@ export class EntityManager {
     const frozen = this.frozenEntities.has(entityId);
     Logging.Log('🔒 isEntityFrozen(' + entityId + ') = ' + frozen + ', frozenEntities size = ' + this.frozenEntities.size);
     return frozen;
+  }
+
+  /**
+   * Record whether an entity can be taken (deleted) by the current user
+   */
+  setEntityCanTake(entityId: string, canTake: boolean): void {
+    this.entityCanTake.set(entityId, canTake);
+  }
+
+  /**
+   * Check if the current user has take permission on an entity.
+   * Returns true if unknown (entity not tracked) to avoid blocking local-only entities.
+   */
+  canTakeEntity(entityId: string): boolean {
+    if (!this.entityCanTake.has(entityId)) return true;
+    return this.entityCanTake.get(entityId)!;
   }
 
   /**

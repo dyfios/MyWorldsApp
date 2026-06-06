@@ -818,6 +818,12 @@ export class StaticSurfaceRenderer extends WorldRendering {
         Logging.Log(`📍 Entity ${instanceId}: pos(${position.x}, ${position.y}, ${position.z}), rot(${rotation.x}, ${rotation.y}, ${rotation.z}, ${rotation.w}), scale(${scale})`);
         Logging.Log('🧩 StaticSurfaceRenderer: scripts for ' + instanceId + ' = ' + (scripts ? 'present' : 'missing'));
 
+        // Determine if current user can take (delete) this entity
+        const currentUserId = this.getUserId();
+        const isOwner = instance.owner === currentUserId;
+        const takeVal: any = isOwner ? instance.owner_take : instance.other_take;
+        const canTake = takeVal == 1 || takeVal === true;
+
         // Load entity using EntityManager with correct parameters
         const loadedInstanceId = this.entityManager.loadEntity(
           null,
@@ -838,7 +844,8 @@ export class StaticSurfaceRenderer extends WorldRendering {
           undefined,        // autoType
           scripts,
           false,            // placingEntity
-          instance.frozen   // frozen flag
+          instance.frozen,  // frozen flag
+          canTake           // take permission
         );
 
         Logging.Log(`✅ StaticSurfaceRenderer: Successfully instantiated entity ${entityId} with loaded instance ID ${loadedInstanceId}`);
