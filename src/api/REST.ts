@@ -65,7 +65,16 @@ export class REST {
         'rot_w': Number(rotation.w) || 0,
         'scl_x': 1,
         'scl_y': 1,
-        'scl_z': 1
+        'scl_z': 1,
+        'owner': userId,
+        'owner_read': 1,
+        'owner_write': 1,
+        'owner_use': 1,
+        'owner_take': 1,
+        'other_read': 1,
+        'other_write': 0,
+        'other_use': 1,
+        'other_take': 0
       },
       'user-id': userId,
       'user-token': userToken
