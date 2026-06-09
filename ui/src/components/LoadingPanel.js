@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './LoadingPanel.css';
 
 const LoadingPanel = () => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(true);
   const [message, setMessage] = useState('Loading...');
 
   // API: Show loading panel

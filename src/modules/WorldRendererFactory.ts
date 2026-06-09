@@ -303,9 +303,11 @@ export class StaticSurfaceRenderer extends WorldRendering {
                 if (assets && Array.isArray(assets)) {
                   Logging.Log('🎯 Calling instantiateEntities with ' + assets.length + ' instances');
                   staticRenderer.instantiateEntities(assets);
+                  (globalThis as any).toggleLoadingPanel(false);
                 } else {
-                  Logging.LogError('❌ Entity instances response missing or invalid "instances" array. Response keys: ' 
+                  Logging.LogError('❌ Entity instances response missing or invalid "instances" array. Response keys: '
                     + Object.keys(instances || {}).join(', '));
+                  (globalThis as any).toggleLoadingPanel(false);
                 }
               } else {
                 Logging.LogError('❌ instantiateEntities method not found on StaticSurfaceRenderer');
@@ -329,6 +331,7 @@ export class StaticSurfaceRenderer extends WorldRendering {
 
   onEntityInstancesError(error: any): void {
     Logging.Log('🎯 StaticSurfaceRenderer: onEntityInstancesError callback invoked');
+    (globalThis as any).toggleLoadingPanel(false);
     const errorMessage = error.message || 'Unknown error';
     Logging.LogError('❌ StaticSurfaceRenderer: Failed to request entity instances: ' + errorMessage);
   }
