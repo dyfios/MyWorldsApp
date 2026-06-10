@@ -207,6 +207,10 @@ export class EntityPlacement {
     this.mass = mass;
     
     entityToPlace.SetHighlight(true);
+    // Switch to Placing interaction state — toggles to preview mesh and (per WebVerse fix)
+    // disables colliders so the placement raycast passes through the entity to hit world
+    // geometry instead of being blocked by the entity's own colliders.
+    entityToPlace.SetInteractionState(InteractionState.Placing);
     // Input.TurnLocomotionMode = Input.VRTurnLocomotionMode.None; // VR-specific, commented out
   }
 
@@ -324,8 +328,13 @@ export class EntityPlacement {
       }
     }
     this.placingEntity.SetHighlight(false);
+    // Transition out of the Placing state so the preview mesh is hidden and the main mesh is
+    // restored. Vehicles go to Physical (driveable, gravity active); everything else goes to
+    // Static (committed, no physics integration). Both Make* paths re-enable colliders.
     if (this.placingEntity instanceof AutomobileEntity || this.placingEntity instanceof AirplaneEntity) {
       this.placingEntity.SetInteractionState(InteractionState.Physical);
+    } else {
+      this.placingEntity.SetInteractionState(InteractionState.Static);
     }
     this.placingEntity = null;
     
