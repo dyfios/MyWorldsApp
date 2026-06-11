@@ -532,6 +532,10 @@ export class StaticSurfaceRenderer extends WorldRendering {
       entity.SetInteractionState(InteractionState.Static);
       entity.SetLightType(LightType.Directional);
       entity.SetLightProperties(Color.white, 1000, 1.0);
+      // Static worlds have no time-of-day source, so place the sun at a fixed
+      // daytime elevation — at the default horizon rotation the engine's
+      // automatic sun intensity renders the world nearly unlit.
+      entity.SetEulerRotation(new Vector3(50, -30, 0), false);
       applySkyConfig(this.worldMetadata?.sky, entity);
       Logging.Log('✅ StaticSurfaceRenderer: Sky configured successfully');
     } catch (error) {
